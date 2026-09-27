@@ -1,0 +1,61 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #09090d;
+  --color-on-surface: #f9fafb;
+  --color-surface-secondary: #161622;
+  --color-on-surface-secondary: #e5e7eb;
+  --color-surface-tertiary: #202033;
+  --color-on-surface-tertiary: #d1d5db;
+  --color-muted: #8b8b9e;
+  --color-brand: #00f3ff;
+  --color-on-brand: #000000;
+  --color-brand-secondary: #b952ff;
+  --color-brand-tertiary: #290a45;
+  --color-success: #00ffa3;
+  --color-warning: #ffd600;
+  --color-error: #ff2a55;
+  --color-border: #2e2e3a;
+  --color-border-strong: #4a4a68;
+  --color-divider: #1f1f2e;
+  --color-overlay: rgb(9 9 13 / 72%);
+  --color-glass: rgb(22 22 34 / 55%);
+  --color-glass-border: rgb(255 255 255 / 10%);
+  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-text: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+}
+
+@layer base {
+  html,
+  body,
+  #app {
+    min-height: 100%;
+    background: var(--color-surface);
+    color: var(--color-on-surface);
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-text);
+    overflow-x: hidden;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+.nexora-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.nexora-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 99px;
+}
