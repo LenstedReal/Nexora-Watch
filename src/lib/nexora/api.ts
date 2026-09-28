@@ -6,7 +6,7 @@ export type Participant = {
   joined_at: string;
 };
 
-export type VideoKind = "youtube" | "drive" | "direct" | "web";
+export type VideoKind = "youtube" | "drive" | "direct" | "hls" | "embed" | "web";
 
 export type VideoSource = {
   url: string;
@@ -15,6 +15,10 @@ export type VideoSource = {
   embed_url?: string | null;
   stream_url?: string | null;
   title: string;
+  mime_type?: string | null;
+  provider?: string | null;
+  confidence?: number;
+  method?: string | null;
 };
 
 export type Playback = {
@@ -33,6 +37,7 @@ export type Room = {
   participants: Participant[];
   video: VideoSource | null;
   playback: Playback;
+  web_open?: boolean;
   server_time: number;
 };
 
@@ -109,6 +114,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ participant_id, playing, position }),
     }),
+  setWebOpen: (code: string, participant_id: string, open: boolean) =>
+    request<Room>(`/rooms/${code}/web`, {
+      method: "PUT",
+      body: JSON.stringify({ participant_id, open }),
+    }),
   leaveRoom: (code: string, participant_id: string) =>
     request<{ ok: boolean }>(`/rooms/${code}/leave`, {
       method: "POST",
@@ -117,9 +127,16 @@ export const api = {
 };
 
 export function wsUrl(code: string, participantId: string): string {
-  const proto = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
-  const host = typeof window !== "undefined" ? window.location.host : "localhost:8080";
-  return `${proto}//${host}/api/ws/rooms/${code}?participant_id=${encodeURIComponent(participantId)}`;
+  const proto =
+    typeof window !== "undefined" && window.location.protocol === "https:"
+      ? "wss:"
+      : "ws:";
+  const host =
+    typeof window !== "undefined"
+      ? window.location.host
+      : "localhost:8080";
+
+  return `${proto}//${host}/api/ws?code=${encodeURIComponent(code)}&participantId=${encodeURIComponent(participantId)}`;
 }
 
 export function messageKey(m: Message): string {

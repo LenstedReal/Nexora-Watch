@@ -9,6 +9,7 @@ export function useRoom({ code, participantId }: Options) {
   const [connected, setConnected] = useState(false);
   const [serverOffset, setServerOffset] = useState(0);
   const offsetRef = useRef(0);
+  const socketRef = useRef<WebSocket | null>(null);
   const enabled = !!participantId;
 
   const roomQuery = useQuery({
@@ -16,15 +17,30 @@ export function useRoom({ code, participantId }: Options) {
     queryFn: () => api.getRoom(code),
     enabled,
     retry: (count, err) => !(err instanceof ApiError && (err.status === 404 || err.status === 410)) && count < 2,
-    refetchInterval: connected ? false : 4000,
+    refetchInterval: 1000,
   });
 
   const messagesQuery = useQuery({
     queryKey: ["messages", code],
     queryFn: () => api.getMessages(code),
     enabled,
-    refetchInterval: connected ? false : 4000,
+    refetchInterval: 1000,
   });
+
+  const sendRealtime = useCallback((payload: unknown) => {
+    try {
+      const socket = socketRef.current;
+
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(payload));
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+
+    return false;
+  }, []);
 
   const applyOffset = useCallback((serverTime?: number) => {
     if (!serverTime) return;
@@ -50,6 +66,7 @@ export function useRoom({ code, participantId }: Options) {
       if (closed) return;
       try {
         socket = new WebSocket(wsUrl(code, participantId));
+        socketRef.current = socket;
       } catch {
         retry = setTimeout(connect, 3000);
         return;
@@ -77,6 +94,20 @@ export function useRoom({ code, participantId }: Options) {
         } else if (data.type === "playback") {
           queryClient.setQueryData<Room>(["room", code], (old) =>
             old ? { ...old, playback: data.playback as Playback, server_time: data.server_time ?? old.server_time } : old,
+          );
+        } else if (data.type === "web") {
+          const open = Boolean(
+            (data as { open?: unknown }).open,
+          );
+
+          queryClient.setQueryData<Room>(["room", code], (old) =>
+            old ? { ...old, web_open: open } : old,
+          );
+
+          window.dispatchEvent(
+            new CustomEvent("nexora:web-sync", {
+              detail: { open },
+            }),
           );
         } else if (data.type === "message") {
           const msg = data.message as Message;
@@ -124,7 +155,9 @@ export function useRoom({ code, participantId }: Options) {
     messages: messagesQuery.data ?? [],
     connected,
     serverOffset,
-  };
+    transport: connected ? "realtime" : "polling",
+    sendRealtime,
+  } as const;
 }
 
 export const DRIFT_TOLERANCE = 2;

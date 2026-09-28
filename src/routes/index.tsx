@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Film, Globe, Key, Sparkles, User, Youtube, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CircleHelp, Film, Globe, Key, Sparkles, User, Youtube, Zap } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/nexora/api";
 import { getSavedNickname, saveNickname, saveRoomSession } from "@/lib/nexora/session";
 
@@ -24,6 +24,13 @@ function Home() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ text: string; kind: "error" | "success" } | null>(null);
+  const [webHintOpen, setWebHintOpen] = useState(false);
+  const webHelpButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [webHintPos, setWebHintPos] = useState<{
+    left: number;
+    top: number;
+    width: number;
+  } | null>(null);
 
   useEffect(() => {
     const n = getSavedNickname();
@@ -35,6 +42,37 @@ function Home() {
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (!webHintOpen) return;
+    const t = setTimeout(() => setWebHintOpen(false), 5000);
+    return () => clearTimeout(t);
+  }, [webHintOpen]);
+
+
+  const openWebHint = () => {
+    setWebHintOpen(true);
+
+    requestAnimationFrame(() => {
+      const button = webHelpButtonRef.current;
+      if (!button) return;
+
+      const rect = button.getBoundingClientRect();
+      const margin = 12;
+      const width = Math.min(208, window.innerWidth - margin * 2);
+
+      const left = Math.min(
+        Math.max(margin, rect.right - width),
+        window.innerWidth - width - margin,
+      );
+
+      setWebHintPos({
+        left,
+        top: Math.max(56, rect.top - 8),
+        width,
+      });
+    });
+  };
 
   const canSubmit = nickname.trim().length > 0 && (mode === "create" || code.trim().length === 6);
 
@@ -77,24 +115,79 @@ function Home() {
             <Zap className="size-3 text-brand" />
             <span className="font-text text-[11px] tracking-[1.5px] text-brand">SENKRON İZLEME</span>
           </div>
-          <h1 className="font-display text-[44px] leading-none font-extrabold tracking-tight text-on-surface">
-            Nexora Watch
+          <div className="flex items-center">
+            <img
+              src="/branding/nexora-logo.jpg"
+              alt="Nexora Watch"
+              className="h-14 w-auto max-w-[260px] rounded-md object-contain"
+            />
+          </div>
+          <h1 className="mt-1 max-w-[340px] font-display text-2xl font-bold leading-tight tracking-tight text-on-surface">
+            Better Than Rave.
           </h1>
-          <p className="font-text text-xs tracking-[1.6px] text-brand-secondary uppercase">by LenstedReal</p>
+          <p className="font-text text-xs tracking-[1.6px] text-brand-secondary uppercase">
+            by LenstedReal
+          </p>
           <p className="font-text max-w-80 text-[15px] leading-5.5 text-on-surface-tertiary">
             Sevdiklerinle aynı anda, aynı karede. YouTube, Drive ve daha fazlası.
           </p>
           <div className="mt-1 flex flex-wrap gap-2">
-            {SOURCES.map((s) => (
-              <span
-                key={s.label}
-                className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface-tertiary px-2.5 py-1.5"
-              >
-                <s.icon className="size-3.5 text-brand-secondary" />
-                <span className="font-text text-xs text-on-surface-tertiary">{s.label}</span>
+        {SOURCES.map((s) =>
+          s.label === "Web" ? (
+            <span
+              key={s.label}
+              className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface-tertiary px-2.5 py-1.5"
+            >
+              <s.icon className="size-3.5 text-brand-secondary" />
+
+              <span className="font-text text-xs text-on-surface-tertiary">
+                Web
+                <span className="ml-1 text-[9px] font-semibold text-brand-secondary">
+                  (BETA)
+                </span>
               </span>
-            ))}
-          </div>
+
+              <span className="relative">
+                <button
+                  ref={webHelpButtonRef}
+                  type="button"
+                  onClick={openWebHint}
+                  className="grid size-5 place-items-center rounded-full text-muted transition hover:text-on-surface"
+                  aria-label="Web özelliği hakkında bilgi"
+                  aria-expanded={webHintOpen}
+                >
+                  <CircleHelp className="size-3.5" />
+                </button>
+
+                {webHintOpen && webHintPos ? (
+                  <span
+                    role="status"
+                    className="pointer-events-none fixed z-[100] -translate-y-full rounded-md border border-border bg-surface-secondary px-3 py-2 text-center font-text text-[10px] leading-4 text-on-surface shadow-2xl"
+                    style={{
+                      left: webHintPos.left,
+                      top: webHintPos.top,
+                      width: webHintPos.width,
+                    }}
+                  >
+                    Şu anda bu özellik test aşamasındadır.
+                  </span>
+                ) : null}
+              </span>
+            </span>
+          ) : (
+            <span
+              key={s.label}
+              className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-surface-tertiary px-2.5 py-1.5"
+            >
+              <s.icon className="size-3.5 text-brand-secondary" />
+              <span className="font-text text-xs text-on-surface-tertiary">
+                {s.label}
+              </span>
+            </span>
+          ),
+        )}
+      </div>
+
         </div>
       </section>
 
@@ -172,6 +265,21 @@ function Home() {
           Odalar 24 saat sonra otomatik kapanır. Videoyu yalnızca oda sahibi kontrol eder.
         </p>
       </section>
+      <a
+        href="https://link.me/lenstedreal"
+        target="_blank"
+        rel="noreferrer"
+        aria-label="LenstedReal portfolio"
+        className="absolute top-4 right-4 z-40 inline-flex items-center gap-2 rounded-full border border-glass-border bg-surface-secondary/80 px-3 py-2 backdrop-blur-md transition-all hover:border-brand-secondary hover:bg-surface-tertiary"
+      >
+        <span className="size-1.5 rounded-full bg-brand shadow-[0_0_8px_currentColor] text-brand" />
+        <span className="font-text text-xs font-semibold text-on-surface">
+          LenstedReal
+        </span>
+        <span className="font-text text-[10px] text-muted">
+          Portfolio ↗
+        </span>
+      </a>
     </main>
   );
 }

@@ -34,19 +34,10 @@ function pgliteBootstrapPlugin(): Plugin {
   return {
     name: "app-builder:pglite-bootstrap",
     apply: "serve",
-    async configureServer(server) {
-      if (!hasGlobbedMigrations(server.config.root)) return;
-      try {
-        const mod = (await server.ssrLoadModule("/src/lib/db.ts")) as {
-          ensureDbReady?: () => Promise<void>;
-        };
-        if (typeof mod.ensureDbReady === "function") {
-          await mod.ensureDbReady();
-        }
-      } catch (err) {
-        console.error("[app-builder] DB bootstrap failed:", err);
-        throw err;
-      }
+    async configureServer() {
+      // Vite 8 no longer exposes a runnable SSR loader from configureServer.
+      // PGLite initializes lazily from src/lib/db when the app actually uses it.
+      return;
     },
   };
 }
@@ -150,13 +141,6 @@ export default defineConfig(({ command, isPreview }) => ({
     host: "0.0.0.0",
     port: 8080,
     strictPort: true,
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-        ws: true,
-      },
-    },
   },
   preview: {
     host: "127.0.0.1",
@@ -174,17 +158,14 @@ export default defineConfig(({ command, isPreview }) => ({
     grokPwaPlugin(),
     tailwindcss(),
     tanstackStart(),
-    ...(command === "build" || isPreview
-      ? [
-          nitro({
-            preset: "vercel",
-            // Auto-registers server/middleware/* (the PWA install page +
-            // manifest + head-tag middleware). Nitro v3 defaults serverDir to
-            // false, so removing this silently unwires /?install=1 on deploys.
-            serverDir: "./server",
-          }),
-        ]
-      : []),
+    nitro({
+      preset: "vercel",
+      // Auto-registers server/middleware/* for the PWA install page + manifest.
+      serverDir: "./server",
+      features: {
+        websocket: true,
+      },
+    }),
     viteReact(),
   ],
 }));

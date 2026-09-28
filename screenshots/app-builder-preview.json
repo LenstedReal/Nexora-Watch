@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Loading http://127.0.0.1:8080/",
+      "hasCanvas": false,
+      "bodyTextLen": 294,
+      "bodyTextHash": "f97135fe3b6f3aebe1f14af517179af7c478a5eb12725637fd48e1f5c3b39e9c",
+      "bodyTextPrefix": "SENKRON İZLEME Better Than Rave. by LenstedReal Sevdiklerinle ay",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Nexora Watch",
+      "hasCanvas": false,
+      "bodyTextLen": 301,
+      "bodyTextHash": "cad0734218a765e7060bbf8146e1f3d95b71dfde11590e05e35da8c2d2a3ff47",
+      "bodyTextPrefix": "SENKRON İZLEME Better Than Rave. BY LENSTEDREAL Sevdiklerinle ay",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
