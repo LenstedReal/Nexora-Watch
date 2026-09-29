@@ -130,6 +130,7 @@ export default defineWebSocketHandler({
     if (type === "web") {
       const payload = data as {
         open?: unknown;
+        url?: unknown;
       };
 
       if (typeof payload.open !== "boolean") {
@@ -141,11 +142,13 @@ export default defineWebSocketHandler({
           code,
           participantId,
           payload.open,
+          payload.url,
         );
 
         broadcastRealtime(code, {
           type: "web",
           open: room.web_open,
+          url: room.web_url,
           server_time: now(),
         });
       } catch {

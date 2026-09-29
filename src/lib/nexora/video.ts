@@ -385,6 +385,57 @@ async function fetchPage(
   }
 }
 
+function localMediaResolve(input: string): ResolvedVideo | null {
+  const trimmed = input.trim();
+  let path = trimmed;
+
+  try {
+    const parsed = new URL(trimmed, "https://nexora.local");
+    if (parsed.pathname.startsWith("/api/media/")) {
+      path = parsed.pathname;
+    }
+  } catch {
+    // keep original
+  }
+
+  if (/^\/api\/media\/[A-Za-z0-9._-]+$/.test(path)) {
+    const name = path.split("/").pop() || "video";
+    return {
+      url: path,
+      kind: "direct",
+      video_id: null,
+      embed_url: null,
+      stream_url: path,
+      title: name,
+      mime_type: name.toLowerCase().endsWith(".webm") ? "video/webm" : "video/mp4",
+      provider: "nexora",
+      confidence: 1,
+      method: "direct",
+    };
+  }
+
+  const url = parseUrl(input);
+  if (!url) return null;
+
+  const host = url.hostname.toLowerCase();
+  if (host.endsWith("vercel-storage.com") || host.endsWith("blob.vercel-storage.com")) {
+    return {
+      url: input,
+      kind: "direct",
+      video_id: null,
+      embed_url: null,
+      stream_url: input,
+      title: url.pathname.split("/").pop() || "video",
+      mime_type: null,
+      provider: "blob",
+      confidence: 1,
+      method: "direct",
+    };
+  }
+
+  return null;
+}
+
 function providerResolve(
   input: string,
 ): ResolvedVideo | null {
@@ -739,6 +790,9 @@ export async function resolveVideoSource(
   if (!raw) {
     throw new Error("Video adresi boş");
   }
+
+  const local = localMediaResolve(raw);
+  if (local) return local;
 
   const provider = providerResolve(raw);
 

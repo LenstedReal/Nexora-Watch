@@ -1,6 +1,7 @@
 import { getSql } from "../db";
 import { resolveVideoSource } from "./video";
 import type { VideoSource } from "./api";
+import { DEFAULT_WEB_URL, normalizeWebUrl } from "./web";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ROOM_LIFETIME = 24 * 60 * 60 * 1000;
@@ -30,6 +31,7 @@ export type Room = {
   video: VideoSource | null;
   playback: Playback;
   web_open: boolean;
+  web_url: string;
   server_time: number;
 };
 
@@ -95,6 +97,7 @@ type RoomRow = {
   video: unknown;
   playback: unknown;
   web_open: unknown;
+  web_url: unknown;
 };
 
 function rowToRoom(row: RoomRow): Room {
@@ -113,6 +116,10 @@ function rowToRoom(row: RoomRow): Room {
       updated_at: 0,
     }),
     web_open: Boolean(row.web_open),
+    web_url:
+      typeof row.web_url === "string" && row.web_url.trim()
+        ? row.web_url
+        : DEFAULT_WEB_URL,
     server_time: Date.now(),
   };
 }
@@ -164,14 +171,16 @@ async function updateVideoRow(
 async function updateWebOpenRow(
   code: string,
   webOpen: boolean,
+  webUrl: string,
 ): Promise<void> {
   const sql = await getSql();
 
   await sql.query(
     `update nexora_rooms
-        set web_open = $2
+        set web_open = $2,
+            web_url = $3
       where code = $1`,
-    [code, webOpen],
+    [code, webOpen, webUrl],
   );
 }
 
@@ -257,7 +266,8 @@ export async function loadRoom(code: string): Promise<Room> {
        participants,
        video,
        playback,
-       web_open
+       web_open,
+       web_url
      from nexora_rooms
      where code = $1
      limit 1`,
@@ -332,7 +342,8 @@ export async function createRoom(
             participants,
             video,
             playback,
-            web_open
+            web_open,
+            web_url
           )
          values
           (
@@ -345,7 +356,8 @@ export async function createRoom(
             $7::jsonb,
             $8::jsonb,
             $9::jsonb,
-            $10
+            $10,
+            $11
           )`,
         [
           id,
@@ -358,6 +370,7 @@ export async function createRoom(
           JSON.stringify(null),
           JSON.stringify(playback),
           false,
+          DEFAULT_WEB_URL,
         ],
       );
 
@@ -372,6 +385,7 @@ export async function createRoom(
         video: null,
         playback,
         web_open: false,
+        web_url: DEFAULT_WEB_URL,
         server_time: Date.now(),
       };
 
@@ -646,7 +660,7 @@ export async function setVideo(
       ? urlInput.trim()
       : "";
 
-  if (!url || url.length > 2000) {
+  if (!url || url.length > 8000) {
     throw jsonError(
       400,
       "Geçerli bir video adresi gerekli",
@@ -775,6 +789,7 @@ export async function setWebOpen(
   code: string,
   participantIdInput: unknown,
   openInput: unknown,
+  urlInput?: unknown,
 ): Promise<Room> {
   const { room, participant } = await participantForRoom(
     code,
@@ -789,11 +804,16 @@ export async function setWebOpen(
   }
 
   const open = Boolean(openInput);
+  const nextUrl =
+    typeof urlInput === "string" && urlInput.trim()
+      ? normalizeWebUrl(urlInput)
+      : room.web_url || DEFAULT_WEB_URL;
 
   room.web_open = open;
+  room.web_url = nextUrl;
   room.server_time = Date.now();
 
-  await updateWebOpenRow(room.code, open);
+  await updateWebOpenRow(room.code, open, nextUrl);
 
   return room;
 }

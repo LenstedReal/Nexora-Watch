@@ -96,17 +96,26 @@ export function useRoom({ code, participantId }: Options) {
             old ? { ...old, playback: data.playback as Playback, server_time: data.server_time ?? old.server_time } : old,
           );
         } else if (data.type === "web") {
-          const open = Boolean(
-            (data as { open?: unknown }).open,
-          );
+          const payload = data as { open?: unknown; url?: unknown };
+          const open = Boolean(payload.open);
+          const url =
+            typeof payload.url === "string" && payload.url.trim()
+              ? payload.url
+              : undefined;
 
           queryClient.setQueryData<Room>(["room", code], (old) =>
-            old ? { ...old, web_open: open } : old,
+            old
+              ? {
+                  ...old,
+                  web_open: open,
+                  web_url: url ?? old.web_url,
+                }
+              : old,
           );
 
           window.dispatchEvent(
             new CustomEvent("nexora:web-sync", {
-              detail: { open },
+              detail: { open, url },
             }),
           );
         } else if (data.type === "message") {

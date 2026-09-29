@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiResolveRouteImport } from './routes/api/resolve'
+import { Route as ApiUploadRouteImport } from './routes/api/upload'
 import { Route as RoomCodeRouteImport } from './routes/room/$code'
 import { Route as ApiDriveIdRouteImport } from './routes/api/drive/$id'
+import { Route as ApiMediaIdRouteImport } from './routes/api/media.$id'
 import { Route as ApiRoomsIndexRouteImport } from './routes/api/rooms/index'
 import { Route as ApiRoomsSplatRouteImport } from './routes/api/rooms/$'
 
@@ -26,6 +28,11 @@ const ApiResolveRoute = ApiResolveRouteImport.update({
   path: '/api/resolve',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUploadRoute = ApiUploadRouteImport.update({
+  id: '/api/upload',
+  path: '/api/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RoomCodeRoute = RoomCodeRouteImport.update({
   id: '/room/$code',
   path: '/room/$code',
@@ -34,6 +41,11 @@ const RoomCodeRoute = RoomCodeRouteImport.update({
 const ApiDriveIdRoute = ApiDriveIdRouteImport.update({
   id: '/api/drive/$id',
   path: '/api/drive/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMediaIdRoute = ApiMediaIdRouteImport.update({
+  id: '/api/media/$id',
+  path: '/api/media/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRoomsIndexRoute = ApiRoomsIndexRouteImport.update({
@@ -50,16 +62,20 @@ const ApiRoomsSplatRoute = ApiRoomsSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/resolve': typeof ApiResolveRoute
+  '/api/upload': typeof ApiUploadRoute
   '/room/$code': typeof RoomCodeRoute
   '/api/drive/$id': typeof ApiDriveIdRoute
+  '/api/media/$id': typeof ApiMediaIdRoute
   '/api/rooms/$': typeof ApiRoomsSplatRoute
   '/api/rooms/': typeof ApiRoomsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/resolve': typeof ApiResolveRoute
+  '/api/upload': typeof ApiUploadRoute
   '/room/$code': typeof RoomCodeRoute
   '/api/drive/$id': typeof ApiDriveIdRoute
+  '/api/media/$id': typeof ApiMediaIdRoute
   '/api/rooms/$': typeof ApiRoomsSplatRoute
   '/api/rooms': typeof ApiRoomsIndexRoute
 }
@@ -67,8 +83,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/resolve': typeof ApiResolveRoute
+  '/api/upload': typeof ApiUploadRoute
   '/room/$code': typeof RoomCodeRoute
   '/api/drive/$id': typeof ApiDriveIdRoute
+  '/api/media/$id': typeof ApiMediaIdRoute
   '/api/rooms/$': typeof ApiRoomsSplatRoute
   '/api/rooms/': typeof ApiRoomsIndexRoute
 }
@@ -77,24 +95,30 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api/resolve'
+    | '/api/upload'
     | '/room/$code'
     | '/api/drive/$id'
+    | '/api/media/$id'
     | '/api/rooms/$'
     | '/api/rooms/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/api/resolve'
+    | '/api/upload'
     | '/room/$code'
     | '/api/drive/$id'
+    | '/api/media/$id'
     | '/api/rooms/$'
     | '/api/rooms'
   id:
     | '__root__'
     | '/'
     | '/api/resolve'
+    | '/api/upload'
     | '/room/$code'
     | '/api/drive/$id'
+    | '/api/media/$id'
     | '/api/rooms/$'
     | '/api/rooms/'
   fileRoutesById: FileRoutesById
@@ -102,8 +126,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiResolveRoute: typeof ApiResolveRoute
+  ApiUploadRoute: typeof ApiUploadRoute
   RoomCodeRoute: typeof RoomCodeRoute
   ApiDriveIdRoute: typeof ApiDriveIdRoute
+  ApiMediaIdRoute: typeof ApiMediaIdRoute
   ApiRoomsSplatRoute: typeof ApiRoomsSplatRoute
   ApiRoomsIndexRoute: typeof ApiRoomsIndexRoute
 }
@@ -124,6 +150,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiResolveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/upload': {
+      id: '/api/upload'
+      path: '/api/upload'
+      fullPath: '/api/upload'
+      preLoaderRoute: typeof ApiUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/room/$code': {
       id: '/room/$code'
       path: '/room/$code'
@@ -136,6 +169,13 @@ declare module '@tanstack/react-router' {
       path: '/api/drive/$id'
       fullPath: '/api/drive/$id'
       preLoaderRoute: typeof ApiDriveIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/media/$id': {
+      id: '/api/media/$id'
+      path: '/api/media/$id'
+      fullPath: '/api/media/$id'
+      preLoaderRoute: typeof ApiMediaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/rooms/': {
@@ -158,8 +198,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiResolveRoute: ApiResolveRoute,
+  ApiUploadRoute: ApiUploadRoute,
   RoomCodeRoute: RoomCodeRoute,
   ApiDriveIdRoute: ApiDriveIdRoute,
+  ApiMediaIdRoute: ApiMediaIdRoute,
   ApiRoomsSplatRoute: ApiRoomsSplatRoute,
   ApiRoomsIndexRoute: ApiRoomsIndexRoute,
 }

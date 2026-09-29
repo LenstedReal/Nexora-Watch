@@ -103,9 +103,11 @@ var ws_default = defineWebSocketHandler({
 			const payload = data;
 			if (typeof payload.open !== "boolean") return;
 			try {
+				const room = await setWebOpen(code, participantId, payload.open, payload.url);
 				broadcastRealtime(code, {
 					type: "web",
-					open: (await setWebOpen(code, participantId, payload.open)).web_open,
+					open: room.web_open,
+					url: room.web_url,
 					server_time: now()
 				});
 			} catch {}

@@ -1,4 +1,4 @@
-//#region node_modules/.nitro/vite/services/ssr/assets/session-D3l43MuA.js
+//#region node_modules/.nitro/vite/services/ssr/assets/session-hq0f4atC.js
 var ApiError = class extends Error {
 	status;
 	constructor(status, message) {
@@ -74,11 +74,12 @@ var api = {
 			position
 		})
 	}),
-	setWebOpen: (code, participant_id, open) => request(`/rooms/${code}/web`, {
+	setWebOpen: (code, participant_id, open, url) => request(`/rooms/${code}/web`, {
 		method: "PUT",
 		body: JSON.stringify({
 			participant_id,
-			open
+			open,
+			url: url ?? null
 		})
 	}),
 	leaveRoom: (code, participant_id) => request(`/rooms/${code}/leave`, {

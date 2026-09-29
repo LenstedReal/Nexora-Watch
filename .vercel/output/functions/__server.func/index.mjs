@@ -27,7 +27,7 @@ var grokOgIdentity = { "site": {
 * shared by the Vite plugin and Nitro middleware. Plain ESM so `node --test`
 * and the Nitro bundler can both consume it.
 */
-var DEFAULT_APP_NAME = "Nexora Watch";
+var DEFAULT_APP_NAME = "Grok App";
 var OG_SITE_REL_PATH = "src/lib/og/site.json";
 var SHARE_META_KEYS = /* @__PURE__ */ new Set([
 	"og:title",
@@ -69,7 +69,7 @@ function appNameFromHost(hostHeader) {
 	if (!host.endsWith(".grok.me")) return DEFAULT_APP_NAME;
 	const slug = host.split(".")[0] ?? "";
 	if (!slug || slug === "www" || !/^[a-z0-9-]{1,63}$/.test(slug)) return DEFAULT_APP_NAME;
-	return slug.split("-").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ") || "Nexora Watch";
+	return slug.split("-").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ") || "Grok App";
 }
 /** True for Vercel system domains. Envoy rewrites origin Host to these; they SSO-protect `/og.jpg`. */
 function isVercelSystemHost(host) {
@@ -131,29 +131,17 @@ function renderWebManifest(hostHeader) {
 		display: "standalone",
 		background_color: "#000000",
 		theme_color: "#000000",
-		icons: [
-			{
-				src: "/branding/nexora-icon-180.png",
-				sizes: "180x180",
-				type: "image/png"
-			},
-			{
-				src: "/branding/nexora-icon-192.png",
-				sizes: "192x192",
-				type: "image/png"
-			},
-			{
-				src: "/branding/nexora-icon-512.png",
-				sizes: "512x512",
-				type: "image/png"
-			}
-		]
+		icons: [{
+			src: "/__grok/icon-180.png",
+			sizes: "180x180",
+			type: "image/png"
+		}]
 	}, null, 2);
 }
 function grokPwaHeadTags(appName = DEFAULT_APP_NAME) {
 	return [
 		["manifest", "<link rel=\"manifest\" href=\"/__grok/manifest.webmanifest\">"],
-		["apple-touch-icon", "<link rel=\"apple-touch-icon\" href=\"/branding/nexora-icon-180.png\">"],
+		["apple-touch-icon", "<link rel=\"apple-touch-icon\" href=\"/__grok/icon-180.png\">"],
 		["apple-mobile-web-app-title", `<meta name="apple-mobile-web-app-title" content="${escapeHtml(appName)}">`],
 		["apple-mobile-web-app-status-bar-style", "<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black\">"],
 		["theme-color", "<meta name=\"theme-color\" content=\"#000000\">"]
@@ -163,6 +151,10 @@ var GROK_EXTENSIONS_SCRIPT_SRC = "https://grok.com/grok-app-builder/extensions.j
 function readGrokProjectId() {
 	const fromProcess = typeof process !== "undefined" ? process.env?.VITE_PROJECT_ID : "";
 	return String(fromProcess ?? "").trim();
+}
+function readGrokExtensionsEnabled() {
+	const fromProcess = typeof process !== "undefined" ? process.env?.VITE_GROK_EXTENSIONS : "";
+	return String(fromProcess ?? "").trim() !== "0";
 }
 function readXCreator() {
 	const fromProcess = typeof process !== "undefined" ? process.env?.X_CREATOR : "";
@@ -183,6 +175,7 @@ function grokExtensionsHeadTags(projectId = readGrokProjectId()) {
 	const id = escapeHtml(projectId);
 	const tags = [];
 	if (projectId) tags.push(`<meta name="grok-project-id" content="${id}">`);
+	if (!readGrokExtensionsEnabled()) return tags;
 	tags.push(`<script src="${GROK_EXTENSIONS_SCRIPT_SRC}"${projectId ? ` data-project-id="${id}"` : ""} defer><\/script>`);
 	return tags;
 }
@@ -232,8 +225,8 @@ function resolveOgTitle(site = {}, appName = DEFAULT_APP_NAME, host = "", docume
 	const fromDoc = String(documentTitle ?? "").trim();
 	if (fromDoc) return fromDoc;
 	const fromHost = appNameFromHost(host);
-	if (fromHost && fromHost !== "Nexora Watch") return fromHost;
-	return String(appName ?? "").trim() || "Nexora Watch";
+	if (fromHost && fromHost !== "Grok App") return fromHost;
+	return String(appName ?? "").trim() || "Grok App";
 }
 function siteHasCustomCard(site = {}) {
 	return String(site.card ?? "").toLowerCase() === "custom";
@@ -282,6 +275,9 @@ function grokOgHeadTags({ host = "", appName = DEFAULT_APP_NAME, site = {}, docu
 	}
 	return tags;
 }
+function stripGrokExtensionsScript(html) {
+	return String(html).replace(/<script\b[^>]*\bsrc\s*=\s*["'][^"']*\/grok-app-builder\/extensions\.js[^"']*["'][^>]*>\s*<\/script>/gi, "");
+}
 function stripShareMetaTags(html) {
 	return String(html).replace(/<meta\b[^>]*>/gi, (tag) => {
 		const attrs = [...tag.matchAll(/\b(?:property|name)\s*=\s*["']([^"']+)["']/gi)];
@@ -302,7 +298,7 @@ function normalizeHeadContext(ctx = {}) {
 	const cwd = ctx.cwd ?? process.cwd();
 	const site = applyCustomCardFromFs(ctx.site !== void 0 ? ctx.site : snapshotOgIdentity(cwd).site, cwd);
 	return {
-		appName: resolveOgTitle(site, ctx.appName ?? "Nexora Watch", ctx.host ?? ""),
+		appName: resolveOgTitle(site, ctx.appName ?? "Grok App", ctx.host ?? ""),
 		projectId: ctx.projectId ?? readGrokProjectId(),
 		creator: ctx.creator ?? readXCreator(),
 		creatorId: ctx.creatorId ?? readXCreatorId(),
@@ -315,11 +311,12 @@ function injectGrokPwaHead(html, ctx = {}) {
 	if (typeof html !== "string") return html;
 	const { site, projectId, creator, creatorId, host, cwd } = normalizeHeadContext(ctx);
 	const documentTitle = titleFromDocument(html);
-	const appName = resolveOgTitle(site, ctx.appName ?? "Nexora Watch", host, documentTitle);
+	const appName = resolveOgTitle(site, ctx.appName ?? "Grok App", host, documentTitle);
 	let next = stripShareMetaTags(html);
+	if (!readGrokExtensionsEnabled()) next = stripGrokExtensionsScript(next);
 	const missing = grokPwaHeadTags(appName).filter(([key]) => {
 		if (key === "manifest") return !next.includes("href=\"/__grok/manifest.webmanifest\"");
-		if (key === "apple-touch-icon") return !next.includes("href=\"/branding/nexora-icon-180.png\"");
+		if (key === "apple-touch-icon") return !next.includes("href=\"/__grok/icon-180.png\"");
 		return !next.includes(`name="${key}"`);
 	}).map(([, tag]) => tag);
 	next = insertAfterHeadOpen(next, grokOgHeadTags({
@@ -329,7 +326,7 @@ function injectGrokPwaHead(html, ctx = {}) {
 		documentTitle,
 		cwd
 	}).join(""));
-	if (!next.includes("/grok-app-builder/extensions.js")) missing.push(...grokExtensionsHeadTags(projectId));
+	if (readGrokExtensionsEnabled() && !next.includes("/grok-app-builder/extensions.js")) missing.push(...grokExtensionsHeadTags(projectId));
 	else if (projectId && !next.includes("name=\"grok-project-id\"")) missing.push(`<meta name="grok-project-id" content="${escapeHtml(projectId)}">`);
 	if (projectId && !next.includes("property=\"grok:app_id\"") && !next.includes("property='grok:app_id'")) missing.push(`<meta property="grok:app_id" content="${escapeHtml(projectId)}">`);
 	const creatorTags = grokXCreatorHeadTags(creator, creatorId);

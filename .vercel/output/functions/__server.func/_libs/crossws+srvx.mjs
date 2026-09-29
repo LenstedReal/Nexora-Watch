@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { PassThrough, Readable } from "node:stream";
+import "node:stream/promises";
 //#region node_modules/crossws/dist/_chunks/libs/ws.mjs
 var t = Object.create;
 var n = Object.defineProperty;

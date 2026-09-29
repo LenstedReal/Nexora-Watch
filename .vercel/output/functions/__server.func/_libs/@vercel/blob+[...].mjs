@@ -26891,7 +26891,7 @@ function createCompleteMultipartUploadMethod({ allowedOptions, getToken, extraCh
 			getToken
 		});
 		const headers = createPutHeaders(allowedOptions, options);
-		return completeMultipartUpload$1({
+		return completeMultipartUpload$2({
 			uploadId: options.uploadId,
 			key: options.key,
 			pathname,
@@ -26901,7 +26901,7 @@ function createCompleteMultipartUploadMethod({ allowedOptions, getToken, extraCh
 		});
 	};
 }
-async function completeMultipartUpload$1({ uploadId, key, pathname, parts, headers, options }) {
+async function completeMultipartUpload$2({ uploadId, key, pathname, parts, headers, options }) {
 	const params = new URLSearchParams({ pathname });
 	try {
 		const response = await requestApi(`/mpu?${params.toString()}`, {
@@ -26931,14 +26931,14 @@ function createCreateMultipartUploadMethod({ allowedOptions, getToken, extraChec
 			extraChecks,
 			getToken
 		});
-		const createMultipartUploadResponse = await createMultipartUpload$1(pathname, createPutHeaders(allowedOptions, options), options);
+		const createMultipartUploadResponse = await createMultipartUpload$2(pathname, createPutHeaders(allowedOptions, options), options);
 		return {
 			key: createMultipartUploadResponse.key,
 			uploadId: createMultipartUploadResponse.uploadId
 		};
 	};
 }
-async function createMultipartUpload$1(pathname, headers, options) {
+async function createMultipartUpload$2(pathname, headers, options) {
 	debug("mpu: create", "pathname:", pathname);
 	const params = new URLSearchParams({ pathname });
 	try {
@@ -26968,7 +26968,7 @@ function createUploadPartMethod({ allowedOptions, getToken, extraChecks }) {
 		const headers = createPutHeaders(allowedOptions, options);
 		if (isPlainObject(body)) throw new BlobError("Body must be a string, buffer or stream. You sent a plain JavaScript object, double check what you're trying to upload.");
 		return {
-			etag: (await uploadPart$1({
+			etag: (await uploadPart$2({
 				uploadId: options.uploadId,
 				key: options.key,
 				pathname,
@@ -26983,7 +26983,7 @@ function createUploadPartMethod({ allowedOptions, getToken, extraChecks }) {
 		};
 	};
 }
-async function uploadPart$1({ uploadId, key, pathname, headers, options, internalAbortController = new AbortController(), part }) {
+async function uploadPart$2({ uploadId, key, pathname, headers, options, internalAbortController = new AbortController(), part }) {
 	var _a3, _b2, _c;
 	const responsePromise = requestApi(`/mpu?${new URLSearchParams({ pathname }).toString()}`, {
 		signal: internalAbortController.signal,
@@ -27095,7 +27095,7 @@ function uploadAllParts({ uploadId, key, pathname, stream, headers, options, tot
 					totalLoadedPerPartNumber[part.partNumber] = event.loaded;
 					if (onUploadProgress) onUploadProgress();
 				} : void 0;
-				const completedPart = await uploadPart$1({
+				const completedPart = await uploadPart$2({
 					uploadId,
 					key,
 					pathname,
@@ -27156,14 +27156,14 @@ function createCreateMultipartUploaderMethod({ allowedOptions, getToken, extraCh
 			getToken
 		});
 		const headers = createPutHeaders(allowedOptions, options);
-		const createMultipartUploadResponse = await createMultipartUpload$1(pathname, headers, options);
+		const createMultipartUploadResponse = await createMultipartUpload$2(pathname, headers, options);
 		return {
 			key: createMultipartUploadResponse.key,
 			uploadId: createMultipartUploadResponse.uploadId,
 			async uploadPart(partNumber, body) {
 				if (isPlainObject(body)) throw new BlobError("Body must be a string, buffer or stream. You sent a plain JavaScript object, double check what you're trying to upload.");
 				return {
-					etag: (await uploadPart$1({
+					etag: (await uploadPart$2({
 						uploadId: createMultipartUploadResponse.uploadId,
 						key: createMultipartUploadResponse.key,
 						pathname,
@@ -27178,7 +27178,7 @@ function createCreateMultipartUploaderMethod({ allowedOptions, getToken, extraCh
 				};
 			},
 			async complete(parts) {
-				return completeMultipartUpload$1({
+				return completeMultipartUpload$2({
 					uploadId: createMultipartUploadResponse.uploadId,
 					key: createMultipartUploadResponse.key,
 					pathname,
@@ -27197,7 +27197,7 @@ async function uncontrolledMultipartUpload(pathname, body, headers, options) {
 		onUploadProgress: void 0
 	};
 	if (options.maximumSizeInBytes !== void 0 && !isStream(body) && computeBodyLength(body) > options.maximumSizeInBytes) throw new BlobError(`Body size of ${computeBodyLength(body)} bytes exceeds the maximum allowed size of ${options.maximumSizeInBytes} bytes`);
-	const createMultipartUploadResponse = await createMultipartUpload$1(pathname, headers, optionsWithoutOnUploadProgress);
+	const createMultipartUploadResponse = await createMultipartUpload$2(pathname, headers, optionsWithoutOnUploadProgress);
 	const totalToLoad = computeBodyLength(body);
 	const stream = await toReadableStream(body);
 	const parts = await uploadAllParts({
@@ -27209,7 +27209,7 @@ async function uncontrolledMultipartUpload(pathname, body, headers, options) {
 		options,
 		totalToLoad
 	});
-	return await completeMultipartUpload$1({
+	return await completeMultipartUpload$2({
 		uploadId: createMultipartUploadResponse.uploadId,
 		key: createMultipartUploadResponse.key,
 		pathname,
@@ -27284,6 +27284,41 @@ new TextEncoder();
 * MIT Licensed
 */
 //#endregion
+//#region node_modules/@vercel/blob/dist/index.js
+var put$1 = createPutMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType",
+	"ifMatch"
+] });
+createCreateMultipartUploadMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType",
+	"ifMatch"
+] });
+createCreateMultipartUploaderMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType",
+	"ifMatch"
+] });
+createUploadPartMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType"
+] });
+createCompleteMultipartUploadMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType"
+] });
+//#endregion
 //#region node_modules/@vercel/blob/dist/client.js
 function createPutExtraChecks(methodName) {
 	return function extraChecks(options) {
@@ -27311,7 +27346,7 @@ createCompleteMultipartUploadMethod({
 	allowedOptions: ["contentType"],
 	extraChecks: createPutExtraChecks("client/`completeMultipartUpload`")
 });
-var upload = createPutMethod({
+createPutMethod({
 	allowedOptions: ["contentType"],
 	extraChecks(options) {
 		if (options.handleUploadUrl === void 0) throw new BlobError("client/`upload` requires the 'handleUploadUrl' parameter");
@@ -27537,4 +27572,4 @@ function getPathFromRequestUrl(url) {
 	}
 }
 //#endregion
-export { require_token_error as a, require_dist$1 as i, upload as n, require_token_util as r, handleUpload as t };
+export { require_token_error as a, require_dist$1 as i, put$1 as n, require_token_util as r, handleUpload as t };

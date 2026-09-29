@@ -4,7 +4,13 @@ import { _ as createFileRoute, b as useRouter, d as Scripts, f as HeadContent, g
 import { c as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { t as QueryClient } from "../_libs/tanstack__query-core.mjs";
 import { a as union, i as string, n as number, r as object, t as literal } from "../_libs/zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-BZfrMaOc.js
+import { n as put } from "../_libs/@vercel/blob+[...].mjs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { join } from "node:path";
+import { mkdir, readdir, stat } from "node:fs/promises";
+//#region node_modules/.nitro/vite/services/ssr/assets/router-D4VypbnI.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
@@ -308,9 +314,9 @@ function PreviewHostBridge() {
 function AuthProvider({ children }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children });
 }
-var styles_default = "/assets/styles-C8YCGkAE.css";
+var styles_default = "/assets/styles-CNcbuLd7.css";
 var APP_NAME = "Nexora Watch";
-var Route$6 = createRootRoute({
+var Route$8 = createRootRoute({
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },
@@ -408,8 +414,8 @@ function RootDocument() {
 		})]
 	});
 }
-var $$splitComponentImporter$1 = () => import("./routes-B1dgFJ6R.mjs");
-var Route$5 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter$1, "component") });
+var $$splitComponentImporter$1 = () => import("./routes-Dq3uw_RD.mjs");
+var Route$7 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter$1, "component") });
 var DIRECT_EXTENSIONS = /\.(mp4|webm|mov|m4v)(?:$|[?#])/i;
 var BLOCKED_HOSTS = /* @__PURE__ */ new Set([
 	"localhost",
@@ -554,6 +560,45 @@ async function fetchPage(url) {
 	} finally {
 		clearTimeout(timeout);
 	}
+}
+function localMediaResolve(input) {
+	const trimmed = input.trim();
+	let path = trimmed;
+	try {
+		const parsed = new URL(trimmed, "https://nexora.local");
+		if (parsed.pathname.startsWith("/api/media/")) path = parsed.pathname;
+	} catch {}
+	if (/^\/api\/media\/[A-Za-z0-9._-]+$/.test(path)) {
+		const name = path.split("/").pop() || "video";
+		return {
+			url: path,
+			kind: "direct",
+			video_id: null,
+			embed_url: null,
+			stream_url: path,
+			title: name,
+			mime_type: name.toLowerCase().endsWith(".webm") ? "video/webm" : "video/mp4",
+			provider: "nexora",
+			confidence: 1,
+			method: "direct"
+		};
+	}
+	const url = parseUrl(input);
+	if (!url) return null;
+	const host = url.hostname.toLowerCase();
+	if (host.endsWith("vercel-storage.com") || host.endsWith("blob.vercel-storage.com")) return {
+		url: input,
+		kind: "direct",
+		video_id: null,
+		embed_url: null,
+		stream_url: input,
+		title: url.pathname.split("/").pop() || "video",
+		mime_type: null,
+		provider: "blob",
+		confidence: 1,
+		method: "direct"
+	};
+	return null;
 }
 function providerResolve(input) {
 	const url = parseUrl(input);
@@ -710,6 +755,8 @@ function chooseCandidate(candidates) {
 async function resolveVideoSource(input) {
 	const raw = input.trim();
 	if (!raw) throw new Error("Video adresi boş");
+	const local = localMediaResolve(raw);
+	if (local) return local;
 	const provider = providerResolve(raw);
 	if (provider) return provider;
 	const direct = directResolve(raw);
@@ -784,7 +831,7 @@ async function resolveVideoSource(input) {
 	if (best) return candidateToResolved(best, raw);
 	throw new Error("Bu adres bir video kaynağı değil. Web özelliği Google üzerinden açılır.");
 }
-var Route$4 = createFileRoute("/api/resolve")({ server: { handlers: { POST: async ({ request }) => {
+var Route$6 = createFileRoute("/api/resolve")({ server: { handlers: { POST: async ({ request }) => {
 	try {
 		const body = await request.json();
 		const url = typeof body.url === "string" ? body.url.trim() : "";
@@ -819,57 +866,112 @@ var Route$4 = createFileRoute("/api/resolve")({ server: { handlers: { POST: asyn
 		}, { status: 422 });
 	}
 } } } });
-var $$splitComponentImporter = () => import("../_code-4cyAd090.mjs");
-var Route$3 = createFileRoute("/room/$code")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
-var DRIVE_HOST = "https://drive.usercontent.google.com/download";
-function validId(value) {
-	return /^[A-Za-z0-9_-]{10,300}$/.test(value);
+var peers = /* @__PURE__ */ new Map();
+function topic(code) {
+	return `nexora-room:${code.toUpperCase()}`;
 }
-var Route$2 = createFileRoute("/api/drive/$id")({ server: { handlers: { GET: async ({ request, params }) => {
-	const id = params.id;
-	if (!id || !validId(id)) return new Response("Geçersiz Drive dosya ID", { status: 400 });
-	const incomingRange = request.headers.get("range");
-	const headers = new Headers({
-		Accept: "*/*",
-		"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36"
-	});
-	if (incomingRange) headers.set("Range", incomingRange);
-	const target = `${DRIVE_HOST}?id=${encodeURIComponent(id)}&export=download&confirm=t`;
-	try {
-		const response = await fetch(target, {
-			method: "GET",
-			redirect: "follow",
-			headers
-		});
-		if (!response.ok && response.status !== 206) return new Response(`Drive ${response.status}`, { status: response.status });
-		const contentType = response.headers.get("content-type") || "application/octet-stream";
-		if (contentType.includes("text/html") || contentType.includes("text/plain")) return new Response("Drive dosyası doğrudan medya olarak alınamadı", { status: 502 });
-		const out = new Headers();
-		for (const name of [
-			"content-type",
-			"content-length",
-			"content-range",
-			"accept-ranges",
-			"cache-control",
-			"etag",
-			"last-modified"
-		]) {
-			const value = response.headers.get(name);
-			if (value) out.set(name, value);
-		}
-		out.set("Content-Disposition", "inline");
-		out.set("Access-Control-Allow-Origin", "*");
-		return new Response(response.body, {
-			status: response.status,
-			headers: out
-		});
-	} catch (error) {
-		console.error("[Drive proxy]", error);
-		return new Response("Drive bağlantısı alınamadı", { status: 502 });
+function broadcastRealtime(code, data) {
+	const set = peers.get(topic(code));
+	if (!set) return;
+	for (const peer of set) try {
+		peer.send(data);
+	} catch {
+		set.delete(peer);
 	}
-} } } });
+}
+var DIR = "/tmp/nexora-media";
+var files = /* @__PURE__ */ new Map();
+var SAFE_NAME = /[^a-zA-Z0-9._-]+/g;
+var SAFE_ID = /^[A-Za-z0-9-]+$/;
+function mimeOf(name, fallback) {
+	const lower = name.toLowerCase();
+	if (lower.endsWith(".webm")) return "video/webm";
+	if (lower.endsWith(".mov")) return "video/quicktime";
+	if (lower.endsWith(".m4v")) return "video/x-m4v";
+	if (lower.endsWith(".m3u8")) return "application/vnd.apple.mpegurl";
+	if (fallback.startsWith("video/")) return fallback;
+	return "video/mp4";
+}
+function extOf(name, mime) {
+	const match = name.toLowerCase().match(/\.(mp4|webm|mov|m4v|m3u8)$/);
+	if (match) return match[0];
+	if (mime.includes("webm")) return ".webm";
+	if (mime.includes("quicktime")) return ".mov";
+	return ".mp4";
+}
+async function saveUploadedVideo(file) {
+	const original = file.name.replace(SAFE_NAME, "-").replace(/-+/g, "-").slice(-180) || "video.mp4";
+	const mime = mimeOf(original, file.type || "");
+	const ext = extOf(original, mime);
+	const id = `${Date.now()}-${crypto.randomUUID()}`;
+	const token = process.env.BLOB_READ_WRITE_TOKEN;
+	if (token) {
+		const blob = await put(`nexora/${id}${ext}`, file, {
+			access: "public",
+			token,
+			addRandomSuffix: false,
+			contentType: mime
+		});
+		const stored = {
+			id,
+			name: original,
+			mime,
+			size: file.size,
+			url: blob.url
+		};
+		files.set(id, stored);
+		return stored;
+	}
+	await mkdir(DIR, { recursive: true });
+	const path = join(DIR, `${id}${ext}`);
+	const nodeStream = Readable.fromWeb(file.stream());
+	await pipeline(nodeStream, createWriteStream(path));
+	const stored = {
+		id,
+		name: original,
+		mime,
+		size: (await stat(path)).size,
+		url: `/api/media/${id}`,
+		path
+	};
+	files.set(id, stored);
+	return stored;
+}
+async function readStoredMedia(id) {
+	if (!SAFE_ID.test(id)) return null;
+	const cached = files.get(id);
+	if (cached) return cached;
+	try {
+		await mkdir(DIR, { recursive: true });
+		const match = (await readdir(DIR)).find((name) => name === id || name.startsWith(`${id}.`));
+		if (!match) return null;
+		const path = join(DIR, match);
+		const info = await stat(path);
+		if (!info.isFile()) return null;
+		const stored = {
+			id,
+			name: match,
+			mime: mimeOf(match, ""),
+			size: info.size,
+			url: `/api/media/${id}`,
+			path
+		};
+		files.set(id, stored);
+		return stored;
+	} catch {
+		return null;
+	}
+}
+function mediaStream(stored, start, end) {
+	if (!stored.path) throw new Error("Bu video uzak depoda; yerel stream yok");
+	return Readable.toWeb(createReadStream(stored.path, {
+		start,
+		end
+	}));
+}
 var _0002_nexora_rooms_default = "create table if not exists nexora_rooms (\n  id text primary key,\n  code text not null unique,\n  name text not null,\n  host_id text not null,\n  created_at timestamptz not null,\n  expires_at timestamptz not null,\n  participants jsonb not null default '[]'::jsonb,\n  video jsonb,\n  playback jsonb not null default '{\"playing\":false,\"position\":0,\"updated_at\":0}'::jsonb\n);\n\ncreate table if not exists nexora_messages (\n  id text primary key,\n  room_code text not null,\n  participant_id text,\n  nickname text not null,\n  text text not null,\n  kind text not null default 'chat',\n  created_at timestamptz not null\n);\n\ncreate index if not exists nexora_messages_room_created_idx\non nexora_messages(room_code, created_at);\n";
 var _0003_nexora_web_open_default = "alter table nexora_rooms\n  add column if not exists web_open boolean not null default false;\n";
+var _0004_nexora_web_url_default = "alter table nexora_rooms\n  add column if not exists web_url text not null default 'https://www.google.com/search?igu=1';\n";
 /**
 * Migration bookkeeping shared by the two appliers — `scripts/migrate.mjs`
 * (deploy, `readdir`) and `src/lib/db.ts` (PGLite preview, `import.meta.glob`).
@@ -989,7 +1091,8 @@ async function createPgliteSql() {
 	const migrate = async () => {
 		const migrations = /* #__PURE__ */ Object.assign({
 			"/migrations/0002_nexora_rooms.sql": _0002_nexora_rooms_default,
-			"/migrations/0003_nexora_web_open.sql": _0003_nexora_web_open_default
+			"/migrations/0003_nexora_web_open.sql": _0003_nexora_web_open_default,
+			"/migrations/0004_nexora_web_url.sql": _0004_nexora_web_url_default
 		});
 		const done = (await pg.query("select name from _migrations")).rows.map((r) => r.name);
 		for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) await pg.transaction(async (tx) => {
@@ -1043,6 +1146,43 @@ if (typeof window === "undefined" && dbSource === "pglite") globalBoot.__pgBoots
 	console.error("[db] PGLite bootstrap failed:", err);
 	throw err;
 });
+var DEFAULT_WEB_URL = "https://www.google.com/search?igu=1&hl=tr";
+var MAX_WEB_URL = 2e3;
+function googleSearchUrl(query) {
+	const url = new URL(DEFAULT_WEB_URL);
+	url.searchParams.set("q", query.slice(0, 500));
+	url.searchParams.set("igu", "1");
+	url.searchParams.set("hl", "tr");
+	return url.toString();
+}
+function normalizeWebUrl(input) {
+	const trimmed = input.trim();
+	if (!trimmed) return DEFAULT_WEB_URL;
+	if (!(/^(https?:\/\/)/i.test(trimmed) || /^www\./i.test(trimmed) || /^[a-z0-9-]+(\.[a-z0-9-]+)+([/:?#]|$)/i.test(trimmed))) return googleSearchUrl(trimmed);
+	try {
+		const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+		const url = new URL(withProto);
+		if (url.protocol !== "http:" && url.protocol !== "https:") return googleSearchUrl(trimmed);
+		const host = url.hostname.toLowerCase();
+		if (host === "google.com" || host.endsWith(".google.com") || host.includes("google.")) {
+			url.searchParams.set("igu", "1");
+			if (!url.searchParams.get("hl")) url.searchParams.set("hl", "tr");
+		}
+		return url.toString().slice(0, MAX_WEB_URL);
+	} catch {
+		return googleSearchUrl(trimmed);
+	}
+}
+function webQueryFromUrl(url) {
+	try {
+		const parsed = new URL(url);
+		const host = parsed.hostname.toLowerCase();
+		if (host === "google.com" || host.endsWith(".google.com") || host.includes("google.")) return parsed.searchParams.get("q") || "";
+		return url;
+	} catch {
+		return url;
+	}
+}
 var CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 var ROOM_LIFETIME = 864e5;
 function jsonError(status, detail) {
@@ -1085,6 +1225,7 @@ function rowToRoom(row) {
 			updated_at: 0
 		}),
 		web_open: Boolean(row.web_open),
+		web_url: typeof row.web_url === "string" && row.web_url.trim() ? row.web_url : DEFAULT_WEB_URL,
 		server_time: Date.now()
 	};
 }
@@ -1108,10 +1249,15 @@ async function updateVideoRow(code, video, playback) {
 		JSON.stringify(playback)
 	]);
 }
-async function updateWebOpenRow(code, webOpen) {
+async function updateWebOpenRow(code, webOpen, webUrl) {
 	await (await getSql()).query(`update nexora_rooms
-        set web_open = $2
-      where code = $1`, [code, webOpen]);
+        set web_open = $2,
+            web_url = $3
+      where code = $1`, [
+		code,
+		webOpen,
+		webUrl
+	]);
 }
 async function deleteRoom(code) {
 	const sql = await getSql();
@@ -1149,7 +1295,8 @@ async function loadRoom(code) {
        participants,
        video,
        playback,
-       web_open
+       web_open,
+       web_url
      from nexora_rooms
      where code = $1
      limit 1`, [normalized]))[0];
@@ -1195,7 +1342,8 @@ async function createRoom(nicknameInput, nameInput) {
             participants,
             video,
             playback,
-            web_open
+            web_open,
+            web_url
           )
          values
           (
@@ -1208,7 +1356,8 @@ async function createRoom(nicknameInput, nameInput) {
             $7::jsonb,
             $8::jsonb,
             $9::jsonb,
-            $10
+            $10,
+            $11
           )`, [
 				id,
 				code,
@@ -1219,7 +1368,8 @@ async function createRoom(nicknameInput, nameInput) {
 				JSON.stringify([participant]),
 				JSON.stringify(null),
 				JSON.stringify(playback),
-				false
+				false,
+				DEFAULT_WEB_URL
 			]);
 			return {
 				room: {
@@ -1233,6 +1383,7 @@ async function createRoom(nicknameInput, nameInput) {
 					video: null,
 					playback,
 					web_open: false,
+					web_url: DEFAULT_WEB_URL,
 					server_time: Date.now()
 				},
 				participant
@@ -1360,7 +1511,7 @@ async function setVideo(code, participantIdInput, urlInput) {
 	const { room, participant } = await participantForRoom(code, participantIdInput);
 	if (!participant.is_host) throw jsonError(403, "Videoyu yalnızca oda sahibi değiştirebilir");
 	const url = typeof urlInput === "string" ? urlInput.trim() : "";
-	if (!url || url.length > 2e3) throw jsonError(400, "Geçerli bir video adresi gerekli");
+	if (!url || url.length > 8e3) throw jsonError(400, "Geçerli bir video adresi gerekli");
 	let resolved;
 	try {
 		resolved = await resolveVideoSource(url);
@@ -1417,15 +1568,145 @@ async function leaveRoom(code, participantIdInput) {
 	await updateParticipants(room.code, room.participants);
 	return { ok: true };
 }
-async function setWebOpen(code, participantIdInput, openInput) {
+async function setWebOpen(code, participantIdInput, openInput, urlInput) {
 	const { room, participant } = await participantForRoom(code, participantIdInput);
 	if (!participant.is_host) throw jsonError(403, "Web görünümünü yalnızca oda sahibi kontrol edebilir");
 	const open = Boolean(openInput);
+	const nextUrl = typeof urlInput === "string" && urlInput.trim() ? normalizeWebUrl(urlInput) : room.web_url || "https://www.google.com/search?igu=1&hl=tr";
 	room.web_open = open;
+	room.web_url = nextUrl;
 	room.server_time = Date.now();
-	await updateWebOpenRow(room.code, open);
+	await updateWebOpenRow(room.code, open, nextUrl);
 	return room;
 }
+var ALLOWED = /^(video\/(mp4|webm|quicktime|x-m4v|mpeg)|application\/octet-stream)?$/i;
+var MAX_BYTES = 2147483648;
+var Route$5 = createFileRoute("/api/upload")({ server: { handlers: { POST: async ({ request }) => {
+	try {
+		const form = await request.formData();
+		const code = String(form.get("code") ?? "").trim().toUpperCase();
+		const participantId = String(form.get("participant_id") ?? "").trim();
+		const file = form.get("file");
+		if (!code || !participantId) return Response.json({ detail: "Oda bilgisi eksik" }, { status: 400 });
+		if (!(file instanceof File) || file.size < 1) return Response.json({ detail: "Video dosyası seçilmedi" }, { status: 400 });
+		if (file.size > MAX_BYTES) return Response.json({ detail: "Video en fazla 2 GB olabilir" }, { status: 400 });
+		const namedOk = /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+		const typeOk = !file.type || ALLOWED.test(file.type) || file.type.startsWith("video/");
+		if (!namedOk && !typeOk) return Response.json({ detail: "Desteklenmeyen video formatı" }, { status: 400 });
+		const stored = await saveUploadedVideo(file);
+		const room = await setVideo(code, participantId, stored.url);
+		broadcastRealtime(code, {
+			type: "room",
+			room,
+			server_time: Date.now()
+		});
+		return Response.json({
+			url: stored.url,
+			name: stored.name,
+			room
+		});
+	} catch (error) {
+		if (error instanceof Response) return error;
+		console.error("[Nexora upload]", error);
+		return Response.json({ detail: error instanceof Error ? error.message : "Video yüklenemedi" }, { status: 400 });
+	}
+} } } });
+var $$splitComponentImporter = () => import("../_code-CwLv46qD.mjs");
+var Route$4 = createFileRoute("/room/$code")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
+var DRIVE_HOST = "https://drive.usercontent.google.com/download";
+function validId(value) {
+	return /^[A-Za-z0-9_-]{10,300}$/.test(value);
+}
+var Route$3 = createFileRoute("/api/drive/$id")({ server: { handlers: { GET: async ({ request, params }) => {
+	const id = params.id;
+	if (!id || !validId(id)) return new Response("Geçersiz Drive dosya ID", { status: 400 });
+	const incomingRange = request.headers.get("range");
+	const headers = new Headers({
+		Accept: "*/*",
+		"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36"
+	});
+	if (incomingRange) headers.set("Range", incomingRange);
+	const target = `${DRIVE_HOST}?id=${encodeURIComponent(id)}&export=download&confirm=t`;
+	try {
+		const response = await fetch(target, {
+			method: "GET",
+			redirect: "follow",
+			headers
+		});
+		if (!response.ok && response.status !== 206) return new Response(`Drive ${response.status}`, { status: response.status });
+		const contentType = response.headers.get("content-type") || "application/octet-stream";
+		if (contentType.includes("text/html") || contentType.includes("text/plain")) return new Response("Drive dosyası doğrudan medya olarak alınamadı", { status: 502 });
+		const out = new Headers();
+		for (const name of [
+			"content-type",
+			"content-length",
+			"content-range",
+			"accept-ranges",
+			"cache-control",
+			"etag",
+			"last-modified"
+		]) {
+			const value = response.headers.get(name);
+			if (value) out.set(name, value);
+		}
+		out.set("Content-Disposition", "inline");
+		out.set("Access-Control-Allow-Origin", "*");
+		return new Response(response.body, {
+			status: response.status,
+			headers: out
+		});
+	} catch (error) {
+		console.error("[Drive proxy]", error);
+		return new Response("Drive bağlantısı alınamadı", { status: 502 });
+	}
+} } } });
+function mediaHeaders(stored, extra) {
+	return new Headers({
+		"Content-Type": stored.mime,
+		"Accept-Ranges": "bytes",
+		"Cache-Control": "private, max-age=3600",
+		"X-Content-Type-Options": "nosniff",
+		...extra
+	});
+}
+var Route$2 = createFileRoute("/api/media/$id")({ server: { handlers: {
+	HEAD: async ({ params }) => {
+		const stored = await readStoredMedia(params.id);
+		if (!stored?.path) return new Response("Video bulunamadı", { status: 404 });
+		return new Response(null, {
+			status: 200,
+			headers: mediaHeaders(stored, { "Content-Length": String(stored.size) })
+		});
+	},
+	GET: async ({ params, request }) => {
+		const stored = await readStoredMedia(params.id);
+		if (!stored?.path) return new Response("Video bulunamadı", { status: 404 });
+		const range = request.headers.get("range");
+		const size = stored.size;
+		if (range) {
+			const match = range.match(/bytes=(\d*)-(\d*)/);
+			const start = match?.[1] ? Number(match[1]) : 0;
+			const end = match?.[2] ? Number(match[2]) : size - 1;
+			if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end >= size || start > end) return new Response("Geçersiz aralık", {
+				status: 416,
+				headers: { "Content-Range": `bytes */${size}` }
+			});
+			const stream = mediaStream(stored, start, end);
+			return new Response(stream, {
+				status: 206,
+				headers: mediaHeaders(stored, {
+					"Content-Length": String(end - start + 1),
+					"Content-Range": `bytes ${start}-${end}/${size}`
+				})
+			});
+		}
+		const stream = mediaStream(stored, 0, size - 1);
+		return new Response(stream, {
+			status: 200,
+			headers: mediaHeaders(stored, { "Content-Length": String(size) })
+		});
+	}
+} } });
 var Route$1 = createFileRoute("/api/rooms/")({ server: { handlers: { POST: async ({ request }) => {
 	try {
 		const body = await request.json();
@@ -1437,19 +1718,6 @@ var Route$1 = createFileRoute("/api/rooms/")({ server: { handlers: { POST: async
 		return Response.json({ detail: "Oda oluşturulurken sunucu hatası oluştu" }, { status: 500 });
 	}
 } } } });
-var peers = /* @__PURE__ */ new Map();
-function topic(code) {
-	return `nexora-room:${code.toUpperCase()}`;
-}
-function broadcastRealtime(code, data) {
-	const set = peers.get(topic(code));
-	if (!set) return;
-	for (const peer of set) try {
-		peer.send(data);
-	} catch {
-		set.delete(peer);
-	}
-}
 function jsonErrorResponse(error) {
 	if (error instanceof Response) return error;
 	console.error("[Nexora API]", error);
@@ -1525,10 +1793,11 @@ var Route = createFileRoute("/api/rooms/$")({ server: { handlers: {
 				return Response.json(playback);
 			}
 			if (parts.length === 2 && parts[1] === "web") {
-				const room = await setWebOpen(parts[0], data.participant_id, data.open);
+				const room = await setWebOpen(parts[0], data.participant_id, data.open, data.url);
 				broadcastRealtime(parts[0], {
 					type: "web",
 					open: room.web_open,
+					url: room.web_url,
 					server_time: Date.now()
 				});
 				return Response.json(room);
@@ -1539,44 +1808,56 @@ var Route = createFileRoute("/api/rooms/$")({ server: { handlers: {
 		}
 	}
 } } });
-var IndexRoute = Route$5.update({
+var IndexRoute = Route$7.update({
 	id: "/",
 	path: "/",
-	getParentRoute: () => Route$6
+	getParentRoute: () => Route$8
 });
-var ApiResolveRoute = Route$4.update({
+var ApiResolveRoute = Route$6.update({
 	id: "/api/resolve",
 	path: "/api/resolve",
-	getParentRoute: () => Route$6
+	getParentRoute: () => Route$8
 });
-var RoomCodeRoute = Route$3.update({
+var ApiUploadRoute = Route$5.update({
+	id: "/api/upload",
+	path: "/api/upload",
+	getParentRoute: () => Route$8
+});
+var RoomCodeRoute = Route$4.update({
 	id: "/room/$code",
 	path: "/room/$code",
-	getParentRoute: () => Route$6
+	getParentRoute: () => Route$8
 });
-var ApiDriveIdRoute = Route$2.update({
+var ApiDriveIdRoute = Route$3.update({
 	id: "/api/drive/$id",
 	path: "/api/drive/$id",
-	getParentRoute: () => Route$6
+	getParentRoute: () => Route$8
+});
+var ApiMediaIdRoute = Route$2.update({
+	id: "/api/media/$id",
+	path: "/api/media/$id",
+	getParentRoute: () => Route$8
 });
 var ApiRoomsIndexRoute = Route$1.update({
 	id: "/api/rooms/",
 	path: "/api/rooms/",
-	getParentRoute: () => Route$6
+	getParentRoute: () => Route$8
 });
 var rootRouteChildren = {
 	IndexRoute,
 	ApiResolveRoute,
+	ApiUploadRoute,
 	RoomCodeRoute,
 	ApiDriveIdRoute,
+	ApiMediaIdRoute,
 	ApiRoomsSplatRoute: Route.update({
 		id: "/api/rooms/$",
 		path: "/api/rooms/$",
-		getParentRoute: () => Route$6
+		getParentRoute: () => Route$8
 	}),
 	ApiRoomsIndexRoute
 };
-var routeTree = Route$6._addFileChildren(rootRouteChildren)._addFileTypes();
+var routeTree = Route$8._addFileChildren(rootRouteChildren)._addFileTypes();
 var router_exports = /* @__PURE__ */ __exportAll({ getRouter: () => getRouter });
 function getRouter() {
 	return createRouter({
@@ -1585,4 +1866,4 @@ function getRouter() {
 	});
 }
 //#endregion
-export { Route$3 as n, router_exports as t };
+export { webQueryFromUrl as a, normalizeWebUrl as i, Route$4 as n, DEFAULT_WEB_URL as r, router_exports as t };

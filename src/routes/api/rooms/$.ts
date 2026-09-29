@@ -166,11 +166,13 @@ export const Route = createFileRoute("/api/rooms/$")({
               parts[0],
               data.participant_id,
               data.open,
+              data.url,
             );
 
             broadcastRealtime(parts[0], {
               type: "web",
               open: room.web_open,
+              url: room.web_url,
               server_time: Date.now(),
             });
 

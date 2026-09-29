@@ -4,6 +4,9 @@ var _0002_nexora_rooms_default = "create table if not exists nexora_rooms (\n  i
 //#region migrations/0003_nexora_web_open.sql?raw
 var _0003_nexora_web_open_default = "alter table nexora_rooms\n  add column if not exists web_open boolean not null default false;\n";
 //#endregion
+//#region migrations/0004_nexora_web_url.sql?raw
+var _0004_nexora_web_url_default = "alter table nexora_rooms\n  add column if not exists web_url text not null default 'https://www.google.com/search?igu=1';\n";
+//#endregion
 //#region scripts/migration-plan.mjs
 /**
 * Migration bookkeeping shared by the two appliers — `scripts/migrate.mjs`
@@ -126,7 +129,8 @@ async function createPgliteSql() {
 	const migrate = async () => {
 		const migrations = /* #__PURE__ */ Object.assign({
 			"/migrations/0002_nexora_rooms.sql": _0002_nexora_rooms_default,
-			"/migrations/0003_nexora_web_open.sql": _0003_nexora_web_open_default
+			"/migrations/0003_nexora_web_open.sql": _0003_nexora_web_open_default,
+			"/migrations/0004_nexora_web_url.sql": _0004_nexora_web_url_default
 		});
 		const done = (await pg.query("select name from _migrations")).rows.map((r) => r.name);
 		for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) await pg.transaction(async (tx) => {
@@ -181,6 +185,35 @@ if (typeof window === "undefined" && dbSource === "pglite") globalBoot.__pgBoots
 	throw err;
 });
 //#endregion
+//#region src/lib/nexora/web.ts
+var DEFAULT_WEB_URL = "https://www.google.com/search?igu=1&hl=tr";
+var MAX_WEB_URL = 2e3;
+function googleSearchUrl(query) {
+	const url = new URL(DEFAULT_WEB_URL);
+	url.searchParams.set("q", query.slice(0, 500));
+	url.searchParams.set("igu", "1");
+	url.searchParams.set("hl", "tr");
+	return url.toString();
+}
+function normalizeWebUrl(input) {
+	const trimmed = input.trim();
+	if (!trimmed) return DEFAULT_WEB_URL;
+	if (!(/^(https?:\/\/)/i.test(trimmed) || /^www\./i.test(trimmed) || /^[a-z0-9-]+(\.[a-z0-9-]+)+([/:?#]|$)/i.test(trimmed))) return googleSearchUrl(trimmed);
+	try {
+		const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+		const url = new URL(withProto);
+		if (url.protocol !== "http:" && url.protocol !== "https:") return googleSearchUrl(trimmed);
+		const host = url.hostname.toLowerCase();
+		if (host === "google.com" || host.endsWith(".google.com") || host.includes("google.")) {
+			url.searchParams.set("igu", "1");
+			if (!url.searchParams.get("hl")) url.searchParams.set("hl", "tr");
+		}
+		return url.toString().slice(0, MAX_WEB_URL);
+	} catch {
+		return googleSearchUrl(trimmed);
+	}
+}
+//#endregion
 //#region src/lib/nexora/server.ts
 function jsonError(status, detail) {
 	return new Response(JSON.stringify({ detail }), {
@@ -222,6 +255,7 @@ function rowToRoom(row) {
 			updated_at: 0
 		}),
 		web_open: Boolean(row.web_open),
+		web_url: typeof row.web_url === "string" && row.web_url.trim() ? row.web_url : DEFAULT_WEB_URL,
 		server_time: Date.now()
 	};
 }
@@ -230,10 +264,15 @@ async function updatePlaybackRow(code, playback) {
         set playback = $2::jsonb
       where code = $1`, [code, JSON.stringify(playback)]);
 }
-async function updateWebOpenRow(code, webOpen) {
+async function updateWebOpenRow(code, webOpen, webUrl) {
 	await (await getSql()).query(`update nexora_rooms
-        set web_open = $2
-      where code = $1`, [code, webOpen]);
+        set web_open = $2,
+            web_url = $3
+      where code = $1`, [
+		code,
+		webOpen,
+		webUrl
+	]);
 }
 async function deleteRoom(code) {
 	const sql = await getSql();
@@ -252,7 +291,8 @@ async function loadRoom(code) {
        participants,
        video,
        playback,
-       web_open
+       web_open,
+       web_url
      from nexora_rooms
      where code = $1
      limit 1`, [normalized]))[0];
@@ -347,13 +387,15 @@ async function setPlayback(code, participantIdInput, playingInput, positionInput
 	await updatePlaybackRow(room.code, playback);
 	return playback;
 }
-async function setWebOpen(code, participantIdInput, openInput) {
+async function setWebOpen(code, participantIdInput, openInput, urlInput) {
 	const { room, participant } = await participantForRoom(code, participantIdInput);
 	if (!participant.is_host) throw jsonError(403, "Web görünümünü yalnızca oda sahibi kontrol edebilir");
 	const open = Boolean(openInput);
+	const nextUrl = typeof urlInput === "string" && urlInput.trim() ? normalizeWebUrl(urlInput) : room.web_url || "https://www.google.com/search?igu=1&hl=tr";
 	room.web_open = open;
+	room.web_url = nextUrl;
 	room.server_time = Date.now();
-	await updateWebOpenRow(room.code, open);
+	await updateWebOpenRow(room.code, open, nextUrl);
 	return room;
 }
 //#endregion

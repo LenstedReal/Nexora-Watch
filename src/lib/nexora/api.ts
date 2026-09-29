@@ -38,6 +38,7 @@ export type Room = {
   video: VideoSource | null;
   playback: Playback;
   web_open?: boolean;
+  web_url?: string;
   server_time: number;
 };
 
@@ -114,10 +115,14 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ participant_id, playing, position }),
     }),
-  setWebOpen: (code: string, participant_id: string, open: boolean) =>
+  setWebOpen: (code: string, participant_id: string, open: boolean, url?: string | null) =>
     request<Room>(`/rooms/${code}/web`, {
       method: "PUT",
-      body: JSON.stringify({ participant_id, open }),
+      body: JSON.stringify({
+        participant_id,
+        open,
+        url: url ?? null,
+      }),
     }),
   leaveRoom: (code: string, participant_id: string) =>
     request<{ ok: boolean }>(`/rooms/${code}/leave`, {
