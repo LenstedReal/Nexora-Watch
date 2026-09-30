@@ -1,10 +1,11 @@
 import { o as __toESM } from "./_runtime.mjs";
 import { a as require_react, i as require_jsx_runtime, r as useQueryClient, t as useQuery } from "./_libs/react+tanstack__react-query.mjs";
-import { _ as Copy, a as Users, d as Search, f as MessageCircle, h as Globe, i as Video, p as LogOut, r as X, s as Upload, u as Send, y as ArrowLeft } from "./_libs/lucide-react.mjs";
-import { a as webQueryFromUrl, i as normalizeWebUrl, n as Route$4, r as DEFAULT_WEB_URL } from "./_ssr/router-D4VypbnI.mjs";
+import { a as Users, d as MessageCircle, f as LogOut, g as Copy, i as Video, m as Globe, r as X, s as Upload, u as Send, v as ArrowLeft } from "./_libs/lucide-react.mjs";
+import { r as upload } from "./_libs/@vercel/blob+[...].mjs";
+import { i as normalizeWebUrl, n as Route$4, r as DEFAULT_WEB_URL } from "./_ssr/router-xRwoUlRM.mjs";
 import { a as getSavedNickname, i as getRoomSession, l as wsUrl, n as api, o as messageKey$1, r as clearRoomSession, t as ApiError } from "./_ssr/session-hq0f4atC.mjs";
 import { t as Hls } from "./_libs/hls.js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/_code-CwLv46qD.js
+//#region node_modules/.nitro/vite/services/ssr/assets/_code-axC6qpiT.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 function useRoom({ code, participantId }) {
@@ -285,20 +286,38 @@ function RoomPage() {
 				name: file.name
 			};
 		});
-		setUploadProgress(0);
 		setLocalUploading(true);
+		setUploadProgress(0);
 		try {
-			const uploaded = await postLocalVideo(file, code, participantId, (pct) => {
-				setUploadProgress(pct);
-				if (pct >= 99) flash("Video kaydediliyor...");
-			});
-			queryClient.setQueryData(["room", code], uploaded.room);
-			if (uploaded.room.video?.url) setVideoUrl(uploaded.room.video.url);
+			let updatedRoom = null;
+			try {
+				const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").slice(-180);
+				const blob = await upload(`rooms/${code}/${Date.now()}-${safeName}`, file, {
+					access: "public",
+					handleUploadUrl: "/api/blob-upload",
+					clientPayload: JSON.stringify({
+						code,
+						participantId,
+						filename: file.name
+					}),
+					multipart: true,
+					onUploadProgress: ({ percentage }) => {
+						setUploadProgress(Math.round(percentage));
+					}
+				});
+				updatedRoom = await api.setVideo(code, participantId, blob.url);
+			} catch {
+				updatedRoom = (await postLocalVideo(file, code, participantId, (pct) => setUploadProgress(pct))).room;
+			}
+			if (updatedRoom) {
+				queryClient.setQueryData(["room", code], updatedRoom);
+				if (updatedRoom.video?.url) setVideoUrl(updatedRoom.video.url);
+			}
 			setLocalVideo((previous) => {
 				if (previous?.url?.startsWith("blob:")) URL.revokeObjectURL(previous.url);
 				return null;
 			});
-			flash("Yerel video odaya yüklendi. Herkes aynı videoyu görüyor.");
+			flash("Yerel video odaya yüklendi ve senkronize edildi.");
 		} catch (error) {
 			console.error("[Nexora local video upload]", error);
 			flash(error instanceof Error ? error.message : "Video yüklenemedi.");
@@ -314,9 +333,11 @@ function RoomPage() {
 		try {
 			const updatedRoom = await api.setVideo(code, participantId, url);
 			queryClient.setQueryData(["room", code], updatedRoom);
+			if (webOpen) openSyncedWeb(false);
 			flash("Video kaynağı güncellendi.");
-		} catch (error) {
-			flash(error instanceof Error ? error.message : "Video güncellenemedi.");
+		} catch {
+			openSyncedWeb(true, url);
+			flash("Web paylaşıldı. Video bulunursa filme döner.");
 		} finally {
 			setSending(false);
 		}
@@ -371,6 +392,11 @@ function RoomPage() {
 	});
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
 		className: "min-h-dvh bg-surface text-on-surface",
+		style: {
+			width: "1024px",
+			maxWidth: "none",
+			zoom: "min(1, calc(100vw / 1024px))"
+		},
 		children: [
 			notice ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "fixed top-4 right-4 left-4 z-50 mx-auto max-w-md rounded-lg border border-brand/40 bg-surface-secondary px-4 py-3 text-center text-sm shadow-lg",
@@ -426,10 +452,7 @@ function RoomPage() {
 							webOpen,
 							webUrl,
 							onWebChange: openSyncedWeb,
-							onWebNavigate: (url) => openSyncedWeb(true, url),
-							localVideo,
-							localUploading,
-							uploadProgress
+							localVideo
 						}),
 						isHost ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 							className: "rounded-xl border border-glass-border bg-surface-secondary p-4",
@@ -468,7 +491,7 @@ function RoomPage() {
 										})]
 									}),
 									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
-										className: "flex min-h-20 w-full cursor-pointer items-center gap-4 rounded-lg border border-dashed border-brand/40 bg-surface-tertiary/60 px-4 py-3 transition hover:border-brand hover:bg-surface-tertiary",
+										className: "relative flex min-h-20 w-full cursor-pointer items-center gap-4 overflow-hidden rounded-lg border border-dashed border-brand/40 bg-surface-tertiary/60 px-4 py-3 transition hover:border-brand hover:bg-surface-tertiary",
 										children: [
 											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 												className: "grid size-11 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand",
@@ -483,7 +506,7 @@ function RoomPage() {
 													}),
 													/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 														className: "mt-1 block text-xs text-muted",
-														children: "MP4, WebM, MOV veya M4V • herkese yüklenir"
+														children: "MP4, WebM, MOV veya M4V • Android / PC"
 													}),
 													localUploading ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
 														className: "mt-1 block text-xs text-brand-secondary",
@@ -500,33 +523,33 @@ function RoomPage() {
 											}),
 											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
 												type: "file",
-												accept: "video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.webm,.mov,.m4v",
-												className: "sr-only",
+												accept: "video/*,.mp4,.webm,.mov,.m4v",
+												className: "absolute inset-0 z-10 cursor-pointer opacity-0",
 												disabled: localUploading,
 												onChange: selectLocalVideo
 											})
 										]
 									}),
-									localVideo || localUploading ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									localVideo ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 										className: "flex items-center justify-between gap-3 rounded-md border border-border bg-surface-tertiary px-3 py-2",
 										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 											className: "min-w-0",
 											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 												className: "truncate text-xs font-semibold",
-												children: localVideo?.name ?? "Video yükleniyor"
+												children: localVideo.name
 											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 												className: "text-[10px] text-muted",
-												children: localUploading ? `Odaya yükleniyor (%${uploadProgress})` : "Yükleme tamamlanınca herkes görür"
+												children: "Bu cihazda oynatılıyor"
 											})]
-										}), !localUploading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 											type: "button",
 											onClick: () => {
-												if (localVideo?.url.startsWith("blob:")) URL.revokeObjectURL(localVideo.url);
+												URL.revokeObjectURL(localVideo.url);
 												setLocalVideo(null);
 											},
 											className: "shrink-0 rounded-md border border-border px-3 py-1.5 text-xs text-muted hover:text-on-surface",
 											children: "Kaldır"
-										}) : null]
+										})]
 									}) : null
 								]
 							})]
@@ -701,16 +724,12 @@ function postLocalVideo(file, code, participantId, onProgress) {
 		xhr.send(form);
 	});
 }
-function VideoPlayer({ room, participantId, isHost, webOpen, webUrl, onWebChange, onWebNavigate, serverOffset, localVideo, localUploading, uploadProgress }) {
+function VideoPlayer({ room, participantId, isHost, webOpen, webUrl, onWebChange, serverOffset, localVideo }) {
 	const videoRef = (0, import_react.useRef)(null);
 	const hlsRef = (0, import_react.useRef)(null);
 	const syncingRemote = (0, import_react.useRef)(false);
 	const lastServerUpdate = (0, import_react.useRef)(0);
 	const hostNativeReadyRef = (0, import_react.useRef)(false);
-	const [webDraft, setWebDraft] = (0, import_react.useState)(() => webQueryFromUrl(webUrl));
-	(0, import_react.useEffect)(() => {
-		setWebDraft(webQueryFromUrl(webUrl) || webUrl);
-	}, [webUrl]);
 	const roomVideo = room.video;
 	const source = roomVideo?.stream_url ?? roomVideo?.embed_url ?? roomVideo?.url ?? "";
 	const isHls = /\.m3u8(?:$|[?#])/i.test(source) || roomVideo?.title?.toLowerCase().includes(".m3u8") === true;
@@ -900,40 +919,29 @@ function VideoPlayer({ room, participantId, isHost, webOpen, webUrl, onWebChange
 		roomVideo
 	]);
 	if (webOpen) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-		className: "relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-surface-secondary sm:aspect-video",
+		className: "relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-black sm:aspect-video",
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "absolute inset-0 flex flex-col",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
-				className: "flex min-h-12 shrink-0 items-center gap-2 border-b border-border px-2",
-				onSubmit: (event) => {
-					event.preventDefault();
-					if (!isHost) return;
-					const value = webDraft.trim();
-					if (!value) return;
-					onWebNavigate(value);
-				},
+			className: "absolute inset-0 flex flex-col bg-surface-secondary",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative z-20 flex min-h-11 shrink-0 items-center gap-2 border-b border-border px-3",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Globe, { className: "size-4 shrink-0 text-brand" }),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
-						value: webDraft,
-						readOnly: !isHost,
-						onChange: (event) => setWebDraft(event.target.value),
-						placeholder: isHost ? "Ara veya adres yaz" : "Oda sahibinin araması",
-						className: "min-h-9 min-w-0 flex-1 rounded-md border border-border bg-surface-tertiary px-2 text-sm outline-none focus:border-brand"
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Globe, { className: "size-4 text-brand" }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "font-display text-xs font-bold",
+						children: "Web"
 					}),
-					isHost ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
-						type: "submit",
-						className: "inline-flex min-h-9 items-center gap-1 rounded-md bg-brand px-3 text-xs font-bold text-on-brand",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Search, { className: "size-3.5" }), "Ara"]
-					}) : null,
-					isHost ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "text-[10px] text-muted",
+						children: "Google"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 						type: "button",
 						onClick: () => onWebChange(false),
-						className: "grid size-9 place-items-center rounded-md border border-border text-muted transition hover:text-on-surface",
-						"aria-label": "Web görünümünü kapat",
-						title: "Web'i kapat",
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-4" })
-					}) : null
+						className: "ml-auto inline-flex min-h-8 items-center gap-1 rounded-md border border-border px-2 text-[10px] font-semibold text-muted transition hover:text-on-surface",
+						"aria-label": "Filme dön",
+						title: "Filme dön",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-4" }), "Film"]
+					})
 				]
 			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "relative min-h-0 flex-1 bg-white",
@@ -944,14 +952,10 @@ function VideoPlayer({ room, participantId, isHost, webOpen, webUrl, onWebChange
 					allow: "autoplay; clipboard-read; clipboard-write; fullscreen",
 					allowFullScreen: true,
 					referrerPolicy: "strict-origin-when-cross-origin"
-				}, webUrl), !isHost ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				}), !isHost ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 					className: "absolute inset-0 z-10",
 					"aria-hidden": "true"
-				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "absolute inset-x-0 top-0 z-10 h-16",
-					"aria-hidden": "true",
-					title: "Aramayı üstteki çubuktan yaz"
-				})]
+				}) : null]
 			})]
 		})
 	});
@@ -959,26 +963,19 @@ function VideoPlayer({ room, participantId, isHost, webOpen, webUrl, onWebChange
 		className: "overflow-hidden rounded-xl border border-glass-border bg-black",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "relative aspect-[1.25] w-full sm:aspect-video",
-			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayerWebButton, {
-					visible: isHost && !localUploading,
-					onClick: () => onWebChange(true)
-				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
-					src: localVideo.url,
-					controls: isHost,
-					playsInline: true,
-					preload: "metadata",
-					className: "absolute inset-0 h-full w-full object-contain"
-				}),
-				localUploading ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "absolute inset-x-0 bottom-0 z-20 bg-black/70 px-3 py-2 text-center text-xs font-semibold text-white",
-					children: ["Odaya yükleniyor %", uploadProgress]
-				}) : null
-			]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayerWebButton, {
+				visible: isHost,
+				onClick: () => onWebChange(true)
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+				src: localVideo.url,
+				controls: isHost,
+				playsInline: true,
+				preload: "metadata",
+				className: "absolute inset-0 h-full w-full object-contain"
+			})]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "border-t border-glass-border bg-surface-secondary px-3 py-2 text-xs text-muted",
-			children: localUploading ? `${localVideo.name} yükleniyor — bitince herkes görür` : `Bu cihazdaki video: ${localVideo.name}`
+			children: ["Bu cihazdaki video: ", localVideo.name]
 		})]
 	});
 	if (!roomVideo) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {

@@ -4,13 +4,13 @@ import { _ as createFileRoute, b as useRouter, d as Scripts, f as HeadContent, g
 import { c as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { t as QueryClient } from "../_libs/tanstack__query-core.mjs";
 import { a as union, i as string, n as number, r as object, t as literal } from "../_libs/zod.mjs";
-import { n as put } from "../_libs/@vercel/blob+[...].mjs";
+import { n as handleUpload, t as put } from "../_libs/@vercel/blob+[...].mjs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createReadStream, createWriteStream } from "node:fs";
 import { join } from "node:path";
 import { mkdir, readdir, stat } from "node:fs/promises";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-D4VypbnI.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-xRwoUlRM.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
@@ -314,9 +314,9 @@ function PreviewHostBridge() {
 function AuthProvider({ children }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children });
 }
-var styles_default = "/assets/styles-CNcbuLd7.css";
+var styles_default = "/assets/styles-Dtf1LgNP.css";
 var APP_NAME = "Nexora Watch";
-var Route$8 = createRootRoute({
+var Route$9 = createRootRoute({
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },
@@ -415,7 +415,184 @@ function RootDocument() {
 	});
 }
 var $$splitComponentImporter$1 = () => import("./routes-Dq3uw_RD.mjs");
-var Route$7 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter$1, "component") });
+var Route$8 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter$1, "component") });
+var _0002_nexora_rooms_default = "create table if not exists nexora_rooms (\n  id text primary key,\n  code text not null unique,\n  name text not null,\n  host_id text not null,\n  created_at timestamptz not null,\n  expires_at timestamptz not null,\n  participants jsonb not null default '[]'::jsonb,\n  video jsonb,\n  playback jsonb not null default '{\"playing\":false,\"position\":0,\"updated_at\":0}'::jsonb\n);\n\ncreate table if not exists nexora_messages (\n  id text primary key,\n  room_code text not null,\n  participant_id text,\n  nickname text not null,\n  text text not null,\n  kind text not null default 'chat',\n  created_at timestamptz not null\n);\n\ncreate index if not exists nexora_messages_room_created_idx\non nexora_messages(room_code, created_at);\n";
+var _0003_nexora_web_open_default = "alter table nexora_rooms\n  add column if not exists web_open boolean not null default false;\n";
+var _0004_nexora_web_url_default = "alter table nexora_rooms\n  add column if not exists web_url text not null default 'https://www.google.com/search?igu=1';\n";
+/**
+* Migration bookkeeping shared by the two appliers — `scripts/migrate.mjs`
+* (deploy, `readdir`) and `src/lib/db.ts` (PGLite preview, `import.meta.glob`).
+*
+* Applied files are keyed by BASENAME, so the same file applies once no matter
+* which directory it is globbed from. That is what makes the auth schema safe to
+* copy from `migrations/auth/` into `migrations/` when an app turns sign-in on:
+* a database that already has `0001_auth.sql` will not re-run it.
+*
+* Neither applier descends into subdirectories, so `migrations/auth/*.sql` is
+* out of scope for both until it is copied up.
+*/
+/**
+* The `_migrations` key for a migration path (or bare filename).
+* @param {string} path
+* @returns {string}
+*/
+function migrationName(path) {
+	return path.split("/").pop() ?? path;
+}
+/**
+* @param {string} path
+* @returns {boolean}
+*/
+function isMigrationFile(path) {
+	return path.endsWith(".sql");
+}
+/**
+* Migrations in `paths` that are not yet in `applied`, in apply order.
+* Non-`.sql` entries (a `readdir` also yields `migrations/auth/`) are dropped.
+* @param {Iterable<string>} paths
+* @param {Iterable<string>} applied
+* @returns {Array<{ name: string, path: string }>}
+*/
+function pendingMigrations(paths, applied) {
+	const done = new Set(applied);
+	return [...paths].filter(isMigrationFile).map((path) => ({
+		name: migrationName(path),
+		path
+	})).sort((a, b) => a.name.localeCompare(b.name)).filter(({ name }) => !done.has(name));
+}
+var rawDatabaseUrl = typeof process !== "undefined" ? process.env.DATABASE_URL : void 0;
+var databaseUrl = rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : void 0;
+/**
+* Active backend: real **Neon** when `DATABASE_URL` is set (deployed / configured
+* sandbox), otherwise a local embedded **PGLite** (Postgres compiled to WASM) so
+* the app has a working database even with nothing configured — the live preview
+* included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
+*/
+var dbSource = databaseUrl ? "neon" : "pglite";
+/**
+* Init state lives on globalThis as promises: dev HMR creates new instances of
+* this module, and two instances racing module-level state would open a second
+* pool or run two concurrent PGLite migration passes (whose duplicate
+* `_migrations` insert rejects — and would get memoized, poisoning every later
+* `getSql()`). A failed init clears its slot so the next call retries.
+*/
+var globalRef = globalThis;
+/**
+* Result-type parity: Postgres sends every value as text plus a type OID — the
+* JS value is the DRIVER's parsing choice, and pg and PGLite disagree (pg:
+* int8 -> string, date -> local-midnight Date; PGLite: int8 -> BigInt, which
+* JSON.stringify rejects, date -> UTC Date). Normalize both so preview and
+* production return identical, JSON-safe shapes:
+*   int8/bigint (incl. count(*)) -> number (past 2^53 loses precision — cast
+*                                   `::text` if you ever need huge integers)
+*   date                         -> 'YYYY-MM-DD' string
+*   interval                     -> Postgres interval text
+* numeric already comes back as a string on both (arbitrary precision).
+*/
+var OID_INT8 = 20;
+var OID_DATE = 1082;
+var OID_INTERVAL = 1186;
+var identity = (v) => v;
+/** Wrap a query runner in the tagged-template + `.query()` `Sql` surface. */
+function toSql(run) {
+	const sql = (async (strings, ...values) => {
+		let text = strings[0];
+		for (let i = 0; i < values.length; i += 1) text += `$${i + 1}${strings[i + 1]}`;
+		return run(text, values);
+	});
+	sql.query = (text, params = []) => run(text, params);
+	return sql;
+}
+function createNeonSql() {
+	globalRef.__pgSqlPromise__ ??= (async () => {
+		const { Pool, types } = await import("../_libs/pg.mjs").then((n) => n.t);
+		types.setTypeParser(OID_INT8, Number);
+		types.setTypeParser(OID_DATE, identity);
+		types.setTypeParser(OID_INTERVAL, identity);
+		const pool = new Pool({ connectionString: databaseUrl });
+		return toSql(async (text, params) => {
+			return (await pool.query(text, params)).rows;
+		});
+	})().catch((err) => {
+		globalRef.__pgSqlPromise__ = void 0;
+		throw err;
+	});
+	return globalRef.__pgSqlPromise__;
+}
+async function createPgliteSql() {
+	globalRef.__pgliteInstance__ ??= (async () => {
+		const { PGlite } = await import("../_libs/electric-sql__pglite.mjs").then((n) => n.t);
+		const pg = new PGlite({ parsers: {
+			[OID_INT8]: Number,
+			[OID_DATE]: identity,
+			[OID_INTERVAL]: identity
+		} });
+		await pg.waitReady;
+		await pg.exec("create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())");
+		return pg;
+	})().catch((err) => {
+		globalRef.__pgliteInstance__ = void 0;
+		throw err;
+	});
+	const pg = await globalRef.__pgliteInstance__;
+	const migrate = async () => {
+		const migrations = /* #__PURE__ */ Object.assign({
+			"/migrations/0002_nexora_rooms.sql": _0002_nexora_rooms_default,
+			"/migrations/0003_nexora_web_open.sql": _0003_nexora_web_open_default,
+			"/migrations/0004_nexora_web_url.sql": _0004_nexora_web_url_default
+		});
+		const done = (await pg.query("select name from _migrations")).rows.map((r) => r.name);
+		for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) await pg.transaction(async (tx) => {
+			await tx.exec(migrations[path]);
+			await tx.query("insert into _migrations (name) values ($1)", [name]);
+		});
+	};
+	const pass = (globalRef.__pgliteMigrateChain__ ?? Promise.resolve()).catch(() => void 0).then(migrate);
+	globalRef.__pgliteMigrateChain__ = pass;
+	await pass;
+	return toSql(async (text, params) => {
+		return (await pg.query(text, params)).rows;
+	});
+}
+var sqlPromise = null;
+async function createSql() {
+	if (typeof window !== "undefined") throw new Error("@/lib/db is server-only — call getSql() from a createServerFn handler or a server route loader, never from client code.");
+	return dbSource === "neon" ? createNeonSql() : createPgliteSql();
+}
+/**
+* Get the shared, **server-only** SQL client. Neon when `DATABASE_URL` is set,
+* otherwise the local PGLite fallback. Memoized — safe to call per request.
+*
+* Schema comes from `migrations/*.sql`, auto-applied before the first query on
+* both backends — define tables there, never inline in server functions.
+*/
+function getSql() {
+	sqlPromise ??= createSql().catch((err) => {
+		sqlPromise = null;
+		throw err;
+	});
+	return sqlPromise;
+}
+/**
+* Finish DB bootstrap before the server handles traffic.
+*
+* - **PGLite** (preview / no `DATABASE_URL`): open the in-memory DB and apply
+*   `migrations/*.sql`. Idempotent — concurrent callers share one promise.
+* - **Neon**: no-op (pool is created lazily on first query).
+*
+* Vite `configureServer` awaits this at dev startup; production imports of this
+* module kick it off immediately (see bottom of file).
+*/
+function ensureDbReady() {
+	if (dbSource !== "pglite") return Promise.resolve();
+	return getSql().then(() => void 0);
+}
+var globalBoot = globalThis;
+if (typeof window === "undefined" && dbSource === "pglite") globalBoot.__pgBootstrapPromise__ ??= ensureDbReady().catch((err) => {
+	globalBoot.__pgBootstrapPromise__ = void 0;
+	console.error("[db] PGLite bootstrap failed:", err);
+	throw err;
+});
 var DIRECT_EXTENSIONS = /\.(mp4|webm|mov|m4v)(?:$|[?#])/i;
 var BLOCKED_HOSTS = /* @__PURE__ */ new Set([
 	"localhost",
@@ -831,321 +1008,6 @@ async function resolveVideoSource(input) {
 	if (best) return candidateToResolved(best, raw);
 	throw new Error("Bu adres bir video kaynağı değil. Web özelliği Google üzerinden açılır.");
 }
-var Route$6 = createFileRoute("/api/resolve")({ server: { handlers: { POST: async ({ request }) => {
-	try {
-		const body = await request.json();
-		const url = typeof body.url === "string" ? body.url.trim() : "";
-		if (!url || url.length > 2e3) return Response.json({
-			ok: false,
-			error: "Geçerli bir video adresi gerekli"
-		}, { status: 400 });
-		const resolved = await resolveVideoSource(url);
-		if (resolved.kind === "web") return Response.json({
-			ok: false,
-			error: "Bu adres video kaynağı değil. Web özelliği Google üzerinden açılır."
-		}, { status: 422 });
-		return Response.json({
-			ok: true,
-			source: {
-				url: resolved.url,
-				kind: resolved.kind,
-				video_id: resolved.video_id,
-				embed_url: resolved.embed_url,
-				stream_url: resolved.stream_url,
-				title: resolved.title,
-				mime_type: resolved.mime_type,
-				provider: resolved.provider,
-				confidence: resolved.confidence,
-				method: resolved.method
-			}
-		});
-	} catch (error) {
-		return Response.json({
-			ok: false,
-			error: error instanceof Error ? error.message : "Video kaynağı çözülemedi"
-		}, { status: 422 });
-	}
-} } } });
-var peers = /* @__PURE__ */ new Map();
-function topic(code) {
-	return `nexora-room:${code.toUpperCase()}`;
-}
-function broadcastRealtime(code, data) {
-	const set = peers.get(topic(code));
-	if (!set) return;
-	for (const peer of set) try {
-		peer.send(data);
-	} catch {
-		set.delete(peer);
-	}
-}
-var DIR = "/tmp/nexora-media";
-var files = /* @__PURE__ */ new Map();
-var SAFE_NAME = /[^a-zA-Z0-9._-]+/g;
-var SAFE_ID = /^[A-Za-z0-9-]+$/;
-function mimeOf(name, fallback) {
-	const lower = name.toLowerCase();
-	if (lower.endsWith(".webm")) return "video/webm";
-	if (lower.endsWith(".mov")) return "video/quicktime";
-	if (lower.endsWith(".m4v")) return "video/x-m4v";
-	if (lower.endsWith(".m3u8")) return "application/vnd.apple.mpegurl";
-	if (fallback.startsWith("video/")) return fallback;
-	return "video/mp4";
-}
-function extOf(name, mime) {
-	const match = name.toLowerCase().match(/\.(mp4|webm|mov|m4v|m3u8)$/);
-	if (match) return match[0];
-	if (mime.includes("webm")) return ".webm";
-	if (mime.includes("quicktime")) return ".mov";
-	return ".mp4";
-}
-async function saveUploadedVideo(file) {
-	const original = file.name.replace(SAFE_NAME, "-").replace(/-+/g, "-").slice(-180) || "video.mp4";
-	const mime = mimeOf(original, file.type || "");
-	const ext = extOf(original, mime);
-	const id = `${Date.now()}-${crypto.randomUUID()}`;
-	const token = process.env.BLOB_READ_WRITE_TOKEN;
-	if (token) {
-		const blob = await put(`nexora/${id}${ext}`, file, {
-			access: "public",
-			token,
-			addRandomSuffix: false,
-			contentType: mime
-		});
-		const stored = {
-			id,
-			name: original,
-			mime,
-			size: file.size,
-			url: blob.url
-		};
-		files.set(id, stored);
-		return stored;
-	}
-	await mkdir(DIR, { recursive: true });
-	const path = join(DIR, `${id}${ext}`);
-	const nodeStream = Readable.fromWeb(file.stream());
-	await pipeline(nodeStream, createWriteStream(path));
-	const stored = {
-		id,
-		name: original,
-		mime,
-		size: (await stat(path)).size,
-		url: `/api/media/${id}`,
-		path
-	};
-	files.set(id, stored);
-	return stored;
-}
-async function readStoredMedia(id) {
-	if (!SAFE_ID.test(id)) return null;
-	const cached = files.get(id);
-	if (cached) return cached;
-	try {
-		await mkdir(DIR, { recursive: true });
-		const match = (await readdir(DIR)).find((name) => name === id || name.startsWith(`${id}.`));
-		if (!match) return null;
-		const path = join(DIR, match);
-		const info = await stat(path);
-		if (!info.isFile()) return null;
-		const stored = {
-			id,
-			name: match,
-			mime: mimeOf(match, ""),
-			size: info.size,
-			url: `/api/media/${id}`,
-			path
-		};
-		files.set(id, stored);
-		return stored;
-	} catch {
-		return null;
-	}
-}
-function mediaStream(stored, start, end) {
-	if (!stored.path) throw new Error("Bu video uzak depoda; yerel stream yok");
-	return Readable.toWeb(createReadStream(stored.path, {
-		start,
-		end
-	}));
-}
-var _0002_nexora_rooms_default = "create table if not exists nexora_rooms (\n  id text primary key,\n  code text not null unique,\n  name text not null,\n  host_id text not null,\n  created_at timestamptz not null,\n  expires_at timestamptz not null,\n  participants jsonb not null default '[]'::jsonb,\n  video jsonb,\n  playback jsonb not null default '{\"playing\":false,\"position\":0,\"updated_at\":0}'::jsonb\n);\n\ncreate table if not exists nexora_messages (\n  id text primary key,\n  room_code text not null,\n  participant_id text,\n  nickname text not null,\n  text text not null,\n  kind text not null default 'chat',\n  created_at timestamptz not null\n);\n\ncreate index if not exists nexora_messages_room_created_idx\non nexora_messages(room_code, created_at);\n";
-var _0003_nexora_web_open_default = "alter table nexora_rooms\n  add column if not exists web_open boolean not null default false;\n";
-var _0004_nexora_web_url_default = "alter table nexora_rooms\n  add column if not exists web_url text not null default 'https://www.google.com/search?igu=1';\n";
-/**
-* Migration bookkeeping shared by the two appliers — `scripts/migrate.mjs`
-* (deploy, `readdir`) and `src/lib/db.ts` (PGLite preview, `import.meta.glob`).
-*
-* Applied files are keyed by BASENAME, so the same file applies once no matter
-* which directory it is globbed from. That is what makes the auth schema safe to
-* copy from `migrations/auth/` into `migrations/` when an app turns sign-in on:
-* a database that already has `0001_auth.sql` will not re-run it.
-*
-* Neither applier descends into subdirectories, so `migrations/auth/*.sql` is
-* out of scope for both until it is copied up.
-*/
-/**
-* The `_migrations` key for a migration path (or bare filename).
-* @param {string} path
-* @returns {string}
-*/
-function migrationName(path) {
-	return path.split("/").pop() ?? path;
-}
-/**
-* @param {string} path
-* @returns {boolean}
-*/
-function isMigrationFile(path) {
-	return path.endsWith(".sql");
-}
-/**
-* Migrations in `paths` that are not yet in `applied`, in apply order.
-* Non-`.sql` entries (a `readdir` also yields `migrations/auth/`) are dropped.
-* @param {Iterable<string>} paths
-* @param {Iterable<string>} applied
-* @returns {Array<{ name: string, path: string }>}
-*/
-function pendingMigrations(paths, applied) {
-	const done = new Set(applied);
-	return [...paths].filter(isMigrationFile).map((path) => ({
-		name: migrationName(path),
-		path
-	})).sort((a, b) => a.name.localeCompare(b.name)).filter(({ name }) => !done.has(name));
-}
-var rawDatabaseUrl = typeof process !== "undefined" ? process.env.DATABASE_URL : void 0;
-var databaseUrl = rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : void 0;
-/**
-* Active backend: real **Neon** when `DATABASE_URL` is set (deployed / configured
-* sandbox), otherwise a local embedded **PGLite** (Postgres compiled to WASM) so
-* the app has a working database even with nothing configured — the live preview
-* included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
-*/
-var dbSource = databaseUrl ? "neon" : "pglite";
-/**
-* Init state lives on globalThis as promises: dev HMR creates new instances of
-* this module, and two instances racing module-level state would open a second
-* pool or run two concurrent PGLite migration passes (whose duplicate
-* `_migrations` insert rejects — and would get memoized, poisoning every later
-* `getSql()`). A failed init clears its slot so the next call retries.
-*/
-var globalRef = globalThis;
-/**
-* Result-type parity: Postgres sends every value as text plus a type OID — the
-* JS value is the DRIVER's parsing choice, and pg and PGLite disagree (pg:
-* int8 -> string, date -> local-midnight Date; PGLite: int8 -> BigInt, which
-* JSON.stringify rejects, date -> UTC Date). Normalize both so preview and
-* production return identical, JSON-safe shapes:
-*   int8/bigint (incl. count(*)) -> number (past 2^53 loses precision — cast
-*                                   `::text` if you ever need huge integers)
-*   date                         -> 'YYYY-MM-DD' string
-*   interval                     -> Postgres interval text
-* numeric already comes back as a string on both (arbitrary precision).
-*/
-var OID_INT8 = 20;
-var OID_DATE = 1082;
-var OID_INTERVAL = 1186;
-var identity = (v) => v;
-/** Wrap a query runner in the tagged-template + `.query()` `Sql` surface. */
-function toSql(run) {
-	const sql = (async (strings, ...values) => {
-		let text = strings[0];
-		for (let i = 0; i < values.length; i += 1) text += `$${i + 1}${strings[i + 1]}`;
-		return run(text, values);
-	});
-	sql.query = (text, params = []) => run(text, params);
-	return sql;
-}
-function createNeonSql() {
-	globalRef.__pgSqlPromise__ ??= (async () => {
-		const { Pool, types } = await import("../_libs/pg.mjs").then((n) => n.t);
-		types.setTypeParser(OID_INT8, Number);
-		types.setTypeParser(OID_DATE, identity);
-		types.setTypeParser(OID_INTERVAL, identity);
-		const pool = new Pool({ connectionString: databaseUrl });
-		return toSql(async (text, params) => {
-			return (await pool.query(text, params)).rows;
-		});
-	})().catch((err) => {
-		globalRef.__pgSqlPromise__ = void 0;
-		throw err;
-	});
-	return globalRef.__pgSqlPromise__;
-}
-async function createPgliteSql() {
-	globalRef.__pgliteInstance__ ??= (async () => {
-		const { PGlite } = await import("../_libs/electric-sql__pglite.mjs").then((n) => n.t);
-		const pg = new PGlite({ parsers: {
-			[OID_INT8]: Number,
-			[OID_DATE]: identity,
-			[OID_INTERVAL]: identity
-		} });
-		await pg.waitReady;
-		await pg.exec("create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())");
-		return pg;
-	})().catch((err) => {
-		globalRef.__pgliteInstance__ = void 0;
-		throw err;
-	});
-	const pg = await globalRef.__pgliteInstance__;
-	const migrate = async () => {
-		const migrations = /* #__PURE__ */ Object.assign({
-			"/migrations/0002_nexora_rooms.sql": _0002_nexora_rooms_default,
-			"/migrations/0003_nexora_web_open.sql": _0003_nexora_web_open_default,
-			"/migrations/0004_nexora_web_url.sql": _0004_nexora_web_url_default
-		});
-		const done = (await pg.query("select name from _migrations")).rows.map((r) => r.name);
-		for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) await pg.transaction(async (tx) => {
-			await tx.exec(migrations[path]);
-			await tx.query("insert into _migrations (name) values ($1)", [name]);
-		});
-	};
-	const pass = (globalRef.__pgliteMigrateChain__ ?? Promise.resolve()).catch(() => void 0).then(migrate);
-	globalRef.__pgliteMigrateChain__ = pass;
-	await pass;
-	return toSql(async (text, params) => {
-		return (await pg.query(text, params)).rows;
-	});
-}
-var sqlPromise = null;
-async function createSql() {
-	if (typeof window !== "undefined") throw new Error("@/lib/db is server-only — call getSql() from a createServerFn handler or a server route loader, never from client code.");
-	return dbSource === "neon" ? createNeonSql() : createPgliteSql();
-}
-/**
-* Get the shared, **server-only** SQL client. Neon when `DATABASE_URL` is set,
-* otherwise the local PGLite fallback. Memoized — safe to call per request.
-*
-* Schema comes from `migrations/*.sql`, auto-applied before the first query on
-* both backends — define tables there, never inline in server functions.
-*/
-function getSql() {
-	sqlPromise ??= createSql().catch((err) => {
-		sqlPromise = null;
-		throw err;
-	});
-	return sqlPromise;
-}
-/**
-* Finish DB bootstrap before the server handles traffic.
-*
-* - **PGLite** (preview / no `DATABASE_URL`): open the in-memory DB and apply
-*   `migrations/*.sql`. Idempotent — concurrent callers share one promise.
-* - **Neon**: no-op (pool is created lazily on first query).
-*
-* Vite `configureServer` awaits this at dev startup; production imports of this
-* module kick it off immediately (see bottom of file).
-*/
-function ensureDbReady() {
-	if (dbSource !== "pglite") return Promise.resolve();
-	return getSql().then(() => void 0);
-}
-var globalBoot = globalThis;
-if (typeof window === "undefined" && dbSource === "pglite") globalBoot.__pgBootstrapPromise__ ??= ensureDbReady().catch((err) => {
-	globalBoot.__pgBootstrapPromise__ = void 0;
-	console.error("[db] PGLite bootstrap failed:", err);
-	throw err;
-});
 var DEFAULT_WEB_URL = "https://www.google.com/search?igu=1&hl=tr";
 var MAX_WEB_URL = 2e3;
 function googleSearchUrl(query) {
@@ -1171,16 +1033,6 @@ function normalizeWebUrl(input) {
 		return url.toString().slice(0, MAX_WEB_URL);
 	} catch {
 		return googleSearchUrl(trimmed);
-	}
-}
-function webQueryFromUrl(url) {
-	try {
-		const parsed = new URL(url);
-		const host = parsed.hostname.toLowerCase();
-		if (host === "google.com" || host.endsWith(".google.com") || host.includes("google.")) return parsed.searchParams.get("q") || "";
-		return url;
-	} catch {
-		return url;
 	}
 }
 var CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -1579,6 +1431,222 @@ async function setWebOpen(code, participantIdInput, openInput, urlInput) {
 	await updateWebOpenRow(room.code, open, nextUrl);
 	return room;
 }
+var ALLOWED_TYPES = [
+	"video/mp4",
+	"video/webm",
+	"video/quicktime",
+	"video/x-m4v"
+];
+var MAX_BYTES$1 = 2147483648;
+async function toRequest(input) {
+	if (input instanceof Request) return {
+		request: input,
+		body: await input.clone().json()
+	};
+	const event = input;
+	if (event?.request instanceof Request) {
+		const body = await event.request.clone().json();
+		return {
+			request: event.request,
+			body
+		};
+	}
+	let parsed = event?.body ?? {};
+	if (typeof event?.json === "function") parsed = await event.json();
+	const body = parsed;
+	return {
+		request: new Request("https://nexora.local/api/blob-upload", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(body ?? {})
+		}),
+		body
+	};
+}
+async function handleNexoraBlobUpload(input) {
+	const { request, body } = await toRequest(input);
+	try {
+		const jsonResponse = await handleUpload({
+			body,
+			request,
+			onBeforeGenerateToken: async (pathname, clientPayload) => {
+				let payload = {};
+				try {
+					payload = typeof clientPayload === "string" ? JSON.parse(clientPayload) : {};
+				} catch {
+					throw new Error("Geçersiz upload bilgisi");
+				}
+				const code = typeof payload.code === "string" ? payload.code.trim().toUpperCase() : "";
+				const participantId = typeof payload.participantId === "string" ? payload.participantId.trim() : "";
+				if (!code || !participantId) throw new Error("Geçersiz oda bilgisi");
+				const participant = (await loadRoom(code)).participants.find((item) => item.id === participantId);
+				if (!participant) throw new Error("Odaya katılım bulunamadı");
+				if (!participant.is_host) throw new Error("Video yüklemeyi yalnızca oda sahibi yapabilir");
+				if (!pathname.startsWith(`rooms/${code}/`)) throw new Error("Geçersiz video yolu");
+				return {
+					allowedContentTypes: ALLOWED_TYPES,
+					maximumSizeInBytes: MAX_BYTES$1,
+					addRandomSuffix: true,
+					tokenPayload: JSON.stringify({
+						code,
+						participantId
+					})
+				};
+			},
+			onUploadCompleted: async () => {}
+		});
+		return Response.json(jsonResponse);
+	} catch (error) {
+		console.error("[Nexora Blob upload]", error);
+		return Response.json({ error: error instanceof Error ? error.message : "Video yükleme yetkilendirmesi başarısız" }, { status: 400 });
+	}
+}
+var Route$7 = createFileRoute("/api/blob-upload")({ server: { handlers: { POST: async ({ request }) => {
+	try {
+		return await handleNexoraBlobUpload(request);
+	} catch (error) {
+		console.error("[Nexora Blob upload]", error);
+		return Response.json({ error: error instanceof Error ? error.message : "Video yükleme yetkilendirmesi başarısız" }, { status: 400 });
+	}
+} } } });
+var Route$6 = createFileRoute("/api/resolve")({ server: { handlers: { POST: async ({ request }) => {
+	try {
+		const body = await request.json();
+		const url = typeof body.url === "string" ? body.url.trim() : "";
+		if (!url || url.length > 2e3) return Response.json({
+			ok: false,
+			error: "Geçerli bir video adresi gerekli"
+		}, { status: 400 });
+		const resolved = await resolveVideoSource(url);
+		if (resolved.kind === "web") return Response.json({
+			ok: false,
+			error: "Bu adres video kaynağı değil. Web özelliği Google üzerinden açılır."
+		}, { status: 422 });
+		return Response.json({
+			ok: true,
+			source: {
+				url: resolved.url,
+				kind: resolved.kind,
+				video_id: resolved.video_id,
+				embed_url: resolved.embed_url,
+				stream_url: resolved.stream_url,
+				title: resolved.title,
+				mime_type: resolved.mime_type,
+				provider: resolved.provider,
+				confidence: resolved.confidence,
+				method: resolved.method
+			}
+		});
+	} catch (error) {
+		return Response.json({
+			ok: false,
+			error: error instanceof Error ? error.message : "Video kaynağı çözülemedi"
+		}, { status: 422 });
+	}
+} } } });
+var peers = /* @__PURE__ */ new Map();
+function topic(code) {
+	return `nexora-room:${code.toUpperCase()}`;
+}
+function broadcastRealtime(code, data) {
+	const set = peers.get(topic(code));
+	if (!set) return;
+	for (const peer of set) try {
+		peer.send(data);
+	} catch {
+		set.delete(peer);
+	}
+}
+var DIR = "/tmp/nexora-media";
+var files = /* @__PURE__ */ new Map();
+var SAFE_NAME = /[^a-zA-Z0-9._-]+/g;
+var SAFE_ID = /^[A-Za-z0-9-]+$/;
+function mimeOf(name, fallback) {
+	const lower = name.toLowerCase();
+	if (lower.endsWith(".webm")) return "video/webm";
+	if (lower.endsWith(".mov")) return "video/quicktime";
+	if (lower.endsWith(".m4v")) return "video/x-m4v";
+	if (lower.endsWith(".m3u8")) return "application/vnd.apple.mpegurl";
+	if (fallback.startsWith("video/")) return fallback;
+	return "video/mp4";
+}
+function extOf(name, mime) {
+	const match = name.toLowerCase().match(/\.(mp4|webm|mov|m4v|m3u8)$/);
+	if (match) return match[0];
+	if (mime.includes("webm")) return ".webm";
+	if (mime.includes("quicktime")) return ".mov";
+	return ".mp4";
+}
+async function saveUploadedVideo(file) {
+	const original = file.name.replace(SAFE_NAME, "-").replace(/-+/g, "-").slice(-180) || "video.mp4";
+	const mime = mimeOf(original, file.type || "");
+	const ext = extOf(original, mime);
+	const id = `${Date.now()}-${crypto.randomUUID()}`;
+	const token = process.env.BLOB_READ_WRITE_TOKEN;
+	if (token) {
+		const blob = await put(`nexora/${id}${ext}`, file, {
+			access: "public",
+			token,
+			addRandomSuffix: false,
+			contentType: mime
+		});
+		const stored = {
+			id,
+			name: original,
+			mime,
+			size: file.size,
+			url: blob.url
+		};
+		files.set(id, stored);
+		return stored;
+	}
+	await mkdir(DIR, { recursive: true });
+	const path = join(DIR, `${id}${ext}`);
+	const nodeStream = Readable.fromWeb(file.stream());
+	await pipeline(nodeStream, createWriteStream(path));
+	const stored = {
+		id,
+		name: original,
+		mime,
+		size: (await stat(path)).size,
+		url: `/api/media/${id}`,
+		path
+	};
+	files.set(id, stored);
+	return stored;
+}
+async function readStoredMedia(id) {
+	if (!SAFE_ID.test(id)) return null;
+	const cached = files.get(id);
+	if (cached) return cached;
+	try {
+		await mkdir(DIR, { recursive: true });
+		const match = (await readdir(DIR)).find((name) => name === id || name.startsWith(`${id}.`));
+		if (!match) return null;
+		const path = join(DIR, match);
+		const info = await stat(path);
+		if (!info.isFile()) return null;
+		const stored = {
+			id,
+			name: match,
+			mime: mimeOf(match, ""),
+			size: info.size,
+			url: `/api/media/${id}`,
+			path
+		};
+		files.set(id, stored);
+		return stored;
+	} catch {
+		return null;
+	}
+}
+function mediaStream(stored, start, end) {
+	if (!stored.path) throw new Error("Bu video uzak depoda; yerel stream yok");
+	return Readable.toWeb(createReadStream(stored.path, {
+		start,
+		end
+	}));
+}
 var ALLOWED = /^(video\/(mp4|webm|quicktime|x-m4v|mpeg)|application\/octet-stream)?$/i;
 var MAX_BYTES = 2147483648;
 var Route$5 = createFileRoute("/api/upload")({ server: { handlers: { POST: async ({ request }) => {
@@ -1611,7 +1679,7 @@ var Route$5 = createFileRoute("/api/upload")({ server: { handlers: { POST: async
 		return Response.json({ detail: error instanceof Error ? error.message : "Video yüklenemedi" }, { status: 400 });
 	}
 } } } });
-var $$splitComponentImporter = () => import("../_code-CwLv46qD.mjs");
+var $$splitComponentImporter = () => import("../_code-axC6qpiT.mjs");
 var Route$4 = createFileRoute("/room/$code")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
 var DRIVE_HOST = "https://drive.usercontent.google.com/download";
 function validId(value) {
@@ -1808,43 +1876,49 @@ var Route = createFileRoute("/api/rooms/$")({ server: { handlers: {
 		}
 	}
 } } });
-var IndexRoute = Route$7.update({
+var IndexRoute = Route$8.update({
 	id: "/",
 	path: "/",
-	getParentRoute: () => Route$8
+	getParentRoute: () => Route$9
+});
+var ApiBlobUploadRoute = Route$7.update({
+	id: "/api/blob-upload",
+	path: "/api/blob-upload",
+	getParentRoute: () => Route$9
 });
 var ApiResolveRoute = Route$6.update({
 	id: "/api/resolve",
 	path: "/api/resolve",
-	getParentRoute: () => Route$8
+	getParentRoute: () => Route$9
 });
 var ApiUploadRoute = Route$5.update({
 	id: "/api/upload",
 	path: "/api/upload",
-	getParentRoute: () => Route$8
+	getParentRoute: () => Route$9
 });
 var RoomCodeRoute = Route$4.update({
 	id: "/room/$code",
 	path: "/room/$code",
-	getParentRoute: () => Route$8
+	getParentRoute: () => Route$9
 });
 var ApiDriveIdRoute = Route$3.update({
 	id: "/api/drive/$id",
 	path: "/api/drive/$id",
-	getParentRoute: () => Route$8
+	getParentRoute: () => Route$9
 });
 var ApiMediaIdRoute = Route$2.update({
 	id: "/api/media/$id",
 	path: "/api/media/$id",
-	getParentRoute: () => Route$8
+	getParentRoute: () => Route$9
 });
 var ApiRoomsIndexRoute = Route$1.update({
 	id: "/api/rooms/",
 	path: "/api/rooms/",
-	getParentRoute: () => Route$8
+	getParentRoute: () => Route$9
 });
 var rootRouteChildren = {
 	IndexRoute,
+	ApiBlobUploadRoute,
 	ApiResolveRoute,
 	ApiUploadRoute,
 	RoomCodeRoute,
@@ -1853,11 +1927,11 @@ var rootRouteChildren = {
 	ApiRoomsSplatRoute: Route.update({
 		id: "/api/rooms/$",
 		path: "/api/rooms/$",
-		getParentRoute: () => Route$8
+		getParentRoute: () => Route$9
 	}),
 	ApiRoomsIndexRoute
 };
-var routeTree = Route$8._addFileChildren(rootRouteChildren)._addFileTypes();
+var routeTree = Route$9._addFileChildren(rootRouteChildren)._addFileTypes();
 var router_exports = /* @__PURE__ */ __exportAll({ getRouter: () => getRouter });
 function getRouter() {
 	return createRouter({
@@ -1866,4 +1940,4 @@ function getRouter() {
 	});
 }
 //#endregion
-export { webQueryFromUrl as a, normalizeWebUrl as i, Route$4 as n, DEFAULT_WEB_URL as r, router_exports as t };
+export { normalizeWebUrl as i, Route$4 as n, DEFAULT_WEB_URL as r, router_exports as t };

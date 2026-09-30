@@ -256,21 +256,6 @@ var MessageCircle = createLucideIcon("message-circle", [["path", {
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
-var Search = createLucideIcon("search", [["path", {
-	d: "m21 21-4.34-4.34",
-	key: "14j7rj"
-}], ["circle", {
-	cx: "11",
-	cy: "11",
-	r: "8",
-	key: "4ej97u"
-}]]);
-/**
-* @license lucide-react v0.510.0 - ISC
-*
-* This source code is licensed under the ISC license.
-* See the LICENSE file in the root directory of this source tree.
-*/
 var Send = createLucideIcon("send", [["path", {
 	d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z",
 	key: "1ffxy3"
@@ -444,4 +429,4 @@ var Zap = createLucideIcon("zap", [["path", {
 	key: "1xq2db"
 }]]);
 //#endregion
-export { Copy as _, Users as a, TriangleAlert as c, Search as d, MessageCircle as f, Film as g, Globe as h, Video as i, Sparkles as l, Key as m, Youtube as n, User as o, LogOut as p, X as r, Upload as s, Zap as t, Send as u, CircleHelp as v, ArrowLeft as y };
+export { CircleHelp as _, Users as a, TriangleAlert as c, MessageCircle as d, LogOut as f, Copy as g, Film as h, Video as i, Sparkles as l, Globe as m, Youtube as n, User as o, Key as p, X as r, Upload as s, Zap as t, Send as u, ArrowLeft as v };

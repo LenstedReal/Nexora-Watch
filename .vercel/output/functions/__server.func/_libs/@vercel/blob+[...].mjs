@@ -27284,41 +27284,6 @@ new TextEncoder();
 * MIT Licensed
 */
 //#endregion
-//#region node_modules/@vercel/blob/dist/index.js
-var put$1 = createPutMethod({ allowedOptions: [
-	"cacheControlMaxAge",
-	"addRandomSuffix",
-	"allowOverwrite",
-	"contentType",
-	"ifMatch"
-] });
-createCreateMultipartUploadMethod({ allowedOptions: [
-	"cacheControlMaxAge",
-	"addRandomSuffix",
-	"allowOverwrite",
-	"contentType",
-	"ifMatch"
-] });
-createCreateMultipartUploaderMethod({ allowedOptions: [
-	"cacheControlMaxAge",
-	"addRandomSuffix",
-	"allowOverwrite",
-	"contentType",
-	"ifMatch"
-] });
-createUploadPartMethod({ allowedOptions: [
-	"cacheControlMaxAge",
-	"addRandomSuffix",
-	"allowOverwrite",
-	"contentType"
-] });
-createCompleteMultipartUploadMethod({ allowedOptions: [
-	"cacheControlMaxAge",
-	"addRandomSuffix",
-	"allowOverwrite",
-	"contentType"
-] });
-//#endregion
 //#region node_modules/@vercel/blob/dist/client.js
 function createPutExtraChecks(methodName) {
 	return function extraChecks(options) {
@@ -27346,7 +27311,7 @@ createCompleteMultipartUploadMethod({
 	allowedOptions: ["contentType"],
 	extraChecks: createPutExtraChecks("client/`completeMultipartUpload`")
 });
-createPutMethod({
+var upload = createPutMethod({
 	allowedOptions: ["contentType"],
 	extraChecks(options) {
 		if (options.handleUploadUrl === void 0) throw new BlobError("client/`upload` requires the 'handleUploadUrl' parameter");
@@ -27572,4 +27537,39 @@ function getPathFromRequestUrl(url) {
 	}
 }
 //#endregion
-export { require_token_error as a, require_dist$1 as i, put$1 as n, require_token_util as r, handleUpload as t };
+//#region node_modules/@vercel/blob/dist/index.js
+var put = createPutMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType",
+	"ifMatch"
+] });
+createCreateMultipartUploadMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType",
+	"ifMatch"
+] });
+createCreateMultipartUploaderMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType",
+	"ifMatch"
+] });
+createUploadPartMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType"
+] });
+createCompleteMultipartUploadMethod({ allowedOptions: [
+	"cacheControlMaxAge",
+	"addRandomSuffix",
+	"allowOverwrite",
+	"contentType"
+] });
+//#endregion
+export { require_dist$1 as a, require_token_util as i, handleUpload as n, require_token_error as o, upload as r, put as t };

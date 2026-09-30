@@ -1,7 +1,7 @@
 import { o as __toESM } from "../_runtime.mjs";
 import { a as require_react, i as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
 import { y as useNavigate } from "../_libs/@tanstack/react-router+[...].mjs";
-import { g as Film, h as Globe, l as Sparkles, m as Key, n as Youtube, o as User, t as Zap, v as CircleHelp } from "../_libs/lucide-react.mjs";
+import { _ as CircleHelp, h as Film, l as Sparkles, m as Globe, n as Youtube, o as User, p as Key, t as Zap } from "../_libs/lucide-react.mjs";
 import { a as getSavedNickname, c as saveRoomSession, n as api, s as saveNickname } from "./session-hq0f4atC.mjs";
 //#region node_modules/.nitro/vite/services/ssr/assets/routes-Dq3uw_RD.js
 var import_react = /* @__PURE__ */ __toESM(require_react());

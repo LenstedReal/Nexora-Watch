@@ -8,7 +8,6 @@ import {
   Globe,
   LogOut,
   MessageCircle,
-  Search,
   Send,
   Upload,
   Users,
@@ -23,11 +22,8 @@ import {
   getSavedNickname,
 } from "@/lib/nexora/session";
 import { useRoom } from "@/lib/nexora/use-room";
-import {
-  DEFAULT_WEB_URL,
-  normalizeWebUrl,
-  webQueryFromUrl,
-} from "@/lib/nexora/web";
+import { upload } from "@vercel/blob/client";
+import { DEFAULT_WEB_URL, normalizeWebUrl } from "@/lib/nexora/web";
 
 export const Route = createFileRoute("/room/$code")({
   component: RoomPage,
@@ -171,16 +167,13 @@ function RoomPage() {
           queryClient.setQueryData(["room", code], updatedRoom);
           if (updatedRoom.web_url) setWebUrl(updatedRoom.web_url);
         })
-        .catch(() => {
-          // Bir sonraki oda poll'u kalıcı değeri getirir.
-        });
+        .catch(() => {});
     },
     [isHost, participantId, code, queryClient, sendRealtime, webUrl],
   );
 
   useEffect(() => {
     if (!room?.video?.url) return;
-
     setVideoUrl(room.video.url);
   }, [room?.video?.url]);
 
@@ -237,6 +230,7 @@ function RoomPage() {
     return;
   }
 
+  // Upload devam ederken bile host kendi cihazındaki videoyu görebilsin.
   const previewUrl = URL.createObjectURL(file);
 
   setLocalVideo((previous) => {
@@ -250,23 +244,50 @@ function RoomPage() {
     };
   });
 
-  setUploadProgress(0);
   setLocalUploading(true);
+  setUploadProgress(0);
 
   try {
-    const uploaded = await postLocalVideo(
-      file,
-      code,
-      participantId,
-      (pct) => {
-        setUploadProgress(pct);
-        if (pct >= 99) flash("Video kaydediliyor...");
-      },
-    );
+    let updatedRoom: Room | null = null;
 
-    queryClient.setQueryData(["room", code], uploaded.room);
-    if (uploaded.room.video?.url) {
-      setVideoUrl(uploaded.room.video.url);
+    try {
+      const safeName = file.name
+        .replace(/[^a-zA-Z0-9._-]+/g, "-")
+        .replace(/-+/g, "-")
+        .slice(-180);
+
+      const blob = await upload(
+        `rooms/${code}/${Date.now()}-${safeName}`,
+        file,
+        {
+          access: "public",
+          handleUploadUrl: "/api/blob-upload",
+          clientPayload: JSON.stringify({
+            code,
+            participantId,
+            filename: file.name,
+          }),
+          multipart: true,
+          onUploadProgress: ({ percentage }) => {
+            setUploadProgress(Math.round(percentage));
+          },
+        },
+      );
+
+      updatedRoom = await api.setVideo(code, participantId, blob.url);
+    } catch {
+      const uploaded = await postLocalVideo(
+        file,
+        code,
+        participantId,
+        (pct) => setUploadProgress(pct),
+      );
+      updatedRoom = uploaded.room;
+    }
+
+    if (updatedRoom) {
+      queryClient.setQueryData(["room", code], updatedRoom);
+      if (updatedRoom.video?.url) setVideoUrl(updatedRoom.video.url);
     }
 
     setLocalVideo((previous) => {
@@ -276,7 +297,7 @@ function RoomPage() {
       return null;
     });
 
-    flash("Yerel video odaya yüklendi. Herkes aynı videoyu görüyor.");
+    flash("Yerel video odaya yüklendi ve senkronize edildi.");
   } catch (error) {
     console.error("[Nexora local video upload]", error);
     flash(
@@ -306,9 +327,14 @@ const updateVideo = async () => {
 
       queryClient.setQueryData(["room", code], updatedRoom);
 
+      if (webOpen) {
+        openSyncedWeb(false);
+      }
+
       flash("Video kaynağı güncellendi.");
-    } catch (error) {
-      flash(error instanceof Error ? error.message : "Video güncellenemedi.");
+    } catch {
+      openSyncedWeb(true, url);
+      flash("Web paylaşıldı. Video bulunursa filme döner.");
     } finally {
       setSending(false);
     }
@@ -372,7 +398,14 @@ const updateVideo = async () => {
   }
 
   return (
-    <main className="min-h-dvh bg-surface text-on-surface">
+    <main
+      className="min-h-dvh bg-surface text-on-surface"
+      style={{
+        width: "1024px",
+        maxWidth: "none",
+        zoom: "min(1, calc(100vw / 1024px))",
+      }}
+    >
       {notice ? (
         <div className="fixed top-4 right-4 left-4 z-50 mx-auto max-w-md rounded-lg border border-brand/40 bg-surface-secondary px-4 py-3 text-center text-sm shadow-lg">
           {notice}
@@ -441,10 +474,7 @@ const updateVideo = async () => {
             webOpen={webOpen}
             webUrl={webUrl}
             onWebChange={openSyncedWeb}
-            onWebNavigate={(url) => openSyncedWeb(true, url)}
             localVideo={localVideo}
-            localUploading={localUploading}
-            uploadProgress={uploadProgress}
           />
 
           {isHost ? (
@@ -486,7 +516,7 @@ const updateVideo = async () => {
                 </div>
 
                 <label
-                  className="flex min-h-20 w-full cursor-pointer items-center gap-4 rounded-lg border border-dashed border-brand/40 bg-surface-tertiary/60 px-4 py-3 transition hover:border-brand hover:bg-surface-tertiary"
+                  className="relative flex min-h-20 w-full cursor-pointer items-center gap-4 overflow-hidden rounded-lg border border-dashed border-brand/40 bg-surface-tertiary/60 px-4 py-3 transition hover:border-brand hover:bg-surface-tertiary"
                 >
                   <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand">
                     <Upload className="size-5" />
@@ -498,7 +528,7 @@ const updateVideo = async () => {
                     </span>
 
                     <span className="mt-1 block text-xs text-muted">
-                      MP4, WebM, MOV veya M4V • herkese yüklenir
+                      MP4, WebM, MOV veya M4V • Android / PC
                     </span>
 
                     {localUploading ? (
@@ -518,40 +548,34 @@ const updateVideo = async () => {
 
                   <input
                     type="file"
-                    accept="video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.webm,.mov,.m4v"
-                    className="sr-only"
+                    accept="video/*,.mp4,.webm,.mov,.m4v"
+                    className="absolute inset-0 z-10 cursor-pointer opacity-0"
                     disabled={localUploading}
                     onChange={selectLocalVideo}
                   />
                 </label>
 
-                {localVideo || localUploading ? (
+                {localVideo ? (
                   <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-tertiary px-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate text-xs font-semibold">
-                        {localVideo?.name ?? "Video yükleniyor"}
+                        {localVideo.name}
                       </p>
                       <p className="text-[10px] text-muted">
-                        {localUploading
-                          ? `Odaya yükleniyor (%${uploadProgress})`
-                          : "Yükleme tamamlanınca herkes görür"}
+                        Bu cihazda oynatılıyor
                       </p>
                     </div>
 
-                    {!localUploading ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (localVideo?.url.startsWith("blob:")) {
-                            URL.revokeObjectURL(localVideo.url);
-                          }
-                          setLocalVideo(null);
-                        }}
-                        className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs text-muted hover:text-on-surface"
-                      >
-                        Kaldır
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        URL.revokeObjectURL(localVideo.url);
+                        setLocalVideo(null);
+                      }}
+                      className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs text-muted hover:text-on-surface"
+                    >
+                      Kaldır
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -783,43 +807,27 @@ function postLocalVideo(
     form.append("code", code);
     form.append("participant_id", participantId);
     form.append("file", file, file.name);
-
     xhr.open("POST", "/api/upload");
     xhr.timeout = 0;
-
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && event.total > 0) {
         onProgress(Math.round((event.loaded / event.total) * 100));
       }
     };
-
     xhr.onload = () => {
-      let data: {
-        detail?: string;
-        url?: string;
-        name?: string;
-        room?: Room;
-      } = {};
-
+      let data: { detail?: string; url?: string; name?: string; room?: Room } = {};
       try {
         data = JSON.parse(xhr.responseText) as typeof data;
       } catch {
         reject(new Error("Video yüklenemedi"));
         return;
       }
-
       if (xhr.status >= 200 && xhr.status < 300 && data.room && data.url) {
-        resolve({
-          url: data.url,
-          name: data.name ?? file.name,
-          room: data.room,
-        });
+        resolve({ url: data.url, name: data.name ?? file.name, room: data.room });
         return;
       }
-
       reject(new Error(data.detail || "Video yüklenemedi"));
     };
-
     xhr.onerror = () => reject(new Error("Yükleme bağlantısı koptu"));
     xhr.ontimeout = () => reject(new Error("Yükleme zaman aşımı"));
     xhr.send(form);
@@ -833,11 +841,8 @@ function VideoPlayer({
   webOpen,
   webUrl,
   onWebChange,
-  onWebNavigate,
   serverOffset,
   localVideo,
-  localUploading,
-  uploadProgress,
 }: {
   room: Room;
   participantId: string | null;
@@ -845,22 +850,14 @@ function VideoPlayer({
   webOpen: boolean;
   webUrl: string;
   onWebChange: (open: boolean) => void;
-  onWebNavigate: (url: string) => void;
   serverOffset: number;
   localVideo: { url: string; name: string } | null;
-  localUploading: boolean;
-  uploadProgress: number;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const syncingRemote = useRef(false);
   const lastServerUpdate = useRef(0);
   const hostNativeReadyRef = useRef(false);
-  const [webDraft, setWebDraft] = useState(() => webQueryFromUrl(webUrl));
-
-  useEffect(() => {
-    setWebDraft(webQueryFromUrl(webUrl) || webUrl);
-  }, [webUrl]);
 
   const roomVideo = room.video;
 
@@ -1198,56 +1195,33 @@ function VideoPlayer({
    */
   if (webOpen) {
     return (
-      <div className="relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-surface-secondary sm:aspect-video">
-        <div className="absolute inset-0 flex flex-col">
-          <form
-            className="flex min-h-12 shrink-0 items-center gap-2 border-b border-border px-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!isHost) return;
-              const value = webDraft.trim();
-              if (!value) return;
-              onWebNavigate(value);
-            }}
-          >
-            <Globe className="size-4 shrink-0 text-brand" />
+      <div className="relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-black sm:aspect-video">
+        <div className="absolute inset-0 flex flex-col bg-surface-secondary">
+          <div className="relative z-20 flex min-h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+            <Globe className="size-4 text-brand" />
 
-            <input
-              value={webDraft}
-              readOnly={!isHost}
-              onChange={(event) => setWebDraft(event.target.value)}
-              placeholder={
-                isHost ? "Ara veya adres yaz" : "Oda sahibinin araması"
-              }
-              className="min-h-9 min-w-0 flex-1 rounded-md border border-border bg-surface-tertiary px-2 text-sm outline-none focus:border-brand"
-            />
+            <span className="font-display text-xs font-bold">
+              Web
+            </span>
 
-            {isHost ? (
-              <button
-                type="submit"
-                className="inline-flex min-h-9 items-center gap-1 rounded-md bg-brand px-3 text-xs font-bold text-on-brand"
-              >
-                <Search className="size-3.5" />
-                Ara
-              </button>
-            ) : null}
+            <span className="text-[10px] text-muted">
+              Google
+            </span>
 
-            {isHost ? (
-              <button
-                type="button"
-                onClick={() => onWebChange(false)}
-                className="grid size-9 place-items-center rounded-md border border-border text-muted transition hover:text-on-surface"
-                aria-label="Web görünümünü kapat"
-                title="Web'i kapat"
-              >
-                <X className="size-4" />
-              </button>
-            ) : null}
-          </form>
+            <button
+              type="button"
+              onClick={() => onWebChange(false)}
+              className="ml-auto inline-flex min-h-8 items-center gap-1 rounded-md border border-border px-2 text-[10px] font-semibold text-muted transition hover:text-on-surface"
+              aria-label="Filme dön"
+              title="Filme dön"
+            >
+              <X className="size-4" />
+              Film
+            </button>
+          </div>
 
           <div className="relative min-h-0 flex-1 bg-white">
             <iframe
-              key={webUrl}
               src={webUrl || DEFAULT_WEB_URL}
               title="Nexora Web"
               className="absolute inset-0 h-full w-full border-0 bg-white"
@@ -1256,17 +1230,8 @@ function VideoPlayer({
               referrerPolicy="strict-origin-when-cross-origin"
             />
             {!isHost ? (
-              <div
-                className="absolute inset-0 z-10"
-                aria-hidden="true"
-              />
-            ) : (
-              <div
-                className="absolute inset-x-0 top-0 z-10 h-16"
-                aria-hidden="true"
-                title="Aramayı üstteki çubuktan yaz"
-              />
-            )}
+              <div className="absolute inset-0 z-10" aria-hidden="true" />
+            ) : null}
           </div>
         </div>
       </div>
@@ -1281,9 +1246,9 @@ function VideoPlayer({
       <div className="overflow-hidden rounded-xl border border-glass-border bg-black">
         <div className="relative aspect-[1.25] w-full sm:aspect-video">
           <PlayerWebButton
-            visible={isHost && !localUploading}
-            onClick={() => onWebChange(true)}
-          />
+        visible={isHost}
+        onClick={() => onWebChange(true)}
+      />
 
           <video
             src={localVideo.url}
@@ -1292,18 +1257,10 @@ function VideoPlayer({
             preload="metadata"
             className="absolute inset-0 h-full w-full object-contain"
           />
-
-          {localUploading ? (
-            <div className="absolute inset-x-0 bottom-0 z-20 bg-black/70 px-3 py-2 text-center text-xs font-semibold text-white">
-              Odaya yükleniyor %{uploadProgress}
-            </div>
-          ) : null}
         </div>
 
         <div className="border-t border-glass-border bg-surface-secondary px-3 py-2 text-xs text-muted">
-          {localUploading
-            ? `${localVideo.name} yükleniyor — bitince herkes görür`
-            : `Bu cihazdaki video: ${localVideo.name}`}
+          Bu cihazdaki video: {localVideo.name}
         </div>
       </div>
     );

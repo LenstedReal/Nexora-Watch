@@ -1,5 +1,5 @@
 import { t as __commonJSMin } from "../_runtime.mjs";
-import { a as require_token_error, i as require_dist, r as require_token_util } from "./@vercel/blob+[...].mjs";
+import { a as require_dist, i as require_token_util, o as require_token_error } from "./@vercel/blob+[...].mjs";
 //#region node_modules/@vercel/oidc/dist/token.js
 var require_token = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	var __defProp = Object.defineProperty;

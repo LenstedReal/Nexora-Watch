@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiBlobUploadRouteImport } from './routes/api/blob-upload'
 import { Route as ApiResolveRouteImport } from './routes/api/resolve'
 import { Route as ApiUploadRouteImport } from './routes/api/upload'
 import { Route as RoomCodeRouteImport } from './routes/room/$code'
@@ -21,6 +22,11 @@ import { Route as ApiRoomsSplatRouteImport } from './routes/api/rooms/$'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBlobUploadRoute = ApiBlobUploadRouteImport.update({
+  id: '/api/blob-upload',
+  path: '/api/blob-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiResolveRoute = ApiResolveRouteImport.update({
@@ -61,6 +67,7 @@ const ApiRoomsSplatRoute = ApiRoomsSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/blob-upload': typeof ApiBlobUploadRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/upload': typeof ApiUploadRoute
   '/room/$code': typeof RoomCodeRoute
@@ -71,6 +78,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/blob-upload': typeof ApiBlobUploadRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/upload': typeof ApiUploadRoute
   '/room/$code': typeof RoomCodeRoute
@@ -82,6 +90,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/blob-upload': typeof ApiBlobUploadRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/upload': typeof ApiUploadRoute
   '/room/$code': typeof RoomCodeRoute
@@ -94,6 +103,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/blob-upload'
     | '/api/resolve'
     | '/api/upload'
     | '/room/$code'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/blob-upload'
     | '/api/resolve'
     | '/api/upload'
     | '/room/$code'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/api/blob-upload'
     | '/api/resolve'
     | '/api/upload'
     | '/room/$code'
@@ -125,6 +137,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiBlobUploadRoute: typeof ApiBlobUploadRoute
   ApiResolveRoute: typeof ApiResolveRoute
   ApiUploadRoute: typeof ApiUploadRoute
   RoomCodeRoute: typeof RoomCodeRoute
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/blob-upload': {
+      id: '/api/blob-upload'
+      path: '/api/blob-upload'
+      fullPath: '/api/blob-upload'
+      preLoaderRoute: typeof ApiBlobUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/resolve': {
@@ -197,6 +217,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiBlobUploadRoute: ApiBlobUploadRoute,
   ApiResolveRoute: ApiResolveRoute,
   ApiUploadRoute: ApiUploadRoute,
   RoomCodeRoute: RoomCodeRoute,
