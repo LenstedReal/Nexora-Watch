@@ -10,6 +10,13 @@ const ALLOWED_TYPES = [
   "video/webm",
   "video/quicktime",
   "video/x-m4v",
+  "video/mpeg",
+  "video/x-matroska",
+  "video/avi",
+  "video/x-msvideo",
+  "video/3gpp",
+  "video/3gpp2",
+  "application/octet-stream",
 ];
 
 const MAX_BYTES = 2 * 1024 * 1024 * 1024;
