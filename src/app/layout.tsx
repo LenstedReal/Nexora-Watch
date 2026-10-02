@@ -12,9 +12,15 @@ export const metadata: Metadata = {
   other: {
     "google-adsense-account": "ca-pub-4558868217074430",
   },
+  manifest: "/__grok/manifest.webmanifest",
   icons: {
     icon: "/branding/nexora-logo.jpg",
-    apple: "/branding/nexora-logo.jpg",
+    apple: "/__grok/icon-180.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: APP_NAME,
+    statusBarStyle: "black",
   },
 };
 

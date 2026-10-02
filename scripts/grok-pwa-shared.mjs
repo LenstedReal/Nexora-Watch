@@ -203,12 +203,12 @@ export function grokPwaHeadTags(appName = DEFAULT_APP_NAME) {
 export const GROK_EXTENSIONS_SCRIPT_SRC = "https://grok.com/grok-app-builder/extensions.js";
 
 export function readGrokProjectId() {
-  const fromProcess = typeof process !== "undefined" ? process.env?.VITE_PROJECT_ID : "";
+  const fromProcess = typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_GROK_PROJECT_ID : "";
   return String(fromProcess ?? "").trim();
 }
 
 export function readGrokExtensionsEnabled() {
-  const fromProcess = typeof process !== "undefined" ? process.env?.VITE_GROK_EXTENSIONS : "";
+  const fromProcess = typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_GROK_EXTENSIONS : "";
   return String(fromProcess ?? "").trim() !== "0";
 }
 

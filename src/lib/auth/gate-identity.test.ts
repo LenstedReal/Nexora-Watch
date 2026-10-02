@@ -11,7 +11,7 @@ import {
   sessionBoundToGateIdentity,
   verifyGateIdentityToken,
   type GateJwks,
-} from "./gate-identity.server.ts";
+} from "./gate-identity.server";
 
 const ISSUER = "https://gate.app-builder-testing.com";
 const AUDIENCE = "app:proj-123";

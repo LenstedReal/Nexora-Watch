@@ -11,9 +11,8 @@
  *     posts the session token to the opener and closes. No SPA hydrate, no
  *     server-fn round-trip.
  *
- * Wired automatically by the Vite `authPopupPlugin` in `vite.config.ts` during
- * `npm run dev` (live preview). Do NOT create `src/routes/auth/popup.tsx` — a
- * React route here paints the full app shell in the popup. The opener lives in
+ * Served directly by the Next.js `/auth/popup` route. Do NOT replace this
+ * with a React page — the popup must remain a minimal document. The opener lives in
  * `client.ts` (`signIn` → `openSignInPopup`).
  */
 import { auth, SESSION_TOKEN_COOKIE } from "./server";
@@ -26,8 +25,7 @@ type PopupMessage = {
 };
 
 /**
- * Handle `GET /auth/popup`. Invoked by the Vite `authPopupPlugin` (dev / live
- * preview). Do not re-export this from a React route file.
+ * Handle `GET /auth/popup`. Invoked by the Next.js route handler. Do not re-export this from a React route file.
  */
 export async function handleAuthPopupRequest(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -62,9 +60,9 @@ export async function handleAuthPopupRequest(request: Request): Promise<Response
   // Stay first-party for the callback so the session cookie lands in THIS popup.
   const back = `${url.origin}/auth/popup?done=1`;
   try {
-    const apiRes = await auth.api.signInWithOAuth2({
+    const apiRes = await auth.api.signInSocial({
       body: {
-        providerId,
+        provider: providerId,
         callbackURL: back,
         errorCallbackURL: `${back}&error=1`,
       },

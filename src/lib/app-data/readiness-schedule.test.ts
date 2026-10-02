@@ -5,7 +5,7 @@ import {
   READINESS_PROBE_MAX_TOTAL_MS,
   readinessProbeDelayMs,
   readinessProbeExhausted,
-} from "./readiness-schedule.ts";
+} from "./readiness-schedule";
 
 describe("readinessProbeDelayMs", () => {
   it("backs off through the schedule and then holds the last delay", () => {

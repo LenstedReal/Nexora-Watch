@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { isFramed } from "./login.ts";
-import { getConnectorReadiness } from "./readiness.ts";
+import { isFramed } from "./login";
 import {
   READINESS_PROBE_MAX_TOTAL_MS,
   readinessProbeDelayMs,
   readinessProbeExhausted,
-} from "./readiness-schedule.ts";
-import { CONNECTOR_TOKEN_READY_EVENT } from "./types.ts";
+} from "./readiness-schedule";
+import { CONNECTOR_TOKEN_READY_EVENT } from "./types";
 
 export type ConnectorWaitStatus =
   | "idle"
@@ -29,9 +28,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 
 async function isConnectorReady(): Promise<boolean> {
   const result = await withTimeout(
-    getConnectorReadiness(),
+    fetch("/api/connector-readiness", {
+      method: "POST",
+      credentials: "same-origin",
+    }).then(async (response) => {
+      if (!response.ok) return null;
+      return (await response.json()) as { ready?: boolean };
+    }),
     READINESS_PROBE_TIMEOUT_MS,
   );
+
   return result?.ready === true;
 }
 

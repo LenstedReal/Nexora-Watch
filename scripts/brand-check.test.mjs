@@ -137,15 +137,15 @@ test("compliant game (custom card + site.json type + x-banner) is silent", () =>
   assert.deepEqual(computeBrandWarnings({ hasCanvas: true, workspaceRoot: root }), []);
 });
 
-test("__root.tsx og:type no longer satisfies the canvas gate", () => {
+test("layout.tsx og:type no longer satisfies the canvas gate", () => {
   const root = makeWorkspace({
     siteJson: UTILITY_CUSTOM_SITE,
     cardFile: "og.jpg",
     narrowFile: "x-banner.jpg",
   });
-  mkdirSync(join(root, "src/routes"), { recursive: true });
+  mkdirSync(join(root, "src/app"), { recursive: true });
   writeFileSync(
-    join(root, "src/routes/__root.tsx"),
+    join(root, "src/app/layout.tsx"),
     '{ property: "og:type", content: "x:game" }',
   );
   const warnings = computeBrandWarnings({ hasCanvas: true, workspaceRoot: root });

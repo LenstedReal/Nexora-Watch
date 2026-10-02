@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { resolveSignInGateState } from "./sign-in-gate.ts";
+import { resolveSignInGateState } from "./sign-in-gate";
 
 describe("resolveSignInGateState", () => {
   it("is pending while the session check is in flight, user or not", () => {

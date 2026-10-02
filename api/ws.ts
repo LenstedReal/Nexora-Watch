@@ -1,24 +1,28 @@
-import { defineWebSocketHandler } from "nitro";
+import { createServer } from "node:http";
+import { WebSocket, WebSocketServer } from "ws";
+import {
+  addRealtimePeer,
+  broadcastRealtime,
+  removeRealtimePeer,
+} from "../src/lib/realtime";
 
 import {
   loadRoom,
   sendMessage,
   setPlayback,
   setWebOpen,
-} from "../../src/lib/nexora/server";
-
-import {
-  addRealtimePeer,
-  removeRealtimePeer,
-  broadcastRealtime,
-} from "../lib/realtime";
+} from "../src/lib/nexora/server";
 
 function now() {
   return Date.now();
 }
 
-function getParams(peer: { request: { url: string } }) {
-  const url = new URL(peer.request.url);
+function topic(code: string) {
+  return `nexora-room:${code.toUpperCase()}`;
+}
+
+function getParams(urlString: string) {
+  const url = new URL(urlString, "http://localhost");
 
   return {
     code: url.searchParams.get("code")?.trim().toUpperCase() ?? "",
@@ -27,49 +31,67 @@ function getParams(peer: { request: { url: string } }) {
   };
 }
 
-export default defineWebSocketHandler({
-  async open(peer) {
-    const { code, participantId } = getParams(peer);
 
-    if (!code || !participantId) {
-      peer.close(1008, "Geçersiz bağlantı");
-      return;
-    }
 
-    let room;
+function sendRealtime(peer: RealtimePeer, data: unknown) {
+  if (peer.readyState !== WebSocket.OPEN) return;
 
-    try {
-      room = await loadRoom(code);
-    } catch {
-      peer.close(1008, "Oda bulunamadı");
-      return;
-    }
+  try {
+    peer.send(JSON.stringify(data));
+  } catch {
+    // Ignore a peer that disappeared during send.
+  }
+}
 
-    addRealtimePeer(code, peer);
 
-    peer.send({
-      type: "room",
-      room,
-      server_time: now(),
-    });
+const server = createServer((_request, response) => {
+  response.writeHead(426, {
+    "content-type": "text/plain; charset=utf-8",
+  });
+  response.end("WebSocket upgrade required");
+});
 
-    broadcastRealtime(code, {
-      type: "presence",
-      participant_id: participantId,
-      online: true,
-      server_time: now(),
-    });
-  },
+const wss = new WebSocketServer({ server });
 
-  async message(peer, message) {
-    const { code, participantId } = getParams(peer);
+wss.on("connection", async (peer, request) => {
+  const { code, participantId } = getParams(
+    request.url ?? "/api/ws",
+  );
 
-    if (!code || !participantId) return;
+  if (!code || !participantId) {
+    peer.close(1008, "Geçersiz bağlantı");
+    return;
+  }
 
+  let room;
+
+  try {
+    room = await loadRoom(code);
+  } catch {
+    peer.close(1008, "Oda bulunamadı");
+    return;
+  }
+
+  addRealtimePeer(code, peer);
+
+  sendRealtime(peer, {
+    type: "room",
+    room,
+    server_time: now(),
+  });
+
+  broadcastRealtime(code, {
+    type: "presence",
+    participant_id: participantId,
+    online: true,
+    server_time: now(),
+  });
+
+  peer.on("message", async (raw) => {
     let data: unknown;
 
     try {
-      data = JSON.parse(message.text());
+      data = JSON.parse(raw.toString());
     } catch {
       return;
     }
@@ -85,7 +107,7 @@ export default defineWebSocketHandler({
     const type = (data as { type?: unknown }).type;
 
     if (type === "ping") {
-      peer.send({
+      sendRealtime(peer, {
         type: "pong",
         server_time: now(),
       });
@@ -138,7 +160,7 @@ export default defineWebSocketHandler({
       }
 
       try {
-        const room = await setWebOpen(
+        const updatedRoom = await setWebOpen(
           code,
           participantId,
           payload.open,
@@ -147,12 +169,12 @@ export default defineWebSocketHandler({
 
         broadcastRealtime(code, {
           type: "web",
-          open: room.web_open,
-          url: room.web_url,
+          open: updatedRoom.web_open,
+          url: updatedRoom.web_url,
           server_time: now(),
         });
       } catch {
-        // invalid room/participant
+        // Invalid room/participant.
       }
 
       return;
@@ -184,16 +206,12 @@ export default defineWebSocketHandler({
           server_time: now(),
         });
       } catch {
-        // Invalid participant/message is rejected.
+        // Invalid participant/message.
       }
     }
-  },
+  });
 
-  close(peer) {
-    const { code, participantId } = getParams(peer);
-
-    if (!code || !participantId) return;
-
+  peer.on("close", () => {
     removeRealtimePeer(code, peer);
 
     broadcastRealtime(code, {
@@ -202,5 +220,13 @@ export default defineWebSocketHandler({
       online: false,
       server_time: now(),
     });
-  },
+  });
+
+  peer.on("error", () => {
+    removeRealtimePeer(code, peer);
+  });
 });
+
+export { server };
+
+export default server;

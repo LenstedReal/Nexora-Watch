@@ -1144,7 +1144,9 @@ function VideoPlayer({
 
         try {
           video.currentTime = target;
-        } catch {}
+        } catch {
+          // Ignore transient media-sync failures.
+        }
 
         window.setTimeout(() => {
           syncingRemote.current = false;
@@ -1692,7 +1694,9 @@ function YouTubeRoomPlayer({
 
       try {
         player?.destroy();
-      } catch {}
+      } catch {
+        // Ignore player teardown failures during unmount.
+      }
 
       if (containerRef.current) {
         containerRef.current.innerHTML = "";
@@ -1807,7 +1811,9 @@ function YouTubeRoomPlayer({
 
         try {
           player.seekTo(target, true);
-        } catch {}
+        } catch {
+          // Ignore transient player seek failures.
+        }
 
         window.setTimeout(() => {
           applyingRemoteRef.current = false;
@@ -1851,7 +1857,9 @@ function YouTubeRoomPlayer({
 
           try {
             player.pauseVideo();
-          } catch {}
+          } catch {
+            // Ignore transient player pause failures.
+          }
 
           window.setTimeout(() => {
             applyingRemoteRef.current = false;

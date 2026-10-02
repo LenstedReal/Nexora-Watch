@@ -45,6 +45,7 @@ export type CallToolOptions = {
   connectorType: ConnectorTypeName;
   connectorCatalogId?: string;
   token?: string | null;
+  request?: Request;
 };
 
 export type ToolArgs = Record<string, unknown>;

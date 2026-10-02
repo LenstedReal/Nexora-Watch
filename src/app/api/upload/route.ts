@@ -1,4 +1,4 @@
-import { broadcastRealtime } from "../../../../server/lib/realtime";
+import { broadcastRealtime } from "@/lib/realtime";
 import { saveUploadedVideo } from "@/lib/nexora/media-store";
 import { setVideo } from "@/lib/nexora/server";
 

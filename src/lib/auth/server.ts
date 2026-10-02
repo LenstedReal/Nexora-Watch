@@ -31,8 +31,7 @@
  */
 import { betterAuth } from "better-auth";
 import { bearer, genericOAuth } from "better-auth/plugins";
-import { tanstackStartCookies } from "better-auth/tanstack-start";
-import { getCookie } from "@tanstack/react-start/server";
+import { nextCookies } from "better-auth/next-js";
 import { randomBytes } from "node:crypto";
 import { Pool } from "pg";
 import { ensureDbReady, getPglite } from "../db";
@@ -248,13 +247,9 @@ export const auth = betterAuth({
 
     // Bridges Better Auth's Set-Cookie into TanStack Start responses. MUST be
     // last so it runs after every other plugin's hooks.
-    tanstackStartCookies(),
+    nextCookies(),
   ],
 });
-
-export function readSessionToken(): string | null {
-  return getCookie(SESSION_TOKEN_COOKIE) ?? null;
-}
 
 // Re-exported for convenience; the array lives in the dependency-free
 // `providers.ts` so the client can import it too.

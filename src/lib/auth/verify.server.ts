@@ -1,4 +1,3 @@
-import { getRequest } from "@tanstack/react-start/server";
 import { gateIdentityEnabled } from "./gate-identity.server";
 import { auth, authConfigured } from "./server";
 
@@ -56,9 +55,9 @@ export type VerifiedUser = { id: string; email: string | null };
  */
 export async function getSessionUser(
   bearerToken?: string,
+  request?: Request,
 ): Promise<VerifiedUser | null> {
   if (!authConfigured && !gateIdentityEnabled()) return null;
-  const request = getRequest();
   if (!request) return null;
   let headers = request.headers;
   if (bearerToken) {

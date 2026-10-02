@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
-import { getRequest } from "@tanstack/react-start/server";
 import {
   assertSameSiteRequest,
   CrossSiteRequestError,
-} from "../auth/isolation.server.ts";
-import { env, isWorkspacePreview } from "../env.server.ts";
-import { assertAppDataServerOnly } from "./server-only.ts";
+} from "../auth/isolation.server";
+import { env, isWorkspacePreview } from "../env.server";
+import { assertAppDataServerOnly } from "./server-only";
 import {
   CONNECTOR_TOKEN_HEADER,
   CONNECTOR_TOKEN_PENDING_CODE,
@@ -13,7 +12,7 @@ import {
   type CallToolOptions,
   type CallToolResult,
   type ToolArgs,
-} from "./types.ts";
+} from "./types";
 
 assertAppDataServerOnly("app-data/client.server");
 
@@ -48,16 +47,8 @@ function connectorsBaseFor(publicHost: string | null): string | null {
   return null;
 }
 
-function tryGetRequest(): Request | null {
-  try {
-    return getRequest() ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function inboundContext(): InboundContext {
-  const req = tryGetRequest();
+function inboundContext(request?: Request): InboundContext {
+  const req = request ?? null;
   const xf = req?.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
   const publicHost =
     (xf || req?.headers.get("host") || "").split(":")[0]?.trim() || null;
@@ -73,15 +64,15 @@ function inboundContext(): InboundContext {
   };
 }
 
-export function resolveGateAppDataBase(): string | null {
-  return inboundContext().connectorsBase;
+export function resolveGateAppDataBase(request?: Request): string | null {
+  return inboundContext(request).connectorsBase;
 }
 
-export function getConnectorAccessToken(): string | null {
-  return inboundContext().token;
+export function getConnectorAccessToken(request?: Request): string | null {
+  return inboundContext(request).token;
 }
 
-export { isWorkspacePreview } from "../env.server.ts";
+export { isWorkspacePreview } from "../env.server";
 
 // Digest of the last preview token the gate answered 401 for. The readiness
 // probe reports "not ready" while that exact token is still the one on the
@@ -106,8 +97,8 @@ function noteTokenAccepted(token: string): void {
  * rejected. This is what the preview readiness probe reports; it never calls
  * the gate.
  */
-export function isConnectorTokenReady(): boolean {
-  const token = inboundContext().token;
+export function isConnectorTokenReady(request?: Request): boolean {
+  const token = inboundContext(request).token;
   return token !== null && tokenDigest(token) !== rejectedTokenDigest;
 }
 
@@ -243,9 +234,9 @@ function unauthorizedResult(
   };
 }
 
-function crossSiteBlockedResult(): CallToolResult | null {
+function crossSiteBlockedResult(request?: Request): CallToolResult | null {
   try {
-    assertSameSiteRequest();
+    assertSameSiteRequest(request);
     return null;
   } catch (e) {
     if (e instanceof CrossSiteRequestError) {
@@ -278,7 +269,9 @@ function tokenIdentityKey(token: string): string {
             .digest("base64url");
         }
       }
-    } catch {}
+    } catch {
+      // Fall back to hashing the raw token when structured token parsing fails.
+    }
   }
   return createHash("sha256").update(token).digest("base64url");
 }
@@ -319,8 +312,8 @@ function safeMemoKey(parts: unknown[]): string | null {
   }
 }
 
-function nonPostBlockedResult(): CallToolResult | null {
-  const req = tryGetRequest();
+function nonPostBlockedResult(request?: Request): CallToolResult | null {
+  const req = request ?? null;
   if (!req || req.method === "POST") return null;
   return {
     ok: false,
@@ -336,10 +329,12 @@ export async function callTool(
   args: ToolArgs,
   options: CallToolOptions,
 ): Promise<CallToolResult> {
-  const blocked = crossSiteBlockedResult() ?? nonPostBlockedResult();
+  const blocked =
+    crossSiteBlockedResult(options.request) ??
+    nonPostBlockedResult(options.request);
   if (blocked) return blocked;
 
-  const ctx = inboundContext();
+  const ctx = inboundContext(options.request);
   const token = options.token ?? ctx.token;
   if (!token) {
     return missingAuthResult();
@@ -417,11 +412,11 @@ export {
   GoogleCalendarTools,
   GoogleDriveTools,
   CONNECTOR_TOKEN_HEADER,
-} from "./types.ts";
+} from "./types";
 export type {
   CallToolResult,
   CallToolOptions,
   ToolArgs,
   ConnectorTypeName,
-} from "./types.ts";
-export { isLoginRequired, redirectToLoginIfRequired } from "./login.ts";
+} from "./types";
+export { isLoginRequired, redirectToLoginIfRequired } from "./login";

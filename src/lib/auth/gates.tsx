@@ -1,5 +1,8 @@
+"use client";
+
+import * as React from "react";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { Navigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { GROK_PROVIDERS, authEnabled, signIn, signOut } from "./client";
 import { hasGateSessionMarker } from "./gate-session-marker";
 import { resolveSignInGateState } from "./sign-in-gate";
@@ -46,7 +49,13 @@ export function SignedOut({ children }: { children: ReactNode }) {
  * render this.
  */
 export function RedirectToSignIn({ to = SIGN_IN_PATH }: { to?: string }) {
-  return <Navigate to={to} />;
+  const router = useRouter();
+
+  React.useEffect(() => {
+    router.replace(to);
+  }, [router, to]);
+
+  return null;
 }
 
 export function SignInGate({

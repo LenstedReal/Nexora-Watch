@@ -4,12 +4,12 @@ import {
   callTool,
   failureMemoSize,
   isConnectorTokenReady,
-} from "./client.server.ts";
-import { ConnectorType, GoogleCalendarTools } from "./types.ts";
-import type { ToolArgs } from "./types.ts";
-import { isLoginRequired, redirectToLoginIfRequired } from "./login.ts";
-import { classifyCallToolError } from "./errors.ts";
-import type { CallToolResult } from "./types.ts";
+} from "./client.server";
+import { ConnectorType, GoogleCalendarTools } from "./types";
+import type { ToolArgs } from "./types";
+import { isLoginRequired, redirectToLoginIfRequired } from "./login";
+import { classifyCallToolError } from "./errors";
+import type { CallToolResult } from "./types";
 
 type WindowStub = {
   location: { assign: (url: string) => void; href: string };

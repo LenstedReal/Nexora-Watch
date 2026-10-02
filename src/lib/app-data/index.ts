@@ -3,19 +3,19 @@ export {
   ConnectorType,
   GoogleCalendarTools,
   GoogleDriveTools,
-} from "./types.ts";
+} from "./types";
 export type {
   CallToolOptions,
   CallToolResult,
   ConnectorTypeName,
   ToolArgs,
-} from "./types.ts";
+} from "./types";
 export {
   isConnectorPending,
   isLoginRequired,
   redirectToLoginIfRequired,
-} from "./login.ts";
-export { classifyCallToolError } from "./errors.ts";
-export type { CallToolErrorKind, CallToolErrorState } from "./errors.ts";
-export { useRefetchWhenConnectorReady } from "./use-connector-readiness.ts";
-export type { ConnectorWaitStatus } from "./use-connector-readiness.ts";
+} from "./login";
+export { classifyCallToolError } from "./errors";
+export type { CallToolErrorKind, CallToolErrorState } from "./errors";
+export { useRefetchWhenConnectorReady } from "./use-connector-readiness";
+export type { ConnectorWaitStatus } from "./use-connector-readiness";

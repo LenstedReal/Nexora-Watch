@@ -24,11 +24,9 @@ type GateAccount = Parameters<typeof handleOAuthUserInfo>[1]["account"];
 /**
  * Emit the signed session cookie so the browser actually receives it.
  *
- * `setSessionCookie` writes into the Better Auth middleware header bag, but on
- * TanStack Start that bag is not always copied onto the final HTTP response
- * (the response can end up with no `Set-Cookie`). Sign the token ourselves and
- * push it through TanStack's `setCookie` + `responseHeaders` so both the
- * framework cookie store and any after-hooks see it.
+ * Better Auth's middleware context provides the cookie helpers directly.
+ * The Next.js Better Auth integration forwards the resulting Set-Cookie
+ * headers to the final HTTP response.
  */
 async function emitSessionCookie(
   ctx: Parameters<Parameters<typeof createAuthMiddleware>[0]>[0],
@@ -65,10 +63,8 @@ async function emitSessionCookie(
     return null;
   }
 
-  // Primary path: TanStack Start's response cookie store (reaches the browser).
   try {
-    const { setCookie } = await import("@tanstack/react-start/server");
-    setCookie(sessionTokenName, sessionValue, {
+    ctx.setCookie(sessionTokenName, sessionValue, {
       path: cookieOptions.path ?? "/",
       httpOnly: cookieOptions.httpOnly ?? true,
       secure: cookieOptions.secure ?? true,
@@ -77,18 +73,11 @@ async function emitSessionCookie(
       domain: cookieOptions.domain,
     });
   } catch (err) {
-    console.error(`${LOG} TanStack setCookie failed`, err);
+    console.error(`${LOG} ctx.setCookie failed`, err);
   }
 
-  // Also stash on Better Auth responseHeaders so after-hooks (tanstackStartCookies)
-  // can forward it if they run.
   try {
-    const responseHeaders = ctx.context.responseHeaders;
-    if (responseHeaders) {
-      responseHeaders.append("set-cookie", signedCookie);
-    } else {
-      console.error(`${LOG} ctx.context.responseHeaders is missing`);
-    }
+    ctx.context.responseHeaders?.append("set-cookie", signedCookie);
   } catch (err) {
     console.error(`${LOG} responseHeaders.append(set-cookie) failed`, err);
   }
@@ -100,8 +89,7 @@ async function emitSessionCookie(
  * Expire the previous user's `session_data` cookie cache after an identity
  * swap. The cache is signed against the old session and outlives it (5-min
  * TTL), so without this `/get-session` keeps serving the replaced user.
- * Mirrors `emitSessionCookie`'s dual-path delivery: TanStack's response
- * cookie store plus Better Auth's `responseHeaders` bag.
+ * The cookie is emitted through Better Auth's response header pipeline.
  */
 async function expireSessionDataCookie(
   ctx: Parameters<Parameters<typeof createAuthMiddleware>[0]>[0],
@@ -110,8 +98,7 @@ async function expireSessionDataCookie(
   const path = cookie.attributes.path ?? "/";
   const secure = cookie.attributes.secure ?? true;
   try {
-    const { setCookie } = await import("@tanstack/react-start/server");
-    setCookie(cookie.name, "", {
+    ctx.setCookie(cookie.name, "", {
       path,
       httpOnly: true,
       secure,
@@ -119,7 +106,7 @@ async function expireSessionDataCookie(
       maxAge: 0,
     });
   } catch (err) {
-    console.error(`${LOG} TanStack setCookie (expire session_data) failed`, err);
+    console.error(`${LOG} ctx.setCookie (expire session_data) failed`, err);
   }
   try {
     ctx.context.responseHeaders?.append(
@@ -153,8 +140,7 @@ async function writeGateMarkerCookie(
       : undefined;
   const value = clear ? "" : "1";
   try {
-    const { setCookie } = await import("@tanstack/react-start/server");
-    setCookie(GATE_SESSION_MARKER_COOKIE, value, {
+    ctx.setCookie(GATE_SESSION_MARKER_COOKIE, value, {
       path: "/",
       httpOnly: false,
       secure: true,
@@ -162,7 +148,7 @@ async function writeGateMarkerCookie(
       maxAge,
     });
   } catch (err) {
-    console.error(`${LOG} TanStack setCookie (gate marker) failed`, err);
+    console.error(`${LOG} ctx.setCookie (gate marker) failed`, err);
   }
   try {
     ctx.context.responseHeaders?.append(

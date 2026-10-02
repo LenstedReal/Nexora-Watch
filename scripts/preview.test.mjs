@@ -91,11 +91,11 @@ test("looksLikePreviewProcess matches the npm wrapper and its vite child", () =>
   assert.equal(looksLikePreviewProcess(npmRun), true);
   assert.equal(looksLikePreviewProcess(cmdline("npm", "run", "preview")), true);
   assert.equal(
-    looksLikePreviewProcess(cmdline("node", "/ws/node_modules/.bin/vite", "preview")),
+    looksLikePreviewProcess(cmdline("node", "/ws/node_modules/.bin/next", "start")),
     true,
   );
   // `ps -o command=` output is space-separated.
-  assert.equal(looksLikePreviewProcess("node /ws/node_modules/.bin/vite preview"), true);
+  assert.equal(looksLikePreviewProcess("node /ws/node_modules/.bin/next start"), true);
 });
 
 test("looksLikePreviewProcess spares the sibling scripts and re-used pids", () => {

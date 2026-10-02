@@ -1,4 +1,4 @@
-import { broadcastRealtime } from "../../../../../server/lib/realtime";
+import { broadcastRealtime } from "@/lib/realtime";
 import {
   getMessages,
   joinRoom,

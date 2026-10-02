@@ -1,4 +1,3 @@
-import { genericOAuthClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { runPreSignInSignOut, runSignOut } from "../../../scripts/sign-out-plan.mjs";
 import { GROK_PROVIDERS } from "./providers";
@@ -18,7 +17,6 @@ import { GROK_PROVIDERS } from "./providers";
  * the visitor stays signed in.
  */
 export const authClient = createAuthClient({
-  plugins: [genericOAuthClient()],
   fetchOptions: {
     onRequest(ctx) {
       const token = getBearerToken();
@@ -35,7 +33,8 @@ export const authClient = createAuthClient({
  * with the key removed, sign-in is real in preview (baked preview client) and
  * when deployed (injected per-app client).
  */
-export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
+export const authEnabled =
+  process.env.NEXT_PUBLIC_AUTH_ENABLED !== "false";
 
 /** The upstream providers to render sign-in buttons for. */
 export { GROK_PROVIDERS };
@@ -87,7 +86,7 @@ type PopupMessage = { source: "grok-auth-popup"; token: string | null; error?: s
  * federating through the Grok auth broker.
  *
  * - **Live preview** (`*.grok-sandbox.com` iframe): opens a POPUP to
- *   `/auth/popup`, served by the template Vite plugin (see `vite.config.ts` +
+ *   `/auth/popup`, served by the Next.js route handler (see `src/app/auth/popup/route.ts` +
  *   `popup.server.ts`) — 302s to the broker/upstream login (no app chrome) and,
  *   on return, posts the session bearer token back. We store it and refresh the
  *   session; no top-level navigation of the iframe to the broker.
@@ -143,8 +142,8 @@ export async function signIn(
     return;
   }
 
-  const { data, error } = await authClient.signIn.oauth2({
-    providerId,
+  const { data, error } = await authClient.signIn.social({
+    provider: providerId,
     callbackURL,
     errorCallbackURL,
   });
@@ -155,7 +154,7 @@ export async function signIn(
 /**
  * Open `/auth/popup` in a new window. Must run synchronously inside the click
  * handler (no await before this). The path is served by the template Vite
- * plugin (`authPopupPlugin` in vite.config.ts) — NOT by a React route.
+ * Next.js `/auth/popup` route handler — NOT by a React page.
  *
  * Opens the real URL directly (not about:blank → assign). From a cross-origin
  * iframe the about:blank dance often fails on the first click and the window

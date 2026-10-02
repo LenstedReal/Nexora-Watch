@@ -85,7 +85,7 @@ function blocked(url: URL): boolean {
 }
 
 function absolute(value: string, base: URL): string | null {
-  let cleaned = value
+  const cleaned = value
     .trim()
     .replace(/^['"`]|['"`]$/g, "")
     .replace(/&amp;/g, "&")

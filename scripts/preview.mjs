@@ -2,7 +2,7 @@
 /**
  * Owns :8081, the built-output QA preview.
  *
- * `vite preview` is strictPort, so a preview left over from an earlier turn
+ * `next start` is strictPort, so a preview left over from an earlier turn
  * both fails the next start and keeps serving the previous build's output.
  * Every restart therefore kills the current port owner first, whoever started
  * it. Owners come from /proc, so this runs only inside the Linux sandbox.
@@ -83,11 +83,11 @@ export function looksLikePreviewProcess(cmdline) {
   // The sandbox service runs scripts/preview-thumbnail.mjs in this box, and
   // this script can be running concurrently: neither is ever a target.
   if (/\bpreview[\w-]*\.mjs\b/.test(argv)) return false;
-  // The `npm run preview` wrapper (`npm-cli.js run preview`) and its vite child.
+  // The `npm run preview` wrapper (`npm-cli.js run preview`) and its Next.js child.
   // `preview` must be the whole script name: `run preview:stop`/`preview:restart`
   // are this tooling's own wrappers, and `vite build --outDir preview-dist` is
   // not a server.
-  return /\brun\s+preview(?:\s|$)/.test(argv) || /\bvite\b\s+preview\b/.test(argv);
+  return /\brun\s+preview(?:\s|$)/.test(argv) || /\bnext\b\s+start\b/.test(argv);
 }
 
 /**
@@ -318,7 +318,7 @@ async function restart() {
     const why =
       failure ??
       `nothing answered on ${PREVIEW_URL} within ${secs}s — check that vite.config.ts ` +
-        `still sets preview.port ${PREVIEW_PORT}`;
+        `still starts Next.js on ${PREVIEW_PORT}`;
     console.error(`[preview] ${why} — see ${LOG_FILE}`);
     // A server that binds a few seconds later would serve a build the agent has
     // already been told to distrust.
