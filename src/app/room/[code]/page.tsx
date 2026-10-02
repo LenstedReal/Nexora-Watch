@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Copy,
-  Globe,
+
   LogOut,
   MessageCircle,
   Send,
@@ -25,7 +25,7 @@ import {
   getSavedNickname,
 } from "@/lib/nexora/session";
 import { useRoom } from "@/lib/nexora/use-room";
-import { DEFAULT_WEB_URL, normalizeWebUrl } from "@/lib/nexora/web";
+const MAX_LOCAL_VIDEO_DURATION = 30;
 
 export default function RoomPage() {
   const { code: codeParam } = useParams<{ code: string }>();
@@ -44,9 +44,7 @@ export default function RoomPage() {
 
   // Web görünümü oda seviyesinde tutulur.
   // Böylece host/guest player state'i birbirinden kopmaz.
-  const [webOpen, setWebOpen] = useState(false);
-  const [webUrl, setWebUrl] = useState(DEFAULT_WEB_URL);
-  const [localUploading, setLocalUploading] = useState(false);
+const [localUploading, setLocalUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState("");
@@ -87,90 +85,6 @@ export default function RoomPage() {
   );
 
   const isHost = me?.is_host === true;
-  const hostWebAppliedRef = useRef(false);
-
-  useEffect(() => {
-    hostWebAppliedRef.current = false;
-    setWebOpen(false);
-  }, [code]);
-
-  // Sunucudan gelen Web durumunu oda seviyesinde uygula.
-  useEffect(() => {
-    if (typeof room?.web_open !== "boolean") return;
-    if (isHost && hostWebAppliedRef.current) {
-      if (typeof room.web_url === "string" && room.web_url.trim()) {
-        setWebUrl(room.web_url);
-      }
-      return;
-    }
-    if (isHost) hostWebAppliedRef.current = true;
-    setWebOpen(room.web_open);
-    if (typeof room.web_url === "string" && room.web_url.trim()) {
-      setWebUrl(room.web_url);
-    }
-  }, [isHost, room?.web_open, room?.web_url]);
-
-  useEffect(() => {
-    const onWebSync = (event: Event) => {
-      const detail = (
-        event as CustomEvent<{ open?: unknown; url?: unknown }>
-      ).detail;
-
-      if (typeof detail?.open === "boolean") {
-        setWebOpen(detail.open);
-      }
-      if (typeof detail?.url === "string" && detail.url.trim()) {
-        setWebUrl(detail.url);
-      }
-    };
-
-    window.addEventListener("nexora:web-sync", onWebSync);
-
-    return () => {
-      window.removeEventListener("nexora:web-sync", onWebSync);
-    };
-  }, []);
-
-  const openSyncedWeb = useCallback(
-    (open: boolean, nextUrl?: string) => {
-      if (!isHost || !participantId) return;
-
-      const resolvedUrl = nextUrl
-        ? normalizeWebUrl(nextUrl)
-        : webUrl || DEFAULT_WEB_URL;
-
-      setWebOpen(open);
-      setWebUrl(resolvedUrl);
-
-      queryClient.setQueryData<Room>(["room", code], (old) =>
-        old
-          ? { ...old, web_open: open, web_url: resolvedUrl }
-          : old,
-      );
-
-      window.dispatchEvent(
-        new CustomEvent("nexora:web-sync", {
-          detail: { open, url: resolvedUrl },
-        }),
-      );
-
-      sendRealtime({
-        type: "web",
-        open,
-        url: resolvedUrl,
-      });
-
-      void api
-        .setWebOpen(code, participantId, open, resolvedUrl)
-        .then((updatedRoom) => {
-          queryClient.setQueryData(["room", code], updatedRoom);
-          if (updatedRoom.web_url) setWebUrl(updatedRoom.web_url);
-        })
-        .catch(() => {});
-    },
-    [isHost, participantId, code, queryClient, sendRealtime, webUrl],
-  );
-
   useEffect(() => {
     if (!room?.video?.url) return;
     setVideoUrl(room.video.url);
@@ -205,6 +119,25 @@ export default function RoomPage() {
 
   if (!file) return;
 
+  const duration = await getVideoDuration(file);
+
+  if (!Number.isFinite(duration) || duration <= 0) {
+    flash("Video süresi okunamadı.");
+    event.target.value = "";
+    return;
+  }
+
+  if (duration > MAX_LOCAL_VIDEO_DURATION) {
+    flash("Cihazdan seçilen video 30 saniye veya daha kısa olmalıdır.");
+    event.target.value = "";
+    return;
+  }
+
+  console.info("[Nexora local video duration]", {
+    name: file.name,
+    duration,
+  });
+
   const allowed =
     file.type.startsWith("video/") ||
     /\.(mp4|webm|mov|m4v)$/i.test(file.name);
@@ -221,7 +154,7 @@ export default function RoomPage() {
     return;
   }
 
-  const MAX_BYTES = 2 * 1024 * 1024 * 1024;
+const MAX_BYTES = 2 * 1024 * 1024 * 1024;
 
   if (file.size > MAX_BYTES) {
     flash("Video en fazla 2 GB olabilir.");
@@ -310,6 +243,34 @@ export default function RoomPage() {
   }
 };
 
+function getVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.removeAttribute("src");
+      video.load();
+    };
+
+    video.preload = "metadata";
+
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      cleanup();
+      resolve(duration);
+    };
+
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Video metadata okunamadı."));
+    };
+
+    video.src = objectUrl;
+  });
+}
+
 const updateVideo = async () => {
     const url = videoUrl.trim();
 
@@ -325,15 +286,11 @@ const updateVideo = async () => {
       );
 
       queryClient.setQueryData(["room", code], updatedRoom);
-
-      if (webOpen) {
-        openSyncedWeb(false);
-      }
-
       flash("Video kaynağı güncellendi.");
     } catch {
-      openSyncedWeb(true, url);
-      flash("Web paylaşıldı. Video bulunursa filme döner.");
+      flash(
+        "Bu bağlantı desteklenen bir video kaynağı olarak çözülemedi. YouTube, Drive, MP4, M3U8 veya desteklenen bir video bağlantısı kullanın.",
+      );
     } finally {
       setSending(false);
     }
@@ -470,10 +427,7 @@ const updateVideo = async () => {
             participantId={participantId}
             isHost={isHost}
             serverOffset={serverOffset}
-            webOpen={webOpen}
-            webUrl={webUrl}
-            onWebChange={openSyncedWeb}
-            localVideo={localVideo}
+localVideo={localVideo}
           />
 
           {isHost ? (
@@ -493,6 +447,10 @@ const updateVideo = async () => {
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <input
+                    type="url"
+                    inputMode="url"
+                    autoComplete="off"
+                    spellCheck={false}
                     value={videoUrl}
                     onChange={(event) => setVideoUrl(event.target.value)}
                     onKeyDown={(event) => {
@@ -500,7 +458,7 @@ const updateVideo = async () => {
                         void updateVideo();
                       }
                     }}
-                    placeholder="YouTube / Drive / MP4 / M3U8"
+                    placeholder="YouTube · Drive · MP4 · M3U8 · Web (desteklenen siteler)"
                     className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-surface-tertiary px-3 text-sm outline-none focus:border-brand"
                   />
 
@@ -527,7 +485,7 @@ const updateVideo = async () => {
                     </span>
 
                     <span className="mt-1 block text-xs text-muted">
-                      MP4, WebM, MOV veya M4V • Android / PC
+                      30 saniye veya daha kısa • MP4, WebM, MOV veya M4V • Android / PC
                     </span>
 
                     {localUploading ? (
@@ -837,18 +795,14 @@ function VideoPlayer({
   room,
   participantId,
   isHost,
-  webOpen,
-  webUrl,
-  onWebChange,
+
   serverOffset,
   localVideo,
 }: {
   room: Room;
   participantId: string | null;
   isHost: boolean;
-  webOpen: boolean;
-  webUrl: string;
-  onWebChange: (open: boolean) => void;
+
   serverOffset: number;
   localVideo: { url: string; name: string } | null;
 }) {
@@ -1026,7 +980,7 @@ function VideoPlayer({
    */
   useEffect(() => {
     hostNativeReadyRef.current = false;
-  }, [source, localVideo?.url, roomVideo?.kind, webOpen]);
+  }, [source, localVideo?.url, roomVideo?.kind]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1191,65 +1145,13 @@ function VideoPlayer({
   ]);
 
   /*
-   * Oda içi Google Web.
-   * Video senkronundan tamamen bağımsız.
-   */
-  if (webOpen) {
-    return (
-      <div className="relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-black sm:aspect-video">
-        <div className="absolute inset-0 flex flex-col bg-surface-secondary">
-          <div className="relative z-20 flex min-h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-            <Globe className="size-4 text-brand" />
-
-            <span className="font-display text-xs font-bold">
-              Web
-            </span>
-
-            <span className="text-[10px] text-muted">
-              Google
-            </span>
-
-            <button
-              type="button"
-              onClick={() => onWebChange(false)}
-              className="ml-auto inline-flex min-h-8 items-center gap-1 rounded-md border border-border px-2 text-[10px] font-semibold text-muted transition hover:text-on-surface"
-              aria-label="Filme dön"
-              title="Filme dön"
-            >
-              <X className="size-4" />
-              Film
-            </button>
-          </div>
-
-          <div className="relative min-h-0 flex-1 bg-white">
-            <iframe
-              src={webUrl || DEFAULT_WEB_URL}
-              title="Nexora Web"
-              className="absolute inset-0 h-full w-full border-0 bg-white"
-              allow="autoplay; clipboard-read; clipboard-write; fullscreen"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-            {!isHost ? (
-              <div className="absolute inset-0 z-10" aria-hidden="true" />
-            ) : null}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /*
    * Local device video.
    */
   if (localVideo) {
     return (
       <div className="overflow-hidden rounded-xl border border-glass-border bg-black">
         <div className="relative aspect-[1.25] w-full sm:aspect-video">
-          <PlayerWebButton
-        visible={isHost}
-        onClick={() => onWebChange(true)}
-      />
+          
 
           <video
             src={localVideo.url}
@@ -1273,10 +1175,7 @@ function VideoPlayer({
   if (!roomVideo) {
     return (
       <div className="relative flex aspect-[1.25] items-center justify-center rounded-xl border border-glass-border bg-black sm:aspect-video">
-        <PlayerWebButton
-        visible={isHost}
-        onClick={() => onWebChange(true)}
-      />
+        
 
         <div className="text-center">
           <Video className="mx-auto size-10 text-muted" />
@@ -1313,7 +1212,6 @@ function VideoPlayer({
         isHost={isHost}
         serverOffset={serverOffset}
         videoId={roomVideo.video_id}
-        onOpenWeb={() => onWebChange(true)}
       />
     );
   }
@@ -1328,10 +1226,7 @@ function VideoPlayer({
     if (roomVideo.stream_url) {
       return (
         <div className="relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-black sm:aspect-video">
-          <PlayerWebButton
-        visible={isHost}
-        onClick={() => onWebChange(true)}
-      />
+          
 
           <video
             ref={videoRef}
@@ -1354,10 +1249,7 @@ function VideoPlayer({
 
     return (
       <div className="relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-black sm:aspect-video">
-        <PlayerWebButton
-        visible={isHost}
-        onClick={() => onWebChange(true)}
-      />
+        
 
         <iframe
           src={roomVideo.embed_url ?? roomVideo.url}
@@ -1376,10 +1268,7 @@ function VideoPlayer({
    */
   return (
     <div className="relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-black sm:aspect-video">
-      <PlayerWebButton
-        visible={isHost}
-        onClick={() => onWebChange(true)}
-      />
+      
 
       <video
         ref={videoRef}
@@ -1399,14 +1288,14 @@ function YouTubeRoomPlayer({
   isHost,
   serverOffset,
   videoId,
-  onOpenWeb,
+
 }: {
   room: Room;
   participantId: string | null;
   isHost: boolean;
   serverOffset: number;
   videoId: string;
-  onOpenWeb: () => void;
+
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
@@ -1916,10 +1805,7 @@ function YouTubeRoomPlayer({
 
   return (
     <div className="relative aspect-[1.25] w-full overflow-hidden rounded-xl border border-glass-border bg-black sm:aspect-video">
-      <PlayerWebButton
-        visible={isHost}
-        onClick={onOpenWeb}
-      />
+      
 
       <div
         ref={containerRef}
@@ -1959,28 +1845,6 @@ function YouTubeRoomPlayer({
         </div>
       )}
     </div>
-  );
-}
-
-function PlayerWebButton({
-  onClick,
-  visible = true,
-}: {
-  onClick: () => void;
-  visible?: boolean;
-}) {
-  if (!visible) return null;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="absolute top-3 right-3 z-30 inline-flex min-h-8 items-center gap-1.5 rounded-md border border-white/15 bg-black/65 px-2.5 text-[10px] font-semibold text-white backdrop-blur-sm transition hover:border-brand hover:bg-black/80"
-      aria-label="Web'i player içinde aç"
-      title="Web'i player içinde aç"
-    >
-      <Globe className="size-3.5" />
-      Web
-    </button>
   );
 }
 
