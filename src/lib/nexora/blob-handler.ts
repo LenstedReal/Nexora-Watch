@@ -97,7 +97,18 @@ export async function handleNexoraBlobUpload(
           throw new Error("Geçersiz oda bilgisi");
         }
 
-        const room = await loadRoom(code);
+        let room;
+
+        try {
+          room = await loadRoom(code);
+        } catch (error) {
+          if (error instanceof Response) {
+            throw new Error("Oda bulunamadı");
+          }
+
+          throw error;
+        }
+
         const participant = room.participants.find(
           (item) => item.id === participantId,
         );
