@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.NexoraWatch" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#09090D</item>
+        <item name="android:navigationBarColor">#09090D</item>
+        <item name="android:windowBackground">#09090D</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

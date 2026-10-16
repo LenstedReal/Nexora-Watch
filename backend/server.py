@@ -1,0 +1,306 @@
+import asyncio
+import json
+import logging
+import time
+from datetime import datetime, timedelta, timezone
+
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
+from starlette.middleware.cors import CORSMiddleware
+
+import rooms as R
+from config import CORS_ORIGINS, ROOM_PURGE_GRACE_S
+from db import db, ensure_indexes
+from hub import hub
+from resolver import resolve
+from security import ApiError, RateLimiter, api_error_response
+from storage import cleanup_once, router as storage_router
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+log = logging.getLogger("nexora")
+
+app = FastAPI(title="Nexora Watch API")
+app.add_middleware(CORSMiddleware, allow_credentials=False, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+write_limiter = RateLimiter(120, 60)
+
+
+@app.exception_handler(ApiError)
+async def _api_error(_req, exc: ApiError):
+    return api_error_response(exc)
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    if request.method in ("POST", "PUT", "DELETE") and "/parts/" not in request.url.path:
+        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "?")).split(",")[0].strip()
+        if not write_limiter.allow(ip):
+            return JSONResponse({"detail": "Çok fazla istek, biraz bekleyin", "code": "rate_limited"}, status_code=429)
+    return await call_next(request)
+
+
+async def body(request: Request) -> dict:
+    try:
+        data = await request.json()
+        data = data if isinstance(data, dict) else {}
+    except Exception:
+        data = {}
+    if not data.get("token") and request.headers.get("x-participant-token"):
+        data["token"] = request.headers["x-participant-token"]
+    return data
+
+
+@app.get("/api/")
+async def health():
+    return {"ok": True, "service": "nexora-watch", "server_time": R.now_ms()}
+
+
+@app.get("/api/time")
+async def server_time():
+    return {"server_time": R.now_ms()}
+
+
+@app.post("/api/rooms")
+async def create_room(request: Request):
+    b = await body(request)
+    return await R.create_room(b.get("nickname"), b.get("name"))
+
+
+@app.get("/api/rooms/{code}")
+async def get_room(code: str):
+    room = await R.get_room(code)
+    return await R.room_view(room)
+
+
+@app.post("/api/rooms/{code}/join")
+async def join_room(code: str, request: Request):
+    b = await body(request)
+    res = await R.join_room(code, b.get("nickname"), b.get("participant_id"), b.get("token"))
+    if not res["rejoined"]:
+        await hub.broadcast(res["room"]["code"], {"type": "room", "room": res["room"], "server_time": R.now_ms()})
+    return res
+
+
+@app.get("/api/rooms/{code}/messages")
+async def get_messages(code: str):
+    room = await R.get_room(code)
+    return await R.list_messages(room.code)
+
+
+@app.post("/api/rooms/{code}/messages", status_code=201)
+async def post_message(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    msg, fresh = await R.send_message(room.code, p, b.get("text"), b.get("client_id"))
+    if fresh:
+        await hub.broadcast(room.code, {"type": "message", "message": msg, "server_time": R.now_ms()})
+    return msg
+
+
+@app.put("/api/rooms/{code}/video")
+async def put_video(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    R.require_host(p)
+    video = None if b.get("url") in (None, "") and b.get("clear") else await resolve(b.get("url"))
+    view = await R.set_video(room, p, video)
+    await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})
+    return view
+
+
+@app.put("/api/rooms/{code}/playback")
+async def put_playback(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    pb, applied = await R.apply_playback(room.code, p, b.get("playing"), b.get("position"), b.get("seq"), b.get("media_id"))
+    if applied:
+        await hub.broadcast(room.code, {"type": "playback", "playback": pb, "server_time": R.now_ms()})
+    return {**pb, "applied": applied}
+
+
+@app.post("/api/rooms/{code}/leave")
+async def leave(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    await R.set_online(room.code, p.participant_id, False)
+    msg = await R.system_message(room.code, f"{p.nickname} ayrıldı")
+    await hub.broadcast(room.code, {"type": "message", "message": msg, "server_time": R.now_ms()})
+    return {"ok": True}
+
+
+@app.post("/api/rooms/{code}/close")
+async def close(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    await R.close_room(room, p)
+    await hub.close_room(room.code, {"type": "room_closed", "code": "room_closed", "detail": "Oda sahibi odayı kapattı"})
+    return {"ok": True}
+
+
+@app.post("/api/resolve")
+async def resolve_url(request: Request):
+    b = await body(request)
+    return {"ok": True, **(await resolve(b.get("url")))}
+
+
+@app.post("/api/rooms/{code}/metrics")
+async def post_metrics(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    samples = b.get("samples") if isinstance(b.get("samples"), list) else []
+    docs = []
+    for s in samples[:120]:
+        if not isinstance(s, dict):
+            continue
+        docs.append({
+            "room_code": room.code, "participant_id": p.participant_id, "nickname": p.nickname,
+            "role": p.role, "t": int(s.get("t") or R.now_ms()), "event": str(s.get("event", "sample"))[:32],
+            **{k: float(s[k]) for k in ("drift", "rtt", "offset", "position", "buffering_ms", "cmd_sent_at",
+                                         "server_at", "received_at") if isinstance(s.get(k), (int, float))},
+            **{k: int(s[k]) for k in ("corrections", "reconnects", "player_errors") if isinstance(s.get(k), (int, float))},
+        })
+    if docs:
+        await db.sync_metrics.insert_many(docs)
+    return {"stored": len(docs)}
+
+
+@app.get("/api/rooms/{code}/metrics/summary")
+async def metrics_summary(code: str):
+    code = R.normalize_code(code)
+    rows = await db.sync_metrics.find({"room_code": code}, {"_id": 0}).sort("t", 1).to_list(20000)
+    by: dict[str, dict] = {}
+    for r in rows:
+        s = by.setdefault(r["participant_id"], {"nickname": r["nickname"], "role": r["role"], "drifts": [], "rtts": [],
+                                                  "corrections": 0, "reconnects": 0, "player_errors": 0, "buffering_ms": 0.0,
+                                                  "latencies": []})
+        if r.get("event") == "sample" and "drift" in r:
+            s["drifts"].append(abs(r["drift"]))
+        if "rtt" in r:
+            s["rtts"].append(r["rtt"])
+        if r.get("event") == "command_received" and "cmd_sent_at" in r and "received_at" in r:
+            s["latencies"].append(r["received_at"] - r["cmd_sent_at"])
+        for k in ("corrections", "reconnects", "player_errors"):
+            s[k] = max(s[k], r.get(k, 0))
+        s["buffering_ms"] += r.get("buffering_ms", 0)
+    out = []
+    for pid, s in by.items():
+        d = s["drifts"]
+        out.append({
+            "participant_id": pid, "nickname": s["nickname"], "role": s["role"], "samples": len(d),
+            "avg_drift_s": round(sum(d) / len(d), 3) if d else None, "max_drift_s": round(max(d), 3) if d else None,
+            "over_2s": sum(1 for x in d if x > 2), "avg_rtt_ms": round(sum(s["rtts"]) / len(s["rtts"]), 1) if s["rtts"] else None,
+            "avg_command_latency_ms": round(sum(s["latencies"]) / len(s["latencies"]), 1) if s["latencies"] else None,
+            "corrections": s["corrections"], "reconnects": s["reconnects"], "player_errors": s["player_errors"],
+            "buffering_ms": round(s["buffering_ms"]),
+        })
+    return {"room_code": code, "participants": out, "total_rows": len(rows)}
+
+
+app.include_router(storage_router)
+
+
+async def _ws_handle(ws: WebSocket, code: str, p: R.RoomParticipant, data: dict, chat_limiter: RateLimiter):
+    t = data.get("type")
+    if t == "ping":
+        await hub.send(ws, {"type": "pong", "client_time": data.get("client_time"), "server_time": R.now_ms()})
+        if int(time.time()) % 3 == 0:
+            await R.set_online(code, p.participant_id, True)
+    elif t == "playback":
+        pb, applied = await R.apply_playback(code, p, data.get("playing"), data.get("position"), data.get("seq"), data.get("media_id"))
+        msg = {"type": "playback", "playback": pb, "server_time": R.now_ms(), "cmd_sent_at": data.get("sent_at"), "seq": data.get("seq")}
+        if applied:
+            await hub.broadcast(code, msg)
+        else:
+            await hub.send(ws, {**msg, "stale": True})
+    elif t == "message":
+        if not chat_limiter.allow(p.participant_id):
+            await hub.send(ws, {"type": "error", "code": "rate_limited", "detail": "Çok hızlı mesaj gönderiyorsun"})
+            return
+        msg, fresh = await R.send_message(code, p, data.get("text"), data.get("client_id"))
+        if fresh:
+            await hub.broadcast(code, {"type": "message", "message": msg, "server_time": R.now_ms()})
+        else:
+            await hub.send(ws, {"type": "message", "message": msg, "server_time": R.now_ms()})
+    elif t == "reaction":
+        if data.get("emoji") in R.REACTIONS and chat_limiter.allow(p.participant_id):
+            await hub.broadcast(code, {"type": "reaction", "emoji": data["emoji"], "participant_id": p.participant_id, "nickname": p.nickname})
+    elif t == "buffering":
+        await hub.broadcast(code, {"type": "peer_state", "participant_id": p.participant_id, "buffering": bool(data.get("buffering"))}, exclude=p.participant_id)
+
+
+@app.websocket("/api/ws")
+async def ws_endpoint(ws: WebSocket):
+    await ws.accept()
+    q = ws.query_params
+    pid = q.get("participant_id") or q.get("participantId") or ""
+    try:
+        room = await R.get_room(q.get("code", ""))
+        p = await R.auth_participant(room.code, pid, q.get("token", ""))
+    except ApiError as e:
+        await hub.send(ws, {"type": "error", "code": e.code, "detail": e.detail, "status": e.status})
+        await ws.close(code=4410 if e.status == 410 else 4404 if e.status == 404 else 4403)
+        return
+    code = room.code
+    await hub.add(code, pid, ws)
+    await R.set_online(code, pid, True)
+    view = await R.room_view(room)
+    await hub.send(ws, {"type": "hello", "room": view, "participant_id": pid, "server_time": R.now_ms()})
+    await hub.broadcast(code, {"type": "presence", "participant_id": pid, "online": True, "nickname": p.nickname, "server_time": R.now_ms()}, exclude=pid)
+    chat_limiter = RateLimiter(8, 5)
+    frame_limiter = RateLimiter(40, 1)
+    try:
+        while True:
+            raw = await asyncio.wait_for(ws.receive_text(), timeout=45)
+            if not frame_limiter.allow(pid):
+                continue
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                continue
+            if not isinstance(data, dict):
+                continue
+            try:
+                await _ws_handle(ws, code, p, data, chat_limiter)
+            except ApiError as e:
+                await hub.send(ws, {"type": "error", "code": e.code, "detail": e.detail, "status": e.status})
+                if e.status == 410:
+                    break
+    except (WebSocketDisconnect, asyncio.TimeoutError):
+        pass
+    except Exception:
+        log.exception("ws loop error")
+    finally:
+        if hub.remove(code, pid, ws):
+            await R.set_online(code, pid, False)
+            await hub.broadcast(code, {"type": "presence", "participant_id": pid, "online": False, "server_time": R.now_ms()})
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+
+async def maintenance_loop():
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            await db.rooms.update_many({"status": "active", "expires_at": {"$lt": now}}, {"$set": {"status": "expired"}})
+            purge_before = now - timedelta(seconds=ROOM_PURGE_GRACE_S)
+            old = [d["code"] async for d in db.rooms.find({"status": {"$in": ["expired", "closed"]}, "expires_at": {"$lt": purge_before}}, {"code": 1})]
+            for c in old:
+                await db.room_messages.delete_many({"room_code": c})
+                await db.sync_metrics.delete_many({"room_code": c})
+            await cleanup_once()
+        except Exception:
+            log.exception("maintenance failed")
+        await asyncio.sleep(600)
+
+
+@app.on_event("startup")
+async def startup():
+    await ensure_indexes()
+    asyncio.create_task(maintenance_loop())

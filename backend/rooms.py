@@ -1,0 +1,255 @@
+import re
+import secrets
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
+
+from config import ROOM_LIFETIME_S
+from db import db
+from models import Room, RoomMessage, RoomParticipant, RoomPlayback
+from security import ApiError, hash_token, new_token
+
+ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+CODE_RE = re.compile(r"^[A-Z2-9]{6}$")
+REACTIONS = {"😀", "😂", "❤️", "🔥", "👍", "😎", "😭", "😡", "👀", "🎉", "💀", "🤣"}
+
+
+def now_ms() -> int:
+    return int(time.time() * 1000)
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def normalize_code(code: str) -> str:
+    code = (code or "").strip().upper()
+    if not CODE_RE.match(code):
+        raise ApiError(404, "room_not_found", "Oda bulunamadı")
+    return code
+
+
+def _text(value, field: str, max_len: int) -> str:
+    text = value.strip() if isinstance(value, str) else ""
+    if not text or len(text) > max_len:
+        raise ApiError(400, f"invalid_{field}", f"{field} 1-{max_len} karakter olmalı")
+    return text
+
+
+async def get_room(code: str) -> Room:
+    code = normalize_code(code)
+    room = Room.from_mongo(await db.rooms.find_one({"code": code}))
+    if not room:
+        raise ApiError(404, "room_not_found", "Oda bulunamadı")
+    if room.status == "closed":
+        raise ApiError(410, "room_closed", "Oda sahibi odayı kapattı")
+    if room.status == "expired" or room.expires_at < utcnow():
+        if room.status != "expired":
+            await db.rooms.update_one({"code": code}, {"$set": {"status": "expired"}})
+        raise ApiError(410, "room_expired", "Odanın süresi doldu (24 saat)")
+    return room
+
+
+def participant_view(p: RoomParticipant) -> dict:
+    return {
+        "id": p.participant_id,
+        "nickname": p.nickname,
+        "is_host": p.role == "host",
+        "online": p.online,
+        "joined_at": iso(p.joined_at),
+        "last_seen_at": iso(p.last_seen_at),
+    }
+
+
+def playback_view(pb: RoomPlayback) -> dict:
+    return {
+        "playing": pb.is_playing,
+        "position": pb.position,
+        "updated_at": pb.updated_at,
+        "revision": pb.revision,
+        "media_id": pb.media_id,
+        "updated_by": pb.updated_by,
+    }
+
+
+async def get_playback(code: str) -> RoomPlayback:
+    return RoomPlayback.from_mongo(await db.room_playback.find_one({"room_code": code}))
+
+
+async def room_view(room: Room) -> dict:
+    from hub import hub
+    live = set(hub.online_ids(room.code))
+    parts = [RoomParticipant.from_mongo(d) async for d in db.room_participants.find({"room_code": room.code}).sort("joined_at", 1)]
+    for p in parts:
+        p.online = p.participant_id in live
+    return {
+        "id": room.id,
+        "code": room.code,
+        "name": room.name,
+        "host_id": room.host_id,
+        "status": room.status,
+        "version": room.version,
+        "created_at": iso(room.created_at),
+        "expires_at": iso(room.expires_at),
+        "participants": [participant_view(p) for p in parts],
+        "video": room.video,
+        "playback": playback_view(await get_playback(room.code)),
+        "server_time": now_ms(),
+    }
+
+
+async def _add_participant(code: str, nickname: str, role: str) -> tuple[RoomParticipant, str]:
+    token = new_token()
+    now = utcnow()
+    p = RoomParticipant(
+        room_code=code, participant_id=str(uuid.uuid4()), nickname=nickname, role=role,
+        token_hash=hash_token(token), joined_at=now, last_seen_at=now, online=False,
+    )
+    await db.room_participants.insert_one(p.to_mongo())
+    return p, token
+
+
+async def create_room(nickname_in, name_in) -> dict:
+    nickname = _text(nickname_in, "nickname", 24)
+    name = (name_in.strip() if isinstance(name_in, str) else "") or f"{nickname}'in odası"
+    name = _text(name, "name", 48)
+    now = utcnow()
+    for _ in range(20):
+        code = "".join(secrets.choice(ALPHABET) for _ in range(6))
+        host_id = str(uuid.uuid4())
+        room = Room(code=code, name=name, host_id=host_id, created_at=now, expires_at=now + timedelta(seconds=ROOM_LIFETIME_S))
+        try:
+            await db.rooms.insert_one(room.to_mongo())
+        except DuplicateKeyError:
+            continue
+        token = new_token()
+        host = RoomParticipant(
+            room_code=code, participant_id=host_id, nickname=nickname, role="host",
+            token_hash=hash_token(token), joined_at=now, last_seen_at=now,
+        )
+        await db.room_participants.insert_one(host.to_mongo())
+        await db.room_playback.insert_one(RoomPlayback(room_code=code, updated_at=now_ms()).to_mongo())
+        await system_message(code, f"{nickname} odayı kurdu")
+        room = await get_room(code)
+        return {"room": await room_view(room), "participant": participant_view(host), "token": token}
+    raise ApiError(500, "code_generation_failed", "Kod üretilemedi")
+
+
+async def join_room(code: str, nickname_in, participant_id: Optional[str], token: Optional[str]) -> dict:
+    room = await get_room(code)
+    nickname = _text(nickname_in, "nickname", 24)
+    if participant_id and token:
+        doc = await db.room_participants.find_one_and_update(
+            {"room_code": room.code, "participant_id": participant_id, "token_hash": hash_token(token)},
+            {"$set": {"nickname": nickname, "last_seen_at": utcnow()}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if doc:
+            return {"room": await room_view(room), "participant": participant_view(RoomParticipant.from_mongo(doc)), "token": token, "rejoined": True}
+    p, new_tok = await _add_participant(room.code, nickname, "guest")
+    await system_message(room.code, f"{nickname} odaya katıldı")
+    return {"room": await room_view(room), "participant": participant_view(p), "token": new_tok, "rejoined": False}
+
+
+async def auth_participant(code: str, participant_id, token) -> RoomParticipant:
+    if not isinstance(participant_id, str) or not isinstance(token, str) or not participant_id or not token:
+        raise ApiError(401, "auth_required", "Katılımcı kimliği gerekli")
+    doc = await db.room_participants.find_one({"room_code": code, "participant_id": participant_id, "token_hash": hash_token(token)})
+    if not doc:
+        raise ApiError(403, "not_participant", "Bu katılımcı odada değil")
+    return RoomParticipant.from_mongo(doc)
+
+
+def require_host(p: RoomParticipant):
+    if p.role != "host":
+        raise ApiError(403, "host_only", "Bu işlemi yalnızca oda sahibi yapabilir")
+
+
+async def set_online(code: str, participant_id: str, online: bool):
+    await db.room_participants.update_one(
+        {"room_code": code, "participant_id": participant_id},
+        {"$set": {"online": online, "last_seen_at": utcnow()}},
+    )
+
+
+async def set_video(room: Room, host: RoomParticipant, video: Optional[dict]) -> dict:
+    require_host(host)
+    source_id = (video or {}).get("media_id") or str(uuid.uuid4())
+    if video is not None:
+        video = {**video, "media_id": source_id}
+    await db.rooms.update_one({"code": room.code}, {"$set": {"video": video}, "$inc": {"version": 1}})
+    await db.room_playback.update_one(
+        {"room_code": room.code},
+        {"$set": {"media_id": source_id if video else None, "position": 0.0, "is_playing": False,
+                  "updated_at": now_ms(), "updated_by": host.participant_id}, "$inc": {"revision": 1}},
+    )
+    return await room_view(await get_room(room.code))
+
+
+async def apply_playback(code: str, host: RoomParticipant, playing, position, seq, media_id) -> tuple[dict, bool]:
+    require_host(host)
+    if not isinstance(playing, bool):
+        raise ApiError(400, "invalid_playing", "playing boolean olmalı")
+    try:
+        position = float(position)
+    except (TypeError, ValueError):
+        raise ApiError(400, "invalid_position", "Geçersiz oynatma konumu")
+    if position < 0 or position != position or position > 7 * 24 * 3600:
+        raise ApiError(400, "invalid_position", "Geçersiz oynatma konumu")
+    seq = int(seq) if isinstance(seq, (int, float)) and seq > 0 else now_ms()
+    filt = {"room_code": code, "last_seq": {"$lt": seq}}
+    if media_id:
+        filt["media_id"] = media_id
+    doc = await db.room_playback.find_one_and_update(
+        filt,
+        {"$set": {"is_playing": playing, "position": round(position, 3), "updated_at": now_ms(),
+                  "updated_by": host.participant_id, "last_seq": seq}, "$inc": {"revision": 1}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if doc:
+        return playback_view(RoomPlayback.from_mongo(doc)), True
+    return playback_view(await get_playback(code)), False
+
+
+async def system_message(code: str, text: str) -> dict:
+    msg = RoomMessage(msg_id=str(uuid.uuid4()), room_code=code, nickname="Nexora", text=text, kind="system", created_at=utcnow())
+    await db.room_messages.insert_one(msg.to_mongo())
+    return message_view(msg)
+
+
+def message_view(m: RoomMessage) -> dict:
+    return {
+        "id": m.msg_id, "room_code": m.room_code, "participant_id": m.participant_id, "nickname": m.nickname,
+        "text": m.text, "kind": m.kind, "client_id": m.client_id, "created_at": iso(m.created_at),
+    }
+
+
+async def list_messages(code: str, limit: int = 200) -> list[dict]:
+    docs = await db.room_messages.find({"room_code": code}).sort("created_at", -1).limit(limit).to_list(limit)
+    return [message_view(RoomMessage.from_mongo(d)) for d in reversed(docs)]
+
+
+async def send_message(code: str, p: RoomParticipant, text_in, client_id=None) -> tuple[dict, bool]:
+    text = _text(text_in, "message", 1000)
+    client_id = client_id if isinstance(client_id, str) and 0 < len(client_id) <= 64 else None
+    msg = RoomMessage(msg_id=str(uuid.uuid4()), room_code=code, participant_id=p.participant_id,
+                      nickname=p.nickname, text=text, client_id=client_id, created_at=utcnow())
+    try:
+        await db.room_messages.insert_one(msg.to_mongo())
+    except DuplicateKeyError:
+        existing = await db.room_messages.find_one({"room_code": code, "client_id": client_id})
+        return message_view(RoomMessage.from_mongo(existing)), False
+    return message_view(msg), True
+
+
+async def close_room(room: Room, host: RoomParticipant):
+    require_host(host)
+    await db.rooms.update_one({"code": room.code}, {"$set": {"status": "closed"}, "$inc": {"version": 1}})

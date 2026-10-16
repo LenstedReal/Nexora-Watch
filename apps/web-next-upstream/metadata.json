@@ -1,0 +1,8 @@
+{
+  "name": "Nexora Watch",
+  "description": "Real native synchronized video watch party client by LenstedReal. Watch together with YouTube, Google Drive, MP4, and HLS streams.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

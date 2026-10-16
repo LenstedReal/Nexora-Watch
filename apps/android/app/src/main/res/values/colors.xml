@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nexora Watch Color Palette -->
+    <color name="nexora_surface">#09090D</color>
+    <color name="nexora_on_surface">#F9FAFB</color>
+    <color name="nexora_surface_secondary">#161622</color>
+    <color name="nexora_on_surface_secondary">#E5E7EB</color>
+    <color name="nexora_surface_tertiary">#202033</color>
+    <color name="nexora_on_surface_tertiary">#D1D5DB</color>
+    <color name="nexora_muted">#8B8B9E</color>
+    
+    <!-- Brand Cyan & Violet -->
+    <color name="nexora_brand">#00F3FF</color>
+    <color name="nexora_on_brand">#000000</color>
+    <color name="nexora_brand_secondary">#B952FF</color>
+    <color name="nexora_brand_tertiary">#290A45</color>
+    
+    <!-- Status Colors -->
+    <color name="nexora_success">#00FFA3</color>
+    <color name="nexora_warning">#FFD600</color>
+    <color name="nexora_error">#FF2A55</color>
+    
+    <!-- Borders -->
+    <color name="nexora_border">#2E2E3A</color>
+    <color name="nexora_border_strong">#4A4A68</color>
+    <color name="nexora_divider">#1F1F2E</color>
+    <color name="nexora_glass_border">#1AFFFFFF</color>
+    
+    <color name="ic_launcher_background">#071320</color>
+</resources>
