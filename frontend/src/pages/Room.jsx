@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageCircle, Users, Film } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useT } from "@/i18n";
 import { api } from "@/lib/api";
 import { clearIdent, getIdent, lastNickname, saveIdent, saveNickname } from "@/lib/session";
 import { useRoomConnection } from "@/hooks/useRoomConnection";
 import { usePlaybackSync } from "@/hooks/usePlaybackSync";
+import { useUpload } from "@/hooks/useUpload";
 import { Stage } from "@/components/player/Stage";
 import { TopBar } from "@/components/room/TopBar";
 import { ConnectionBanner } from "@/components/room/ConnectionBanner";
 import { SourcePanel } from "@/components/room/SourcePanel";
-import { Participants } from "@/components/room/Participants";
+import { PeopleList, PeopleStrip } from "@/components/room/Participants";
 import { Chat } from "@/components/room/Chat";
-import { SyncHud } from "@/components/room/SyncHud";
 
 const Gate = ({ title, children }) => {
   const nav = useNavigate();
@@ -86,21 +86,28 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
   const t = useT();
   const nav = useNavigate();
   const playerRef = useRef(null);
-  const [hud, setHud] = useState(false);
+  const [tab, setTab] = useState("chat");
+  const [unread, setUnread] = useState(0);
   const conn = useRoomConnection(code, ident, initialRoom, (e) => toast.error(errorText(t, e)));
   const { room } = conn;
   const isHost = room.host_id === ident.participant_id;
   const sync = usePlaybackSync({ room, isHost, conn, playerRef, ident });
+  const upload = useUpload({ code, ident });
+  const msgCount = conn.messages.length;
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
 
   useEffect(() => {
     if (conn.status === "unauthorized") onIdentLost();
   }, [conn.status, onIdentLost]);
   useEffect(() => { document.title = `${room.name} · Nexora Watch`; }, [room.name]);
+  useEffect(() => { if (tabRef.current !== "chat") setUnread((u) => u + 1); }, [msgCount]);
+  const switchTab = (k) => { setTab(k); if (k === "chat") setUnread(0); };
 
   if (GATE_KEYS[conn.status]) return <Gate title={t(GATE_KEYS[conn.status])} />;
   if (conn.status === "replaced") return <Gate title={t("replaced")} />;
 
-  const buffName = Object.entries(conn.peerState).find(([id, s]) => s.buffering && id === room.host_id) ? `HOST · ${t("buffering")}` : null;
+  const send = (v) => conn.sendChat(v).catch((e) => toast.error(errorText(t, e)));
   const leave = async () => {
     await api.leave(code, ident).catch(() => {});
     nav("/");
@@ -109,21 +116,32 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
     if (!window.confirm(t("close_confirm"))) return;
     try { await api.close(code, ident); } catch (e) { toast.error(errorText(t, e)); }
   };
+  const source = isHost ? <SourcePanel code={code} ident={ident} video={room.video} upload={upload} onRoom={conn.setRoom} /> : null;
 
   return (
     <div className="room" data-testid="room-page">
-      <TopBar room={room} status={conn.status} attempt={conn.attempt} isHost={isHost} onBack={() => nav("/")} onLeave={leave} onClose={close} onToggleHud={() => setHud((h) => !h)} />
+      <TopBar room={room} status={conn.status} attempt={conn.attempt} isHost={isHost} onBack={() => nav("/")} onLeave={leave} onClose={close} />
       <ConnectionBanner status={conn.status} attempt={conn.attempt} onRetry={conn.retryNow} />
-      <div className="layout">
-        <div className="main-col">
-          <Stage video={room.video} isHost={isHost} ident={ident} playerRef={playerRef} sync={sync} peerBuffering={buffName} />
+      <div className="body">
+        <section className="main">
+          <Stage video={room.video} playback={room.playback} isHost={isHost} ident={ident} playerRef={playerRef} sync={sync} onAddVideo={() => switchTab("video")} />
           {room.video && room.video.capabilities?.sync === false && <div className="hint">{t("no_sync")}</div>}
-          {isHost && <SourcePanel code={code} ident={ident} onRoom={conn.setRoom} />}
-          {hud && <SyncHud code={code} sync={sync} clock={conn.clock} reconnects={conn.statsRef.current.reconnects} />}
-        </div>
+          {source && <div className="desk-only">{source}</div>}
+        </section>
         <aside className="side">
-          <Participants room={room} me={ident.participant_id} peerState={conn.peerState} />
-          <Chat messages={conn.messages} me={ident.participant_id} onSend={(v) => conn.sendChat(v).catch((e) => toast.error(errorText(t, e)))} onReact={(e) => conn.sendChat(e).catch((ex) => toast.error(errorText(t, ex)))} />
+          <nav className="tabs-bar mob-only" data-testid="room-tabs">
+            <button className={tab === "chat" ? "on" : ""} onClick={() => switchTab("chat")} data-testid="tab-chat"><MessageCircle size={16} /> {t("chat")}{unread > 0 && tab !== "chat" && <span className="badge" data-testid="chat-unread">{unread}</span>}</button>
+            <button className={tab === "people" ? "on" : ""} onClick={() => switchTab("people")} data-testid="tab-people"><Users size={16} /> {t("people")}</button>
+            {isHost && <button className={tab === "video" ? "on" : ""} onClick={() => switchTab("video")} data-testid="tab-video"><Film size={16} /> {t("video")}</button>}
+          </nav>
+          <div className="desk-only"><PeopleStrip room={room} me={ident.participant_id} /></div>
+          <div className="pane">
+            {tab === "people" && <div className="pane-sec mob-only"><PeopleList room={room} me={ident.participant_id} peerState={conn.peerState} /></div>}
+            {tab === "video" && isHost && <div className="pane-sec mob-only video-mob">{source}</div>}
+            <div className={`pane-sec chat-sec ${tab === "chat" ? "" : "hidden"}`}>
+              <Chat messages={conn.messages} me={ident.participant_id} onSend={send} />
+            </div>
+          </div>
         </aside>
       </div>
       {conn.reactions.map((r) => <div key={r.id} className="fly" style={{ left: `${r.left}%` }}>{r.emoji}</div>)}

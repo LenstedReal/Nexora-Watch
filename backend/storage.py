@@ -50,7 +50,7 @@ class EmergentDriver:
         self.url = base.rstrip("/") + "/objstore/api/v1/storage"
         self.http = httpx.AsyncClient(timeout=120)
         self.cache: "OrderedDict[str, bytes]" = OrderedDict()
-        self.cache_max = int(os.environ.get("PART_CACHE_PARTS", "8"))
+        self.cache_max = int(os.environ.get("PART_CACHE_PARTS", "24"))
         self.locks: dict[str, asyncio.Lock] = {}
 
     async def _key(self, force=False) -> str:
@@ -390,7 +390,6 @@ async def media_stream(media_id: str, request: Request, exp: int = 0, sig: str =
         if start >= size or start > end:
             return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
         status = 206
-        end = min(end, start + 16 * 1024 * 1024 - 1)
 
     async def chunks():
         pos = start

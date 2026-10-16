@@ -10,31 +10,38 @@ export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal })
   evRef.current = events;
   const buffering = useRef(false);
   const [src, setSrc] = useState(null);
-  const [refresh, setRefresh] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+
+  const setBuf = (on) => {
+    if (buffering.current === on) return;
+    buffering.current = on;
+    evRef.current.onBuffering?.(on);
+  };
 
   useEffect(() => {
     let alive = true;
+    setBuf(true);
     if (video.kind === "upload") {
       api.mediaUrl(video.media_id, ident).then((r) => alive && setSrc(absUrl(r.url))).catch((e) => alive && onFatal(e.code || "network"));
     } else setSrc(video.stream_url || video.url);
     return () => { alive = false; };
-  }, [video.kind, video.media_id, video.stream_url, video.url, ident, onFatal, refresh]);
+  }, [video.kind, video.media_id, video.stream_url, video.url, ident, onFatal, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => setBuf(false), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = ref.current;
     if (!el || !src) return undefined;
     let hls;
     let ready = false;
-    const setBuf = (on) => {
-      if (buffering.current === on) return;
-      buffering.current = on;
-      evRef.current.onBuffering?.(on);
-    };
+    let disposed = false;
+    const stalled = () => !el.ended && el.readyState < 3 && (!el.paused || el.readyState < 1);
+    const tick = setInterval(() => setBuf(stalled()), 250);
     playerRef.current = {
       get ready() { return ready; }, supportsRate: true, kind: "html",
       getTime: () => el.currentTime,
       isPaused: () => el.paused,
-      isBuffering: () => buffering.current,
+      isBuffering: () => stalled(),
       play: () => el.play(),
       pause: () => el.pause(),
       seek: (s) => { if (Number.isFinite(s)) el.currentTime = s; },
@@ -42,17 +49,18 @@ export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal })
       setMuted: (m) => { el.muted = m; },
     };
     const on = {
-      loadedmetadata: () => { ready = true; evRef.current.onReady?.(); },
+      loadedmetadata: () => { ready = true; setBuf(stalled()); evRef.current.onReady?.(); },
       play: () => evRef.current.onPlay?.(),
-      pause: () => evRef.current.onPause?.(),
-      seeked: () => evRef.current.onSeek?.(),
+      pause: () => { setBuf(false); evRef.current.onPause?.(); },
+      seeked: () => { setBuf(stalled()); evRef.current.onSeek?.(); },
       waiting: () => setBuf(true),
       playing: () => setBuf(false),
       canplay: () => setBuf(false),
       error: () => {
-        evRef.current.onError?.();
+        if (disposed || (!hls && !el.getAttribute("src"))) return;
         const c = el.error?.code;
-        if (video.kind === "upload" && c === 2 && refresh < 1) setRefresh((n) => n + 1);
+        evRef.current.onError?.();
+        if (video.kind === "upload" && (c === 2 || c === 4) && attempt < 1) setTimeout(() => setAttempt((n) => n + 1), 700);
         else onFatal(MEDIA_ERR[c] || "unsupported");
       },
     };
@@ -72,15 +80,19 @@ export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal })
       onFatal("codec");
     } else {
       el.src = src;
+      el.load();
     }
     return () => {
+      disposed = true;
+      clearInterval(tick);
       Object.entries(on).forEach(([k, fn]) => el.removeEventListener(k, fn));
       hls?.destroy();
       playerRef.current = null;
+      el.pause();
       el.removeAttribute("src");
       el.load();
     };
-  }, [src, video.kind, playerRef, onFatal, refresh]);
+  }, [src, video.kind, playerRef, onFatal, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <video ref={ref} playsInline controls={isHost} preload="auto" className="html-video" data-testid="html-video-player" />;
 };

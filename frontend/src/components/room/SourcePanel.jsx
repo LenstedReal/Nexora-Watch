@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Link2, Upload, Loader2 } from "lucide-react";
+import { Link2, Upload, Loader2, Film, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useT } from "@/i18n";
 import { api } from "@/lib/api";
 import { UploadPanel } from "./UploadPanel";
 
-export const SourcePanel = ({ code, ident, onRoom }) => {
+export const SourcePanel = ({ code, ident, video, upload, onRoom }) => {
   const t = useT();
   const [tab, setTab] = useState("link");
   const [url, setUrl] = useState("");
@@ -29,8 +29,12 @@ export const SourcePanel = ({ code, ident, onRoom }) => {
   };
 
   return (
-    <section className="panel" data-testid="source-panel">
-      <div className="ph">{t("source")} <em>HOST</em></div>
+    <section className="src-card" data-testid="source-panel">
+      <div className="src-head">
+        {video ? <PlayCircle size={16} className="ok-c" /> : <Film size={16} />}
+        <b data-testid="source-title">{video ? video.title || video.url : t("add_video")}</b>
+        {video && <span className="np">{t("now_playing")}</span>}
+      </div>
       <div className="seg">
         <button className={tab === "link" ? "on" : ""} onClick={() => setTab("link")} data-testid="source-tab-link"><Link2 size={14} /> {t("share_link")}</button>
         <button className={tab === "upload" ? "on" : ""} onClick={() => setTab("upload")} data-testid="source-tab-upload"><Upload size={14} /> {t("upload_video")}</button>
@@ -41,7 +45,7 @@ export const SourcePanel = ({ code, ident, onRoom }) => {
           <button className="set" disabled={busy} data-testid="source-set-btn">{busy ? <Loader2 size={15} className="spin" /> : t("set")}</button>
         </form>
       ) : (
-        <UploadPanel code={code} ident={ident} />
+        <UploadPanel upload={upload} />
       )}
       {err && tab === "link" && <div className="inline-err" data-testid="source-error">{errorText(t, err)}</div>}
     </section>

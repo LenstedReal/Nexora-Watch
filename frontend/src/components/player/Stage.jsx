@@ -1,37 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clapperboard, Loader2, Maximize, TriangleAlert, Volume2, VolumeX, Hand } from "lucide-react";
+import { Clapperboard, TriangleAlert, Volume2, VolumeX, Hand, Pause, Plus } from "lucide-react";
 import { useT } from "@/i18n";
 import { HtmlPlayer } from "./HtmlPlayer";
 import { YouTubePlayer } from "./YouTubePlayer";
 
-export const Stage = ({ video, isHost, ident, playerRef, sync, peerBuffering }) => {
+export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVideo }) => {
   const t = useT();
-  const boxRef = useRef(null);
   const [fatal, setFatal] = useState(null);
-  const [muted, setMuted] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const onFatal = useCallback((code) => setFatal(code), []);
   const sourceKey = `${video?.media_id || "none"}:${retryKey}`;
+  const prev = useRef(video?.media_id);
 
-  useEffect(() => setFatal(null), [video?.media_id]);
-
-  const toggleMute = () => {
-    playerRef.current?.setMuted?.(!muted);
-    setMuted(!muted);
-  };
-  const fullscreen = () => {
-    const el = boxRef.current;
-    if (document.fullscreenElement) document.exitFullscreen();
-    else (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el).then?.(() => window.screen.orientation?.lock?.("landscape").catch(() => {}));
-  };
+  useEffect(() => { if (prev.current !== video?.media_id) { prev.current = video?.media_id; setFatal(null); } }, [video?.media_id]);
 
   let body;
   if (!video) {
     body = (
       <div className="empty" data-testid="stage-empty">
-        <Clapperboard size={30} strokeWidth={1.5} />
-        <b>{t("waiting_title")}</b>
-        <span>{t("waiting_sub")}</span>
+        <Clapperboard size={34} strokeWidth={1.5} />
+        <b>{isHost ? t("add_video") : t("waiting_title")}</b>
+        <span>{isHost ? t("host_empty") : t("waiting_sub")}</span>
+        {isHost && onAddVideo && <button className="go" onClick={onAddVideo} data-testid="stage-add-video-btn"><Plus size={16} /> {t("add_video")}</button>}
       </div>
     );
   } else if (video.kind === "youtube") {
@@ -42,32 +32,32 @@ export const Stage = ({ video, isHost, ident, playerRef, sync, peerBuffering }) 
     body = <HtmlPlayer key={sourceKey} video={video} isHost={isHost} ident={ident} playerRef={playerRef} events={sync.events} onFatal={onFatal} />;
   }
 
+  const embed = video?.kind === "drive_embed";
+  const showPaused = video && !isHost && !embed && playback && !playback.playing && !sync.stats.buffering && !fatal;
   return (
-    <div className="stage" ref={boxRef} data-testid="video-stage">
+    <div className="stage" data-testid="video-stage">
       {body}
-      {video && !isHost && video.kind !== "drive_embed" && <div className="lock" />}
-      {sync.stats.buffering && !fatal && (
-        <div className="stage-chip" data-testid="buffering-indicator"><Loader2 className="spin" size={14} /> {t("buffering")}</div>
-      )}
-      {!isHost && peerBuffering && !sync.stats.buffering && <div className="stage-chip alt">{peerBuffering}</div>}
+      {video && !isHost && !embed && <div className="lock" />}
+      {video && sync.stats.buffering && !fatal && <div className="loader" data-testid="buffering-indicator"><span className="ring" /></div>}
+      {showPaused && <div className="stage-chip" data-testid="paused-chip"><Pause size={12} /> {t("host_paused")}</div>}
       {video?.warning && <div className="stage-warn" data-testid="source-warning"><TriangleAlert size={13} /> {video.warning}</div>}
       {sync.needsGesture && !fatal && !isHost && (
         <button className="gesture" onClick={sync.resolveGesture} data-testid="tap-to-sync-btn"><Hand size={18} /> {t("tap_sync")}</button>
       )}
+      {sync.autoMuted && !sync.needsGesture && !fatal && !isHost && (
+        <button className="sound" onClick={() => sync.setMuted(false)} data-testid="tap-for-sound-btn"><VolumeX size={16} /> {t("tap_sound")}</button>
+      )}
       {fatal && (
         <div className="fatal" data-testid="player-error">
-          <TriangleAlert size={26} />
+          <TriangleAlert size={28} />
           <b>{t("player_error")}</b>
           <span>{t(`err_${fatal}`) === `err_${fatal}` ? fatal : t(`err_${fatal}`)}</span>
           <button className="btn" onClick={() => { setFatal(null); setRetryKey((k) => k + 1); }} data-testid="player-retry-btn">{t("retry")}</button>
         </div>
       )}
-      {video && (
+      {video && !isHost && !embed && (
         <div className="stage-tools">
-          {!isHost && video.kind !== "drive_embed" && (
-            <button onClick={toggleMute} aria-label="mute" data-testid="guest-mute-btn">{muted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
-          )}
-          <button onClick={fullscreen} aria-label="fullscreen" data-testid="fullscreen-btn"><Maximize size={16} /></button>
+          <button onClick={() => sync.setMuted(!sync.muted)} aria-label="mute" data-testid="guest-mute-btn">{sync.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
         </div>
       )}
     </div>

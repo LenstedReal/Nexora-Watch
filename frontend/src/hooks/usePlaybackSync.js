@@ -14,6 +14,8 @@ export function expectedPosition(pb, offset) {
 
 export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
   const [needsGesture, setNeedsGesture] = useState(false);
+  const [muted, setMutedState] = useState(false);
+  const [autoMuted, setAutoMuted] = useState(false);
   const [stats, setStats] = useState({ drift: null, corrections: 0, buffering: false, errors: 0 });
   const seqRef = useRef(0);
   const lastPubRef = useRef(null);
@@ -26,8 +28,37 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
   const samples = useRef([]);
   const roomRef = useRef(room);
   roomRef.current = room;
+  const mutedRef = useRef(false);
   const caps = room?.video?.capabilities || {};
   const mediaId = room?.video?.media_id;
+
+  const setMuted = useCallback((m) => {
+    mutedRef.current = m;
+    playerRef.current?.setMuted?.(m);
+    setMutedState(m);
+    if (!m) setAutoMuted(false);
+  }, [playerRef]);
+
+  // Guest autoplay: try with sound, fall back to muted autoplay, finally ask for a tap.
+  const tryPlay = useCallback(async (p) => {
+    try {
+      await p.play();
+      setNeedsGesture(false);
+    } catch {
+      if (mutedRef.current) { setNeedsGesture(true); return; }
+      try {
+        p.setMuted?.(true);
+        await p.play();
+        mutedRef.current = true;
+        setMutedState(true);
+        setAutoMuted(true);
+        setNeedsGesture(false);
+      } catch {
+        p.setMuted?.(false);
+        setNeedsGesture(true);
+      }
+    }
+  }, []);
 
   const push = useCallback((s) => {
     samples.current.push({ t: Date.now(), reconnects: conn.statsRef.current.reconnects, corrections: corrections.current, player_errors: errors.current, ...s });
@@ -44,11 +75,11 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     conn.publishPlayback({ playing, position, seq, media_id: r.playback.media_id });
   }, [isHost, conn, playerRef]);
 
-  // Host: restore authoritative state once when the player becomes ready (refresh / rejoin keeps position).
   const onReady = useCallback(() => {
     const p = playerRef.current;
     const pb = roomRef.current?.playback;
     if (!p || !pb) return;
+    p.setMuted?.(mutedRef.current);
     const target = expectedPosition(pb, conn.clockRef.current.offset);
     if (isHost) {
       suppressUntil.current = Date.now() + 1500;
@@ -57,8 +88,10 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
       if (pb.playing) p.play().catch(() => setNeedsGesture(true));
     } else {
       cooldown.current = 0;
+      if (target > 0.5) p.seek(target);
+      if (pb.playing) { playTry.current = Date.now(); tryPlay(p); }
     }
-  }, [isHost, conn.clockRef, playerRef]);
+  }, [isHost, conn.clockRef, playerRef, tryPlay]);
 
   const onBuffering = useCallback((on) => {
     setStats((s) => (s.buffering === on ? s : { ...s, buffering: on }));
@@ -81,7 +114,7 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     onBuffering,
     onError,
     onPlay: () => isHost && publish(true),
-    onPause: () => isHost && !playerRef.current?.isBuffering() && publish(false),
+    onPause: () => isHost && publish(false),
     onSeek: () => isHost && publish(!playerRef.current?.isPaused()),
   };
 
@@ -90,6 +123,7 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     cooldown.current = 0;
     playTry.current = 0;
     setNeedsGesture(false);
+    setStats((s) => ({ ...s, buffering: false }));
   }, [mediaId]);
 
   // Main loop: host verifies its own state; guest follows the host.
@@ -126,7 +160,7 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
         if (now - playTry.current > 2500) {
           playTry.current = now;
           if (Math.abs(t - target) > 0.5) p.seek(target);
-          p.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
+          tryPlay(p);
         }
         return;
       }
@@ -146,9 +180,8 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
       setStats((s) => ({ ...s, drift, corrections: corrections.current }));
     }, isHost ? 1000 : 500);
     return () => clearInterval(id);
-  }, [mediaId, caps.sync, isHost, conn.clockRef, playerRef, publish, push]);
+  }, [mediaId, caps.sync, isHost, conn.clockRef, playerRef, publish, push, tryPlay]);
 
-  // Measurement: sample every 2s while playing, record command latency, flush every 10s.
   useEffect(() => conn.onPlaybackEvent((msg) => {
     const recv = Date.now() + conn.clockRef.current.offset;
     if (typeof msg.cmd_sent_at === "number") push({ event: "command_received", cmd_sent_at: msg.cmd_sent_at, server_at: msg.server_time, received_at: recv });
@@ -178,11 +211,10 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     const p = playerRef.current;
     if (!p) return;
     const r = roomRef.current;
-    const target = expectedPosition(r.playback, conn.clockRef.current.offset);
-    p.setMuted?.(false);
-    p.seek(target);
+    setMuted(false);
+    p.seek(expectedPosition(r.playback, conn.clockRef.current.offset));
     p.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
-  }, [playerRef, conn.clockRef]);
+  }, [playerRef, conn.clockRef, setMuted]);
 
-  return { events, needsGesture, resolveGesture, stats };
+  return { events, needsGesture, resolveGesture, stats, muted, setMuted, autoMuted };
 }
