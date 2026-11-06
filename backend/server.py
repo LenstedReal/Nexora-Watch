@@ -12,6 +12,7 @@ import rooms as R
 from config import CORS_ORIGINS, ROOM_PURGE_GRACE_S
 from db import db, ensure_indexes
 from hub import hub
+from policy import check_source, public_config
 from resolver import resolve
 from security import ApiError, RateLimiter, api_error_response
 from storage import cleanup_once, router as storage_router
@@ -104,7 +105,11 @@ async def put_video(code: str, request: Request):
     room = await R.get_room(code)
     p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
     R.require_host(p)
-    video = None if b.get("url") in (None, "") and b.get("clear") else await resolve(b.get("url"), b.get("referer"), b.get("title"))
+    if b.get("url") in (None, "") and b.get("clear"):
+        video = None
+    else:
+        check_source(b.get("url"), b.get("referer"))
+        video = await resolve(b.get("url"), b.get("referer"), b.get("title"))
     view = await R.set_video(room, p, video)
     await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})
     return view
@@ -145,7 +150,66 @@ async def close(code: str, request: Request):
 @app.post("/api/resolve")
 async def resolve_url(request: Request):
     b = await body(request)
+    check_source(b.get("url"), b.get("referer"))
     return {"ok": True, **(await resolve(b.get("url"), b.get("referer"), b.get("title")))}
+
+
+@app.get("/api/config")
+async def app_config():
+    return public_config()
+
+
+REPORT_REASONS = {"spam", "abuse", "sexual", "violence", "copyright", "other"}
+report_limiter = RateLimiter(10, 3600)
+
+
+@app.post("/api/rooms/{code}/report")
+async def report(code: str, request: Request):
+    b = await body(request)
+    code = R.normalize_code(code)
+    p = await R.auth_participant(code, b.get("participant_id"), b.get("token"))
+    reason = b.get("reason") if b.get("reason") in REPORT_REASONS else None
+    if not reason:
+        raise ApiError(400, "invalid_reason", "Geçersiz şikâyet nedeni")
+    if not report_limiter.allow(p.participant_id):
+        raise ApiError(429, "rate_limited", "Çok fazla şikâyet gönderdin, biraz bekle")
+    target_id = b.get("target_id") if isinstance(b.get("target_id"), str) else None
+    message_id = b.get("message_id") if isinstance(b.get("message_id"), str) else None
+    target = await db.room_participants.find_one({"room_code": code, "participant_id": target_id}) if target_id else None
+    msg = await db.room_messages.find_one({"room_code": code, "msg_id": message_id}) if message_id else None
+    if msg and not target_id:
+        target_id = msg.get("participant_id")
+    note = b.get("note")
+    await db.reports.insert_one({
+        "room_code": code, "reporter_id": p.participant_id, "reporter_nickname": p.nickname,
+        "target_id": target_id, "target_nickname": (target or {}).get("nickname") or (msg or {}).get("nickname"),
+        "message_id": message_id, "message_text": (msg or {}).get("text"), "reason": reason,
+        "note": note[:500] if isinstance(note, str) else None, "status": "open",
+        "created_at": datetime.now(timezone.utc),
+    })
+    return {"ok": True}
+
+
+@app.post("/api/rooms/{code}/kick")
+async def kick(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    R.require_host(p)
+    target_id = b.get("target_id")
+    if not isinstance(target_id, str) or not target_id or target_id == p.participant_id or target_id == room.host_id:
+        raise ApiError(400, "invalid_target", "Bu kişi odadan çıkarılamaz")
+    target = await db.room_participants.find_one_and_delete({"room_code": room.code, "participant_id": target_id})
+    if not target:
+        raise ApiError(404, "not_participant", "Kişi odada değil")
+    await hub.kick(room.code, target_id, {"type": "error", "code": "kicked", "detail": "Oda sahibi seni odadan çıkardı"})
+    msg = await R.system_message(room.code, f"{target.get('nickname', 'Biri')} odadan çıkarıldı")
+    await hub.broadcast(room.code, {"type": "message", "message": msg, "server_time": R.now_ms()})
+    view = await R.room_view(room)
+    await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})
+    await db.audit_log.insert_one({"action": "kick", "actor": p.participant_id, "media_id": None, "room_code": room.code,
+                                   "extra": {"target": target_id}, "at": datetime.now(timezone.utc)})
+    return view
 
 
 @app.post("/api/rooms/{code}/metrics")
@@ -299,6 +363,9 @@ async def maintenance_loop():
                 await db.room_messages.delete_many({"room_code": c})
                 await db.sync_metrics.delete_many({"room_code": c})
             await cleanup_once()
+            # Retention promised in the privacy policy: reports 180 days, audit/security logs 90 days.
+            await db.reports.delete_many({"created_at": {"$lt": now - timedelta(days=180)}})
+            await db.audit_log.delete_many({"at": {"$lt": now - timedelta(days=90)}})
         except Exception:
             log.exception("maintenance failed")
         await asyncio.sleep(600)

@@ -28,7 +28,7 @@ const Gate = ({ title, children }) => {
   );
 };
 
-const GATE_KEYS = { room_closed: "closed_title", room_expired: "expired_title", room_not_found: "notfound_title" };
+const GATE_KEYS = { room_closed: "closed_title", room_expired: "expired_title", room_not_found: "notfound_title", kicked: "kicked_title" };
 
 export default function RoomPage() {
   const { code: raw } = useParams();
@@ -108,6 +108,25 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
   if (conn.status === "replaced") return <Gate title={t("replaced")} />;
 
   const send = (v) => conn.sendChat(v).catch((e) => toast.error(errorText(t, e)));
+  const report = async (person, messageId) => {
+    const reasons = { "1": "spam", "2": "abuse", "3": "sexual", "4": "violence", "5": "copyright", "6": "other" };
+    const pick = window.prompt(`${t("report_title")} — ${person?.nickname || ""}\n1 Spam · 2 ${t("reason_abuse")} · 3 ${t("reason_sexual")} · 4 ${t("reason_violence")} · 5 ${t("reason_copyright")} · 6 ${t("reason_other")}`, "2");
+    if (!pick || !reasons[pick.trim()]) return;
+    try {
+      await api.report(code, ident, { target_id: person?.id || null, message_id: messageId, reason: reasons[pick.trim()] });
+      toast.success(t("report_sent"));
+    } catch (e) {
+      toast.error(errorText(t, e));
+    }
+  };
+  const kick = async (person) => {
+    if (!window.confirm(`${person.nickname} — ${t("kick_confirm")}`)) return;
+    try {
+      conn.setRoom(await api.kick(code, ident, person.id));
+    } catch (e) {
+      toast.error(errorText(t, e));
+    }
+  };
   const leave = async () => {
     await api.leave(code, ident).catch(() => {});
     nav("/");
@@ -136,10 +155,10 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
           </nav>
           <div className="desk-only"><PeopleStrip room={room} me={ident.participant_id} /></div>
           <div className="pane">
-            {tab === "people" && <div className="pane-sec mob-only"><PeopleList room={room} me={ident.participant_id} peerState={conn.peerState} /></div>}
+            {tab === "people" && <div className="pane-sec mob-only"><PeopleList room={room} me={ident.participant_id} peerState={conn.peerState} isHost={isHost} onReport={report} onKick={kick} /></div>}
             {tab === "video" && isHost && <div className="pane-sec mob-only video-mob">{source}</div>}
             <div className={`pane-sec chat-sec ${tab === "chat" ? "" : "hidden"}`}>
-              <Chat messages={conn.messages} me={ident.participant_id} onSend={send} />
+              <Chat messages={conn.messages} me={ident.participant_id} onSend={send} onReport={(m) => report({ id: m.participant_id, nickname: m.nickname }, m.id)} />
             </div>
           </div>
         </aside>

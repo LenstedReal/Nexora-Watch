@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { SendHorizontal, MessageCircle } from "lucide-react";
+import { SendHorizontal, MessageCircle, Flag } from "lucide-react";
 import { useI18n } from "@/i18n";
 import { EMOJI_LIST as EMOJI } from "@/hooks/useRoomConnection";
 import { Avatar } from "./Participants";
 
 const time = (iso, lang) => new Date(iso).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" });
 
-export const Chat = ({ messages, me, onSend }) => {
+export const Chat = ({ messages, me, onSend, onReport }) => {
   const { t, lang } = useI18n();
   const [text, setText] = useState("");
   const box = useRef(null);
@@ -43,6 +43,11 @@ export const Chat = ({ messages, me, onSend }) => {
               <div className="col">
                 {!cont && <div className="meta"><b>{m.nickname}</b><span>{time(m.created_at, lang)}</span></div>}
                 <div className="bub">{m.text}</div>
+                {onReport && m.participant_id !== me && (
+                  <button className="msg-flag" onClick={() => onReport(m)} aria-label={t("report_title")} title={t("report_title")} data-testid="chat-report-btn">
+                    <Flag size={12} />
+                  </button>
+                )}
               </div>
             </div>
           );

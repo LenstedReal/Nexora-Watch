@@ -1,4 +1,5 @@
-const BASE = process.env.REACT_APP_BACKEND_URL;
+// Empty = same origin (Caddy serves the web app and proxies /api to the backend).
+const BASE = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
 
 export class ApiError extends Error {
   constructor(status, code, message) {
@@ -31,8 +32,13 @@ const q = (ident) => `participant_id=${encodeURIComponent(ident.participant_id)}
 
 export const absUrl = (u) => (/^https?:\/\//.test(u) ? u : `${BASE}${u}`);
 
-export const wsUrl = (code, ident) =>
-  `${BASE.replace(/^http/, "ws")}/api/ws?code=${encodeURIComponent(code)}&${q(ident)}`;
+const wsBase = () => {
+  if (BASE) return BASE.replace(/^http/, "ws");
+  const { protocol, host } = window.location;
+  return `${protocol === "https:" ? "wss" : "ws"}://${host}`;
+};
+
+export const wsUrl = (code, ident) => `${wsBase()}/api/ws?code=${encodeURIComponent(code)}&${q(ident)}`;
 
 export const api = {
   createRoom: (nickname, name) => req("POST", "/rooms", { nickname, name }),
@@ -52,4 +58,9 @@ export const api = {
   partUrls: (id, ident, parts) => req("POST", `/uploads/${id}/part-urls`, { ...cred(ident), parts }),
   uploadComplete: (id, ident) => req("POST", `/uploads/${id}/complete`, cred(ident)),
   uploadAbort: (id, ident) => req("POST", `/uploads/${id}/abort`, cred(ident)),
+  config: () => req("GET", "/config"),
+  importDrive: (code, ident, url) => req("POST", "/uploads/import", { code, ...cred(ident), url }),
+  importStatus: (id, ident) => req("GET", `/uploads/${id}/import-status?${q(ident)}`),
+  report: (code, ident, body) => req("POST", `/rooms/${code}/report`, { ...cred(ident), ...body }),
+  kick: (code, ident, target_id) => req("POST", `/rooms/${code}/kick`, { ...cred(ident), target_id }),
 };

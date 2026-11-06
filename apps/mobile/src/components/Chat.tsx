@@ -5,13 +5,14 @@ import { C, R, avatarColor } from "../theme";
 import { Avatar } from "./ui";
 import { REACTIONS } from "../core/useRoom";
 import type { ChatMessage } from "../core/types";
+import { useT } from "../i18n";
 
 function time(iso: string) {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? "" : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-const Bubble = memo(function Bubble({ m, mine, grouped }: { m: ChatMessage; mine: boolean; grouped: boolean }) {
+const Bubble = memo(function Bubble({ m, mine, grouped, onLong }: { m: ChatMessage; mine: boolean; grouped: boolean; onLong?: (m: ChatMessage) => void }) {
   if (m.kind === "system") {
     return (
       <View style={styles.sysRow}>
@@ -24,10 +25,10 @@ const Bubble = memo(function Bubble({ m, mine, grouped }: { m: ChatMessage; mine
       <View style={{ width: 30 }}>{!grouped && !mine && <Avatar name={m.nickname} seed={m.participant_id ?? m.nickname} size={30} />}</View>
       <View style={{ maxWidth: "78%", alignItems: mine ? "flex-end" : "flex-start" }}>
         {!grouped && !mine && <Text style={[styles.name, { color: avatarColor(m.participant_id ?? m.nickname) }]}>{m.nickname}</Text>}
-        <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+        <Pressable onLongPress={!mine && onLong ? () => onLong(m) : undefined} delayLongPress={350} style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
           <Text style={styles.text}>{m.text}</Text>
           <Text style={styles.time}>{time(m.created_at)}</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -38,12 +39,15 @@ export function Chat({
   me,
   onSend,
   onReact,
+  onMessageAction,
 }: {
   messages: ChatMessage[];
   me: string;
   onSend: (t: string) => void;
   onReact: (e: string) => void;
+  onMessageAction?: (m: ChatMessage) => void;
 }) {
+  const t = useT();
   const [text, setText] = useState("");
   const data = useMemo(() => [...messages].reverse(), [messages]);
   const send = () => {
@@ -57,7 +61,7 @@ export function Chat({
       {messages.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="chatbubbles-outline" size={34} color={C.dim} />
-          <Text style={styles.emptyText}>Henüz mesaj yok. İlk merhabayı sen de!</Text>
+          <Text style={styles.emptyText}>{t("chat_empty")}</Text>
         </View>
       ) : (
         <FlatList
@@ -69,7 +73,7 @@ export function Chat({
           renderItem={({ item, index }) => {
             const older = data[index + 1];
             const grouped = !!older && older.kind !== "system" && item.kind !== "system" && older.participant_id === item.participant_id;
-            return <Bubble m={item} mine={item.participant_id === me} grouped={grouped} />;
+            return <Bubble m={item} mine={item.participant_id === me} grouped={grouped} onLong={onMessageAction} />;
           }}
         />
       )}
@@ -84,7 +88,7 @@ export function Chat({
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder="Mesaj yaz…"
+          placeholder={t("msg_ph")}
           placeholderTextColor={C.dim}
           selectionColor={C.cyan}
           style={styles.input}

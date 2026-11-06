@@ -1,14 +1,29 @@
-import { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { WebView, type WebViewNavigation } from "react-native-webview";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { C, R } from "../theme";
 import { Badge, IconButton } from "../components/ui";
+import { FALLBACK_CONFIG, loadConfig, type SiteInfo } from "../core/api";
+import { useT } from "../i18n";
 
 export type DetectedMedia = {
   url: string;
-  kind: "hls" | "mp4" | "webm" | "video" | "blocked";
+  kind: "hls" | "mp4" | "webm" | "video" | "youtube" | "blocked";
   page: string;
   title: string;
   how: string;
@@ -16,9 +31,9 @@ export type DetectedMedia = {
 };
 
 /**
- * Injected into every page (before content loads, so fetch/XHR hooks catch the first manifest request).
- * Finds media in four ways: <video>/<source> elements, fetch(), XMLHttpRequest and the Resource Timing API.
- * Segment files (.ts/.m4s) are ignored; blob:/MediaSource players are reported as "blocked" (not shareable).
+ * Injected into pages of supported sites (before content loads, so fetch/XHR hooks catch the first manifest request).
+ * Finds media via <video>/<source>, fetch(), XMLHttpRequest and the Resource Timing API.
+ * Segment files are ignored; blob:/MediaSource players are reported as "blocked" (not shareable).
  */
 const DETECTOR = `(function(){
 if(window.__nxDetector)return;window.__nxDetector=true;
@@ -52,13 +67,24 @@ function scan(){
       if(s)report(s,'video',{duration:isFinite(v.duration)?v.duration:0});
       var ss=v.querySelectorAll('source');for(var j=0;j<ss.length;j++){if(ss[j].src)report(ss[j].src,'source')}
     }
-    post({t:'page',url:location.href,title:document.title,videos:vs.length});
   }catch(e){}
 }
 document.addEventListener('play',function(e){if(e.target&&e.target.tagName==='VIDEO')scan()},true);
 document.addEventListener('DOMContentLoaded',scan);
 setInterval(scan,1500);
 })();true;`;
+
+const YT_RE = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/;
+const MAX_ITEMS = 12;
+
+export function hostOf(url: string): string {
+  const m = url.match(/^https?:\/\/([^/?#:]+)/i);
+  return m ? m[1].toLowerCase() : "";
+}
+
+export function isAllowedHost(host: string, sites: SiteInfo[]): boolean {
+  return !!host && sites.some((s) => host === s.domain || host.endsWith(`.${s.domain}`) || (s.domain === "youtube.com" && host === "youtu.be"));
+}
 
 function classify(url: string, blocked: boolean): DetectedMedia["kind"] {
   if (blocked) return "blocked";
@@ -69,20 +95,12 @@ function classify(url: string, blocked: boolean): DetectedMedia["kind"] {
 }
 
 function rank(m: DetectedMedia): number {
+  if (m.kind === "youtube") return -1;
   if (m.kind === "blocked") return 9;
   if (m.kind === "hls") return /master|playlist|index/i.test(m.url) ? 0 : 1;
   if (m.how === "video" || m.how === "source") return 2;
   return 3;
 }
-
-function toUrl(input: string): string {
-  const t = input.trim();
-  if (/^https?:\/\//i.test(t)) return t;
-  if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(t)) return `https://${t}`;
-  return `https://www.google.com/search?q=${encodeURIComponent(t)}`;
-}
-
-const HOME = "https://www.google.com";
 
 export function BrowserModal({
   visible,
@@ -93,27 +111,59 @@ export function BrowserModal({
   onClose: () => void;
   onPick: (m: DetectedMedia) => Promise<void>;
 }) {
+  const t = useT();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const web = useRef<WebView>(null);
-  const [url, setUrl] = useState(HOME);
+  const [sites, setSites] = useState<SiteInfo[]>(FALLBACK_CONFIG.allowed_sites);
+  const [url, setUrl] = useState<string | null>(null); // null = start page with supported sites
   const [address, setAddress] = useState("");
-  const [nav, setNav] = useState({ back: false, fwd: false, loading: false, title: "" });
+  const [nav, setNav] = useState({ back: false, fwd: false, loading: false });
   const [found, setFound] = useState<DetectedMedia[]>([]);
   const [listOpen, setListOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const pageHost = useRef("");
+
+  useEffect(() => {
+    if (visible) loadConfig().then((c) => setSites(c.allowed_sites));
+  }, [visible]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const sorted = useMemo(() => [...found].sort((a, b) => rank(a) - rank(b)), [found]);
   const shareable = sorted.filter((m) => m.kind !== "blocked");
 
-  const go = (text: string) => {
-    const next = toUrl(text);
+  const addItem = (item: DetectedMedia) =>
+    setFound((prev) => {
+      if (prev.some((p) => p.url === item.url || (item.kind === "blocked" && p.kind === "blocked"))) return prev;
+      return [...prev, item].slice(-MAX_ITEMS);
+    });
+
+  const open = (target: string) => {
+    const host = hostOf(target);
+    if (!isAllowedHost(host, sites)) {
+      setNotice(t("b_unsupported"));
+      return;
+    }
     setFound([]);
-    setUrl(next);
+    setListOpen(false);
+    pageHost.current = host;
+    setUrl(target);
+    setAddress(target);
   };
 
-  const onNav = (s: WebViewNavigation) => {
-    setNav({ back: s.canGoBack, fwd: s.canGoForward, loading: s.loading, title: s.title ?? "" });
-    if (!s.loading) setAddress(s.url);
+  const submitAddress = () => {
+    const t = address.trim();
+    if (!t) return;
+    if (/^https?:\/\//i.test(t)) return open(t);
+    if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(t)) return open(`https://${t}`);
+    // Free text: search on YouTube (a supported site) instead of a general web search.
+    open(`https://m.youtube.com/results?search_query=${encodeURIComponent(t)}`);
   };
 
   const pick = async (m: DetectedMedia) => {
@@ -125,18 +175,21 @@ export function BrowserModal({
     }
   };
 
+  const remove = (u: string) => setFound((prev) => prev.filter((x) => x.url !== u));
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={[styles.bar, { paddingTop: insets.top + 8 }]}>
-          <IconButton icon="close" onPress={onClose} label="Kapat" />
+          <IconButton icon="close" onPress={onClose} label={t("close")} />
           <View style={styles.address}>
-            <Ionicons name={address.startsWith("https") ? "lock-closed" : "globe-outline"} size={14} color={C.muted} />
+            <Ionicons name={url ? "lock-closed" : "search"} size={14} color={C.muted} />
             <TextInput
               value={address}
               onChangeText={setAddress}
-              onSubmitEditing={() => go(address)}
-              placeholder="Site ara veya adres yaz"
+              onFocus={() => setListOpen(false)}
+              onSubmitEditing={submitAddress}
+              placeholder={t("b_ph")}
               placeholderTextColor={C.dim}
               autoCapitalize="none"
               autoCorrect={false}
@@ -146,77 +199,153 @@ export function BrowserModal({
               style={styles.addrInput}
             />
             {nav.loading && <ActivityIndicator size="small" color={C.cyan} />}
+            {!!url && (
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  setUrl(null);
+                  setFound([]);
+                  setAddress("");
+                }}
+              >
+                <Ionicons name="apps" size={18} color={C.muted} />
+              </Pressable>
+            )}
           </View>
         </View>
 
+        {notice && (
+          <View style={styles.notice}>
+            <Ionicons name="shield-checkmark" size={16} color={C.warning} />
+            <Text style={styles.noticeText}>{notice}</Text>
+          </View>
+        )}
+
         <View style={{ flex: 1 }}>
-          <WebView
-            ref={web}
-            source={{ uri: url }}
-            injectedJavaScriptBeforeContentLoaded={DETECTOR}
-            injectedJavaScript={DETECTOR}
-            injectedJavaScriptForMainFrameOnly={false}
-            injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}
-            onNavigationStateChange={onNav}
-            onMessage={(e) => {
-              let m: any;
-              try {
-                m = JSON.parse(e.nativeEvent.data);
-              } catch {
-                return;
-              }
-              if (m?.t !== "media" || typeof m.url !== "string") return;
-              const item: DetectedMedia = {
-                url: m.url,
-                kind: classify(m.url, !!m.blocked),
-                page: String(m.page || ""),
-                title: String(m.title || "").slice(0, 120),
-                how: String(m.how || ""),
-                duration: typeof m.duration === "number" ? m.duration : undefined,
-              };
-              setFound((prev) => {
-                if (prev.some((p) => p.url === item.url || (item.kind === "blocked" && p.kind === "blocked" && p.page === item.page))) return prev;
-                return [...prev, item].slice(-40);
-              });
-            }}
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            allowsFullscreenVideo
-            javaScriptEnabled
-            domStorageEnabled
-            setSupportMultipleWindows={false}
-            style={{ backgroundColor: "#000" }}
-          />
+          {!url ? (
+            <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
+              <Text style={styles.startTitle}>{t("b_title")}</Text>
+              <Text style={styles.startSub}>{t("b_sub")}</Text>
+              <View style={styles.grid}>
+                {sites.map((s) => (
+                  <Pressable key={s.domain} onPress={() => open(`https://${s.domain === "youtube.com" ? "m.youtube.com" : s.domain}`)} style={({ pressed }) => [styles.site, pressed && { opacity: 0.8 }]}>
+                    <View style={styles.siteIcon}>
+                      <Text style={styles.siteLetter}>{s.name.slice(0, 1)}</Text>
+                    </View>
+                    <Text style={styles.siteName} numberOfLines={1}>
+                      {s.name}
+                    </Text>
+                    <Text style={styles.siteDomain} numberOfLines={1}>
+                      {s.domain}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.legal}>
+                <Ionicons name="information-circle" size={16} color={C.muted} />
+                <Text style={styles.legalText}>{t("b_legal")}</Text>
+              </View>
+            </ScrollView>
+          ) : (
+            <WebView
+              ref={web}
+              source={{ uri: url }}
+              injectedJavaScriptBeforeContentLoaded={DETECTOR}
+              injectedJavaScript={DETECTOR}
+              injectedJavaScriptForMainFrameOnly={false}
+              injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}
+              onShouldStartLoadWithRequest={(r) => {
+                if (!/^https?:/i.test(r.url)) return false; // intent://, market:// etc.
+                if ((r as any).isTopFrame === false) return true;
+                if (r.url === "about:blank") return true;
+                const ok = isAllowedHost(hostOf(r.url), sites);
+                if (!ok) setNotice(t("b_blocked_nav"));
+                return ok;
+              }}
+              onNavigationStateChange={(s) => {
+                setNav({ back: s.canGoBack, fwd: s.canGoForward, loading: s.loading });
+                if (s.loading) return;
+                setAddress(s.url);
+                const host = hostOf(s.url);
+                if (host && host !== pageHost.current) {
+                  // New site: forget videos detected on the previous one.
+                  pageHost.current = host;
+                  setFound([]);
+                }
+                const yt = s.url.match(YT_RE);
+                if (yt) {
+                  addItem({ url: `https://www.youtube.com/watch?v=${yt[1]}`, kind: "youtube", page: s.url, title: s.title || t("yt_video"), how: "page" });
+                }
+              }}
+              onMessage={(e) => {
+                let m: any;
+                try {
+                  m = JSON.parse(e.nativeEvent.data);
+                } catch {
+                  return;
+                }
+                if (m?.t !== "media" || typeof m.url !== "string") return;
+                if (!isAllowedHost(hostOf(String(m.page || "")), sites)) return;
+                // YouTube pages stream through MediaSource; the page itself is offered instead (see above).
+                if (/youtube\.com|youtu\.be|googlevideo\.com/i.test(String(m.page || ""))) return;
+                addItem({
+                  url: m.url,
+                  kind: classify(m.url, !!m.blocked),
+                  page: String(m.page || ""),
+                  title: String(m.title || "").slice(0, 120),
+                  how: String(m.how || ""),
+                  duration: typeof m.duration === "number" ? m.duration : undefined,
+                });
+              }}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo
+              javaScriptEnabled
+              domStorageEnabled
+              setSupportMultipleWindows={false}
+              style={{ backgroundColor: "#000" }}
+            />
+          )}
         </View>
 
         {listOpen && (
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Sayfada bulunan videolar</Text>
+          <View style={[styles.sheet, { maxHeight: height * 0.42 }]}>
+            <View style={styles.sheetHead}>
+              <Text style={styles.sheetTitle}>{t("b_found")}</Text>
+              {found.length > 0 && (
+                <Pressable onPress={() => setFound([])} hitSlop={8} style={styles.clearBtn}>
+                  <Ionicons name="trash-outline" size={14} color={C.error} />
+                  <Text style={{ color: C.error, fontWeight: "800", fontSize: 12 }}>{t("b_clear")}</Text>
+                </Pressable>
+              )}
+            </View>
             {sorted.length === 0 ? (
-              <Text style={styles.hint}>Videoyu sayfada bir kez oynat; oynatıcı yüklenince burada görünür.</Text>
+              <Text style={styles.hint}>{t("b_hint")}</Text>
             ) : (
               <FlatList
                 data={sorted}
                 keyExtractor={(m) => m.url}
-                style={{ maxHeight: 300 }}
-                contentContainerStyle={{ gap: 8 }}
+                contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+                keyboardShouldPersistTaps="handled"
                 renderItem={({ item }) => (
                   <View style={styles.item}>
                     <View style={{ flex: 1, gap: 3 }}>
                       <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                         <Badge
-                          text={item.kind === "blocked" ? "KORUMALI" : item.kind.toUpperCase()}
-                          color={item.kind === "blocked" ? C.error : item.kind === "hls" ? C.cyan : C.purple}
+                          text={item.kind === "blocked" ? t("b_protected") : item.kind.toUpperCase()}
+                          color={item.kind === "blocked" ? C.error : item.kind === "hls" || item.kind === "youtube" ? C.cyan : C.purple}
                         />
                         {!!item.duration && item.duration > 0 && (
-                          <Text style={styles.meta}>{Math.floor(item.duration / 60)}:{String(Math.floor(item.duration % 60)).padStart(2, "0")}</Text>
+                          <Text style={styles.meta}>
+                            {Math.floor(item.duration / 60)}:{String(Math.floor(item.duration % 60)).padStart(2, "0")}
+                          </Text>
                         )}
                       </View>
                       <Text style={styles.itemTitle} numberOfLines={1}>
-                        {item.title || item.page}
+                        {item.title || hostOf(item.page)}
                       </Text>
                       <Text style={styles.meta} numberOfLines={1}>
-                        {item.kind === "blocked" ? "Bu site videoyu şifreli/blob akışla veriyor; paylaşılamaz." : item.url}
+                        {item.kind === "blocked" ? t("b_protected_d") : hostOf(item.url)}
                       </Text>
                     </View>
                     {item.kind !== "blocked" && (
@@ -224,25 +353,27 @@ export function BrowserModal({
                         {busy === item.url ? <ActivityIndicator color="#fff" /> : <Ionicons name="play" size={18} color="#fff" />}
                       </Pressable>
                     )}
+                    <Pressable onPress={() => remove(item.url)} hitSlop={8} style={styles.del} accessibilityLabel={t("close")}>
+                      <Ionicons name="close" size={18} color={C.muted} />
+                    </Pressable>
                   </View>
                 )}
               />
             )}
           </View>
         )}
+
         <View style={[styles.bottom, { paddingBottom: insets.bottom + 8 }]}>
-          <IconButton icon="chevron-back" onPress={() => web.current?.goBack()} color={nav.back ? C.text : C.dim} />
-          <IconButton icon="chevron-forward" onPress={() => web.current?.goForward()} color={nav.fwd ? C.text : C.dim} />
-          <IconButton icon="refresh" onPress={() => web.current?.reload()} />
+          <IconButton icon="chevron-back" onPress={() => (nav.back ? web.current?.goBack() : setUrl(null))} color={url ? C.text : C.dim} />
+          <IconButton icon="refresh" onPress={() => web.current?.reload()} color={url ? C.text : C.dim} />
           <Pressable onPress={() => setListOpen((o) => !o)} style={[styles.detectBtn, shareable.length > 0 && styles.detectOn]}>
             <Ionicons name="videocam" size={18} color={shareable.length ? "#fff" : C.muted} />
             <Text style={[styles.detectText, { color: shareable.length ? "#fff" : C.muted }]}>
-              {shareable.length ? `${shareable.length} video bulundu` : "Video aranıyor…"}
+              {shareable.length ? t("b_n_found", { n: shareable.length }) : url ? t("b_searching") : t("b_pick_site")}
             </Text>
             <Ionicons name={listOpen ? "chevron-down" : "chevron-up"} size={16} color={shareable.length ? "#fff" : C.muted} />
           </Pressable>
         </View>
-
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -250,17 +381,32 @@ export function BrowserModal({
 
 const styles = StyleSheet.create({
   bar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingBottom: 8, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
-  address: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.input, borderRadius: R.pill, paddingHorizontal: 14, height: 40 },
+  address: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.input, borderRadius: R.pill, paddingHorizontal: 14, height: 42 },
   addrInput: { flex: 1, color: C.text, fontSize: 14, paddingVertical: 0 },
+  notice: { flexDirection: "row", gap: 8, alignItems: "center", padding: 10, backgroundColor: C.warning + "18", borderBottomWidth: 1, borderBottomColor: C.warning + "44" },
+  noticeText: { flex: 1, color: C.text, fontSize: 12 },
+  startTitle: { color: C.text, fontSize: 22, fontWeight: "900" },
+  startSub: { color: C.muted, fontSize: 13, lineHeight: 19 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  site: { width: "48%", flexGrow: 1, backgroundColor: C.card, borderRadius: R.md, borderWidth: 1, borderColor: C.border, padding: 14, gap: 4 },
+  siteIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: C.purpleDeep, borderWidth: 1, borderColor: C.purple + "77", alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  siteLetter: { color: C.text, fontSize: 18, fontWeight: "900" },
+  siteName: { color: C.text, fontSize: 15, fontWeight: "800" },
+  siteDomain: { color: C.muted, fontSize: 11 },
+  legal: { flexDirection: "row", gap: 8, padding: 12, backgroundColor: C.card, borderRadius: R.md, borderWidth: 1, borderColor: C.border },
+  legalText: { flex: 1, color: C.muted, fontSize: 12, lineHeight: 17 },
   bottom: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingTop: 8, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border },
-  detectBtn: { flex: 1, height: 40, borderRadius: R.pill, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.input },
+  detectBtn: { flex: 1, height: 42, borderRadius: R.pill, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.input },
   detectOn: { backgroundColor: C.purple },
   detectText: { fontSize: 14, fontWeight: "800" },
-  sheet: { backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, gap: 10, borderTopWidth: 1, borderColor: C.border },
+  sheet: { backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 14, gap: 10, borderTopWidth: 1, borderColor: C.border },
+  sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sheetTitle: { color: C.text, fontSize: 16, fontWeight: "800" },
+  clearBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   hint: { color: C.muted, fontSize: 13 },
   item: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.cardHi, borderRadius: 14, padding: 12 },
   itemTitle: { color: C.text, fontSize: 14, fontWeight: "700" },
   meta: { color: C.muted, fontSize: 11 },
-  play: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" },
+  play: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" },
+  del: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: C.input },
 });

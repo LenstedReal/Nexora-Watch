@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { I18nProvider } from "@/i18n";
 import Home from "@/pages/Home";
 import RoomPage from "@/pages/Room";
+import { ChildSafety, Copyright, DeleteData, Kvkk, Privacy, Terms } from "@/pages/Legal";
 
 export default function App() {
   return (
@@ -12,6 +13,12 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/room/:code" element={<RoomPage />} />
+          <Route path="/gizlilik" element={<Privacy />} />
+          <Route path="/kosullar" element={<Terms />} />
+          <Route path="/kvkk" element={<Kvkk />} />
+          <Route path="/telif" element={<Copyright />} />
+          <Route path="/veri-silme" element={<DeleteData />} />
+          <Route path="/cocuk-guvenligi" element={<ChildSafety />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </BrowserRouter>

@@ -5,6 +5,7 @@ import { C } from "../theme";
 import { api, absUrl, errorText } from "../core/api";
 import type { Identity, VideoSource } from "../core/types";
 import { EmbedPlayer, NativePlayer, PlayerMessage, YouTubePlayer, type PlayerHandle } from "./players";
+import { useT } from "../i18n";
 
 /** Resolves the playable URL for the room video (uploads need a short-lived signed URL) and picks the player. */
 export function Stage({
@@ -24,6 +25,7 @@ export function Stage({
   onPlayerError: (msg: string) => void;
   fill?: boolean;
 }) {
+  const t = useT();
   const [uploadUrl, setUploadUrl] = useState<{ id: string; url: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
@@ -53,11 +55,11 @@ export function Stage({
         <View style={styles.glow}>
           <Ionicons name="add" size={34} color="#fff" />
         </View>
-        <Text style={styles.title}>Video ekle</Text>
-        <Text style={styles.detail}>YouTube, bağlantı, siteden algıla veya galeriden yükle</Text>
+        <Text style={styles.title}>{t("add_video")}</Text>
+        <Text style={styles.detail}>{t("add_video_sub")}</Text>
       </Pressable>
     ) : (
-      <PlayerMessage icon={<Ionicons name="film-outline" size={34} color={C.dim} />} title="Video bekleniyor" detail="Oda sahibi bir video seçince burada başlayacak." />
+      <PlayerMessage icon={<Ionicons name="film-outline" size={34} color={C.dim} />} title={t("waiting")} detail={t("waiting_sub")} />
     );
   } else if (err) {
     body = (
@@ -72,7 +74,7 @@ export function Stage({
           }}
         >
           <Ionicons name="refresh" size={16} color="#fff" />
-          <Text style={{ color: "#fff", fontWeight: "700" }}>Tekrar dene</Text>
+          <Text style={{ color: "#fff", fontWeight: "700" }}>{t("retry")}</Text>
         </Pressable>
       </View>
     );

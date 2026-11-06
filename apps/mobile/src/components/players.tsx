@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { WebView } from "react-native-webview";
 import { C } from "../theme";
+import { t } from "../i18n";
 
 /** What the sync engine needs from any player. */
 export interface PlayerHandle {
@@ -38,7 +39,7 @@ export const NativePlayer = forwardRef<PlayerHandle, CommonProps & { uri: string
   const errorReported = useRef(false);
 
   useEffect(() => {
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       let s = "loading";
       try {
         s = String((player as any).status ?? "loading");
@@ -48,10 +49,10 @@ export const NativePlayer = forwardRef<PlayerHandle, CommonProps & { uri: string
       setStatus((prev) => (prev === s ? prev : s));
       if (s === "error" && !errorReported.current) {
         errorReported.current = true;
-        onError?.("Video oynatılamadı. Bağlantı veya format desteklenmiyor olabilir.");
+        onError?.(t("play_error"));
       }
     }, 250);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, [player, onError]);
 
   useImperativeHandle(
@@ -169,15 +170,8 @@ window.nx=function(c){if(!ready||!player)return;
 </script></body></html>`;
 }
 
-const YT_ERRORS: Record<number, string> = {
-  2: "Geçersiz YouTube bağlantısı.",
-  5: "Bu video bu oynatıcıda açılamıyor.",
-  100: "Video bulunamadı veya kaldırılmış.",
-  101: "Video sahibi gömülü oynatmaya izin vermiyor.",
-  150: "Video sahibi gömülü oynatmaya izin vermiyor.",
-  152: "YouTube bu oynatıcıyı reddetti.",
-  153: "YouTube bu oynatıcıyı reddetti.",
-};
+const ytError = (code: number) =>
+  code === 100 ? t("yt_notfound") : code === 101 || code === 150 ? t("yt_embed") : t("yt_error", { c: code });
 
 export const YouTubePlayer = forwardRef<PlayerHandle, CommonProps & { videoId: string }>(function YouTubePlayer(
   { videoId, controls, onError },
@@ -229,7 +223,7 @@ export const YouTubePlayer = forwardRef<PlayerHandle, CommonProps & { videoId: s
           }
           if (m.t === "ready") st.current = { ...st.current, ready: true };
           else if (m.t === "tick") st.current = { ready: true, state: Number(m.s), time: Number(m.time) || 0, at: Date.now() };
-          else if (m.t === "error") onError?.(YT_ERRORS[Number(m.code)] ?? `YouTube hatası (${m.code})`);
+          else if (m.t === "error") onError?.(ytError(Number(m.code)));
         }}
       />
     </View>

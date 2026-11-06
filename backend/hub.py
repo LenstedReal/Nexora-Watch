@@ -50,6 +50,18 @@ class Hub:
             except Exception:
                 self.remove(code, pid, ws)
 
+    async def kick(self, code: str, pid: str, data: dict | None = None):
+        ws = self.rooms.get(code, {}).get(pid)
+        if ws is None:
+            return
+        if data:
+            await self.send(ws, data)
+        self.remove(code, pid, ws)
+        try:
+            await ws.close(code=4403, reason="kicked")
+        except Exception:
+            pass
+
     async def close_room(self, code: str, data: dict):
         await self.broadcast(code, data)
         for pid, ws in list(self.rooms.get(code, {}).items()):

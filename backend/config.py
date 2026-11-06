@@ -39,3 +39,24 @@ OCI_SECRET_KEY = os.environ.get("OCI_SECRET_KEY", "")
 OCI_BUCKET = os.environ.get("OCI_BUCKET", "")
 
 STORAGE_DRIVER = "oci" if all([OCI_S3_ENDPOINT, OCI_REGION, OCI_ACCESS_KEY, OCI_SECRET_KEY, OCI_BUCKET]) else "local"
+
+MEDIA_DELETE_AFTER_CLOSE_HOURS = float(os.environ.get("MEDIA_DELETE_AFTER_CLOSE_HOURS", "1"))
+
+# --- Public app config / content policy -------------------------------------------------------------------
+WEB_URL = os.environ.get("WEB_URL", "https://nexora.lenstedreal.info").rstrip("/")
+PLAY_URL = os.environ.get("PLAY_URL", "")
+APK_URL = os.environ.get("APK_URL", "https://github.com/LenstedReal/Nexora-Watch/releases/latest")
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "destek@lenstedreal.info")
+
+_DEFAULT_SITES = ("youtube.com|YouTube,vimeo.com|Vimeo,dailymotion.com|Dailymotion,archive.org|Internet Archive,"
+                  "twitch.tv|Twitch,drive.google.com|Google Drive")
+ALLOWED_SITES: list[dict] = []
+for _item in (os.environ.get("ALLOWED_SITES") or _DEFAULT_SITES).split(","):
+    _dom, _, _name = _item.strip().partition("|")
+    _dom = _dom.strip().lower().lstrip(".")
+    if _dom:
+        ALLOWED_SITES.append({"domain": _dom, "name": (_name.strip() or _dom)})
+
+_DEFAULT_BLOCKED = ("netflix.com,disneyplus.com,primevideo.com,amazon.com,max.com,hbomax.com,blutv.com,exxen.com,"
+                    "gain.com.tr,tabii.com,puhutv.com,mubi.com,tv.apple.com,spotify.com")
+BLOCKED_HOSTS = [h.strip().lower().lstrip(".") for h in (os.environ.get("BLOCKED_HOSTS") or _DEFAULT_BLOCKED).split(",") if h.strip()]

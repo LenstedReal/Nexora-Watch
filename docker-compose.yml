@@ -1,15 +1,19 @@
-# Nexora Watch backend: MongoDB + FastAPI (+ optional Caddy for HTTPS).
-#   docker compose up -d                      -> API on http://<host>:8001
-#   DOMAIN=api.example.com docker compose --profile tls up -d   -> HTTPS via Caddy (ports 80/443)
+# Nexora Watch: MongoDB + FastAPI backend (+ Caddy: HTTPS, web app, personal site).
+#   docker compose up -d                       -> API only on http://<host>:8001
+#   docker compose --profile tls up -d --build -> HTTPS on DOMAIN (web + /api) and PERSONAL_DOMAIN (ports 80/443)
 services:
   mongo:
     image: mongo:7
     restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
     volumes: [mongo-data:/data/db]
 
   backend:
     build: ./backend
     restart: unless-stopped
+    logging: *logging
     depends_on: [mongo]
     environment:
       MONGO_URL: mongodb://mongo:27017
@@ -21,22 +25,36 @@ services:
       OCI_ACCESS_KEY: ${OCI_ACCESS_KEY:-}
       OCI_SECRET_KEY: ${OCI_SECRET_KEY:-}
       OCI_BUCKET: ${OCI_BUCKET:-}
+      WEB_URL: ${WEB_URL:-https://nexora.lenstedreal.info}
+      PLAY_URL: ${PLAY_URL:-}
+      APK_URL: ${APK_URL:-https://github.com/LenstedReal/Nexora-Watch/releases/latest}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-destek@lenstedreal.info}
+      MEDIA_RETENTION_DAYS: ${MEDIA_RETENTION_DAYS:-7}
+      MEDIA_DELETE_AFTER_CLOSE_HOURS: ${MEDIA_DELETE_AFTER_CLOSE_HOURS:-1}
+      # Comma lists; "domain|Name" for ALLOWED_SITES. Defaults live in backend/config.py too.
+      ALLOWED_SITES: ${ALLOWED_SITES:-youtube.com|YouTube,vimeo.com|Vimeo,dailymotion.com|Dailymotion,archive.org|Internet Archive,twitch.tv|Twitch,drive.google.com|Google Drive}
+      BLOCKED_HOSTS: ${BLOCKED_HOSTS:-netflix.com,disneyplus.com,primevideo.com,amazon.com,max.com,hbomax.com,blutv.com,exxen.com,gain.com.tr,tabii.com,puhutv.com,mubi.com,tv.apple.com,spotify.com}
     volumes: [media-data:/data/media]
     ports: ["8001:8001"]
 
   caddy:
-    image: caddy:2
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
     profiles: [tls]
     restart: unless-stopped
+    logging: *logging
     depends_on: [backend]
     environment:
       DOMAIN: ${DOMAIN:-localhost}
+      PERSONAL_DOMAIN: ${PERSONAL_DOMAIN:-me.lenstedreal.info}
     ports: ["80:80", "443:443"]
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   mongo-data:
   media-data:
   caddy-data:
+  caddy-config:

@@ -1,5 +1,7 @@
 import asyncio
 import math
+
+import httpx
 import os
 import re
 import shutil
@@ -12,7 +14,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, Response, StreamingResponse
 
 import rooms as R
-from config import (MAX_UPLOAD_BYTES, MEDIA_DIR, OCI_ACCESS_KEY, OCI_BUCKET, OCI_MONTHLY_REQUEST_LIMIT, OCI_REGION,
+from config import (MAX_UPLOAD_BYTES, MEDIA_DELETE_AFTER_CLOSE_HOURS, MEDIA_DIR, MEDIA_RETENTION_DAYS, OCI_ACCESS_KEY, OCI_BUCKET, OCI_MONTHLY_REQUEST_LIMIT, OCI_REGION,
                     OCI_S3_ENDPOINT, OCI_SECRET_KEY, PARTICIPANT_QUOTA_BYTES, STORAGE_DRIVER, STORAGE_QUOTA_BYTES,
                     STORAGE_WARN_RATIO)
 from db import db
@@ -162,7 +164,7 @@ async def audit(action: str, actor: str, media_id: str, room_code: str, extra: d
 
 
 async def used_bytes(filt: dict | None = None) -> int:
-    q = {"status": {"$in": ["uploading", "completed"]}, **(filt or {})}
+    q = {"status": {"$in": ["uploading", "importing", "completed"]}, **(filt or {})}
     res = await db.media.aggregate([{"$match": q}, {"$group": {"_id": None, "s": {"$sum": "$size"}}}]).to_list(1)
     return int(res[0]["s"]) if res else 0
 
@@ -422,6 +424,170 @@ async def media_delete(media_id: str, request: Request):
     return {"media_id": media_id, "status": "deleted"}
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# Google Drive import: the server downloads a PUBLIC Drive file into our own storage, so it plays like an upload
+# (full sync, any size up to MAX_UPLOAD_BYTES, no Drive virus-scan page). No Google login / OAuth is involved.
+# ---------------------------------------------------------------------------------------------------------------
+DRIVE_ID_RE = re.compile(r"(?:drive\.google\.com/(?:file/d/|open\?id=|uc\?(?:.*&)?id=)|drive\.usercontent\.google\.com/download\?(?:.*&)?id=)([\w-]{20,})")
+_import_tasks: set = set()
+IMPORT_STALE_HOURS = 2
+
+
+def _cd_filename(cd: str) -> str:
+    m = re.search(r"filename\*=UTF-8''([^;]+)", cd or "", re.I)
+    if m:
+        from urllib.parse import unquote
+        return unquote(m.group(1)).strip('"')
+    m = re.search(r'filename="?([^";]+)"?', cd or "", re.I)
+    return m.group(1).strip() if m else ""
+
+
+@router.post("/uploads/import")
+async def upload_import(request: Request):
+    b = await _body(request)
+    room = await R.get_room(str(b.get("code", "")))
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    R.require_host(p)
+    mt = DRIVE_ID_RE.search(str(b.get("url") or ""))
+    if not mt:
+        raise ApiError(400, "not_drive", "Yalnızca Google Drive bağlantıları içe aktarılabilir")
+    fid = mt.group(1)
+    if len([t for t in _import_tasks if not t.done()]) >= 2:
+        raise ApiError(429, "import_busy", "Sunucu şu an başka içe aktarmalar yapıyor, biraz sonra tekrar dene")
+
+    client = httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(30.0, read=120.0), max_redirects=5,
+                               headers={"User-Agent": "Mozilla/5.0 (NexoraWatch import)"})
+    try:
+        resp = await client.send(client.build_request(
+            "GET", f"https://drive.usercontent.google.com/download?id={fid}&export=download&confirm=t"), stream=True)
+    except httpx.HTTPError:
+        await client.aclose()
+        raise ApiError(422, "network", "Google Drive'a ulaşılamadı")
+    try:
+        ctype = resp.headers.get("content-type", "").split(";")[0].strip().lower()
+        if resp.status_code >= 400 or ctype.startswith("text/"):
+            raise ApiError(422, "drive_not_public",
+                           "Drive dosyası açılamadı. Paylaşımı 'Bağlantıya sahip olan herkes' olmalı (çok indirilen dosyalarda Drive geçici kota da uygulayabilir).")
+        filename = (_cd_filename(resp.headers.get("content-disposition", "")) or f"drive-{fid}.mp4")[:180]
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if ext not in EXT_MIME:
+            raise ApiError(415, "unsupported_format", "Drive dosyası bir video değil (MP4, M4V, WebM, MOV desteklenir)")
+        mime = ctype if ctype.startswith("video/") else EXT_MIME[ext]
+        size = int(resp.headers.get("content-length") or 0)
+        if size > MAX_UPLOAD_BYTES:
+            raise ApiError(413, "too_large", f"Dosya en fazla {MAX_UPLOAD_BYTES // 1024**2} MB olabilir")
+        if size and await used_bytes() + size > STORAGE_QUOTA_BYTES:
+            raise ApiError(507, "storage_quota", "Depolama kotası dolu")
+        if size and await used_bytes({"owner_id": p.participant_id}) + size > PARTICIPANT_QUOTA_BYTES:
+            raise ApiError(507, "user_quota", "Kişisel yükleme kotanız doldu")
+    except BaseException:
+        await resp.aclose()
+        await client.aclose()
+        raise
+
+    media_id = uuid.uuid4().hex
+    m = Media(media_id=media_id, room_code=room.code, owner_id=p.participant_id, filename=filename, size=size, mime=mime,
+              object_key=f"rooms/{room.code}/{media_id}.{ext}", driver=driver.name, status="importing",
+              fingerprint=f"drive:{fid}", part_size=max(size, 1), part_count=1, created_at=datetime.now(timezone.utc))
+    doc = m.to_mongo()
+    doc["bytes_done"] = 0
+    await db.media.insert_one(doc)
+    await audit("import_start", p.participant_id, media_id, room.code, {"drive_id": fid, "size": size, "filename": filename})
+    task = asyncio.create_task(_run_import(m, client, resp, p.participant_id))
+    _import_tasks.add(task)
+    task.add_done_callback(_import_tasks.discard)
+    return {"media_id": media_id, "status": "importing", "size": size, "filename": filename}
+
+
+async def _run_import(m: Media, client: httpx.AsyncClient, resp: httpx.Response, owner_id: str):
+    tmp_dir = MEDIA_DIR / "imports"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp = tmp_dir / f"{m.media_id}.part"
+    done = 0
+    try:
+        last = 0
+        f = await asyncio.to_thread(open, tmp, "wb")
+        try:
+            async for chunk in resp.aiter_bytes(1024 * 1024):
+                done += len(chunk)
+                if done > MAX_UPLOAD_BYTES:
+                    raise ApiError(413, "too_large", "Dosya boyut sınırını aştı")
+                await asyncio.to_thread(f.write, chunk)
+                if done - last >= 4 * 1024 * 1024:
+                    last = done
+                    await db.media.update_one({"media_id": m.media_id}, {"$set": {"bytes_done": done}})
+        finally:
+            f.close()
+        if m.size and done != m.size:
+            raise ApiError(502, "integrity_failed", "Drive indirmesi yarım kaldı")
+        if done == 0:
+            raise ApiError(502, "empty_file", "Drive boş dosya döndürdü")
+        m.size = done
+        if driver.name == "local":
+            dest = driver.path(m)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(tmp, dest)
+        else:
+            await count_requests(max(2, math.ceil(done / MIN_PART)) + 2)
+            await asyncio.to_thread(driver.s3.upload_file, str(tmp), OCI_BUCKET, m.object_key, ExtraArgs={"ContentType": m.mime})
+        await db.media.update_one({"media_id": m.media_id}, {"$set": {"status": "completed", "size": done, "part_size": done,
+                                                                      "bytes_done": done, "completed_at": datetime.now(timezone.utc)}})
+        await audit("import_complete", owner_id, m.media_id, m.room_code, {"size": done})
+        try:
+            room = await R.get_room(m.room_code)
+            host = R.RoomParticipant.from_mongo(await db.room_participants.find_one({"room_code": m.room_code, "participant_id": owner_id}))
+            if host and host.role == "host":
+                view = await R.set_video(room, host, _upload_video(m))
+                await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})
+        except ApiError:
+            pass  # room closed meanwhile; retention cleanup removes the file
+    except Exception as e:
+        detail = e.detail if isinstance(e, ApiError) else "Drive içe aktarma başarısız oldu"
+        await db.media.update_one({"media_id": m.media_id}, {"$set": {"status": "failed", "bytes_done": done, "error": detail}})
+        await audit("import_failed", owner_id, m.media_id, m.room_code, {"error": detail})
+        await hub.broadcast(m.room_code, {"type": "error", "code": "import_failed", "detail": detail})
+    finally:
+        try:
+            await resp.aclose()
+            await client.aclose()
+        except Exception:
+            pass
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
+
+@router.get("/uploads/{media_id}/import-status")
+async def import_status(media_id: str, participant_id: str = "", token: str = ""):
+    m, _ = await _owner_session(media_id, {"participant_id": participant_id, "token": token})
+    doc = await db.media.find_one({"media_id": media_id}, {"bytes_done": 1, "error": 1})
+    return {"media_id": media_id, "status": m.status, "size": m.size, "bytes_done": int((doc or {}).get("bytes_done") or 0),
+            "error": (doc or {}).get("error")}
+
+
+async def _expire_media(m: Media, reason: str):
+    """Delete the stored file, mark it deleted and clear it from the room if it is still playing there."""
+    try:
+        await driver.delete(m)
+    except Exception:
+        pass
+    await db.media.update_one({"media_id": m.media_id}, {"$set": {"status": "deleted", "deleted_at": datetime.now(timezone.utc)}})
+    await audit("media_expire", "system", m.media_id, m.room_code, {"reason": reason})
+    room = await db.rooms.find_one({"code": m.room_code})
+    if room and (room.get("video") or {}).get("media_id") == m.media_id:
+        await db.rooms.update_one({"code": m.room_code}, {"$set": {"video": None}, "$inc": {"version": 1}})
+        await db.room_playback.update_one({"room_code": m.room_code}, {"$set": {"media_id": None, "position": 0.0, "is_playing": False,
+                                                                                 "updated_at": R.now_ms()}, "$inc": {"revision": 1}})
+        if room.get("status") == "active":
+            try:
+                view = await R.room_view(await R.get_room(m.room_code))
+                await hub.broadcast(m.room_code, {"type": "room", "room": view, "server_time": R.now_ms()})
+            except ApiError:
+                pass
+
+
 async def cleanup_once():
     now = datetime.now(timezone.utc)
     stale = now - timedelta(hours=int(os.environ.get("STALE_UPLOAD_HOURS", "24")))
@@ -430,3 +596,35 @@ async def cleanup_once():
         await driver.abort(m)
         await db.media.update_one({"media_id": m.media_id}, {"$set": {"status": "failed"}})
         await audit("upload_cleanup", "system", m.media_id, m.room_code)
+
+    # Imports interrupted by a restart (no running task) or stuck for too long.
+    stuck = now - timedelta(hours=IMPORT_STALE_HOURS)
+    running = len([t for t in _import_tasks if not t.done()])
+    q = {"status": "importing"} if running == 0 else {"status": "importing", "created_at": {"$lt": stuck}}
+    async for d in db.media.find(q):
+        await db.media.update_one({"media_id": d["media_id"]}, {"$set": {"status": "failed", "error": "interrupted"}})
+        await audit("import_cleanup", "system", d["media_id"], d["room_code"])
+
+    # (a) rooms that were closed or expired: delete their videos after a short grace period.
+    grace = now - timedelta(hours=MEDIA_DELETE_AFTER_CLOSE_HOURS)
+    gone = set()
+    async for r in db.rooms.find({"$or": [{"status": {"$in": ["closed", "expired"]}}, {"expires_at": {"$lt": now}}]},
+                                 {"code": 1, "status": 1, "expires_at": 1, "closed_at": 1}):
+        ended_at = r.get("closed_at") if r.get("status") == "closed" and r.get("closed_at") else r.get("expires_at")
+        if r.get("status") == "closed" and not r.get("closed_at"):
+            ended_at = None  # closed before closed_at existed: treat as ended long ago
+        if ended_at is None or ended_at <= grace:
+            gone.add(r["code"])
+    if gone:
+        async for d in db.media.find({"status": {"$in": ["completed", "uploading"]}, "room_code": {"$in": list(gone)}}):
+            m = Media.from_mongo(d)
+            if m.status == "uploading":
+                await driver.abort(m)
+                await db.media.update_one({"media_id": m.media_id}, {"$set": {"status": "aborted"}})
+            else:
+                await _expire_media(m, "room_gone")
+
+    # (b) hard retention limit for every stored video.
+    cutoff = now - timedelta(days=MEDIA_RETENTION_DAYS)
+    async for d in db.media.find({"status": "completed", "created_at": {"$lt": cutoff}}):
+        await _expire_media(Media.from_mongo(d), "retention")

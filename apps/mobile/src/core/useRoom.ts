@@ -19,9 +19,10 @@ export type ConnStatus =
   | "room_expired"
   | "room_not_found"
   | "unauthorized"
-  | "replaced";
+  | "replaced"
+  | "kicked";
 
-export const TERMINAL: ConnStatus[] = ["room_closed", "room_expired", "room_not_found", "unauthorized", "replaced"];
+export const TERMINAL: ConnStatus[] = ["room_closed", "room_expired", "room_not_found", "unauthorized", "replaced", "kicked"];
 
 export type FlyingReaction = { id: string; emoji: string; left: number };
 
@@ -191,9 +192,13 @@ export function useRoom(code: string, ident: Identity, initialRoom: Room, onNoti
           stop("room_closed");
           break;
         case "error":
+          if (data.code === "kicked") {
+            stop("kicked");
+            break;
+          }
           lastError.current = data.code;
           if (!["room_closed", "room_expired", "room_not_found", "not_participant", "auth_required"].includes(data.code)) {
-            noticeRef.current(typeof data.detail === "string" ? data.detail : "Hata");
+            noticeRef.current(typeof data.detail === "string" ? data.detail : "Error");
           }
           break;
         default:

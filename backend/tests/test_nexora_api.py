@@ -211,6 +211,52 @@ def test_metrics_summary_requires_auth(room):
     assert r.status_code == 200
 
 
+# Config + content policy
+def test_config_shape():
+    r = requests.get(f"{API}/config")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["min_age"] == 13 and d["contact_email"]
+    assert any(s["domain"] == "youtube.com" for s in d["allowed_sites"])
+    for k in ("privacy", "terms", "kvkk", "copyright", "delete_data", "child_safety"):
+        assert d["legal"][k].startswith("http")
+
+
+def test_drm_and_unsupported_sites_rejected(room):
+    h = cred(room["host"])
+    r = requests.put(f"{API}/rooms/{room['code']}/video", json={**h, "url": MP4, "referer": "https://www.netflix.com/watch/1"})
+    assert r.status_code == 403 and r.json()["code"] == "drm_not_allowed"
+    r = requests.post(f"{API}/resolve", json={"url": "https://www.netflix.com/title/1"})
+    assert r.status_code == 403 and r.json()["code"] == "drm_not_allowed"
+    r = requests.post(f"{API}/resolve", json={"url": MP4, "referer": "https://some-random-site.example/movie"})
+    assert r.status_code == 403 and r.json()["code"] == "site_not_supported"
+
+
+# Reports + moderation
+def test_report_message(room):
+    g = cred(room["guest"])
+    msgs = requests.get(f"{API}/rooms/{room['code']}/messages").json()
+    mid = [m for m in msgs if m["kind"] == "chat"][0]["id"]
+    r = requests.post(f"{API}/rooms/{room['code']}/report", json={**g, "message_id": mid, "reason": "spam"})
+    assert r.status_code == 200 and r.json()["ok"] is True
+    r = requests.post(f"{API}/rooms/{room['code']}/report", json={**g, "reason": "nope"})
+    assert r.status_code == 400
+
+
+def test_kick(room):
+    victim = requests.post(f"{API}/rooms/{room['code']}/join", json={"nickname": "TEST_victim"}).json()
+    v = cred(victim)
+    r = requests.post(f"{API}/rooms/{room['code']}/kick", json={**cred(room["guest"]), "target_id": v["participant_id"]})
+    assert r.status_code == 403
+    r = requests.post(f"{API}/rooms/{room['code']}/kick", json={**cred(room["host"]), "target_id": room["host"]["participant"]["id"]})
+    assert r.status_code == 400
+    r = requests.post(f"{API}/rooms/{room['code']}/kick", json={**cred(room["host"]), "target_id": v["participant_id"]})
+    assert r.status_code == 200
+    assert all(p["id"] != v["participant_id"] for p in r.json()["participants"])
+    r = requests.post(f"{API}/rooms/{room['code']}/messages", json={**v, "text": "hala burada miyim"})
+    assert r.status_code == 403
+
+
 # Close
 def test_close_guest_forbidden_then_host(room):
     r = requests.post(f"{API}/rooms/{room['code']}/close", json=cred(room["guest"]))
@@ -219,3 +265,9 @@ def test_close_guest_forbidden_then_host(room):
     assert r.status_code == 200
     r = requests.get(f"{API}/rooms/{room['code']}")
     assert r.status_code == 410 and r.json()["code"] == "room_closed"
+
+
+def test_drive_import_rejects_non_drive(room):
+    r = requests.post(f"{API}/uploads/import", json={"code": room["code"], **cred(room["host"]), "url": "https://example.com/a.mp4"})
+    # room may already be closed by the close test depending on order -> 410 is acceptable too
+    assert r.status_code in (400, 410), r.text

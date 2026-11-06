@@ -3,7 +3,7 @@
     "name": "Nexora Watch",
     "slug": "nexora-watch",
     "scheme": "nexora",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "default",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#09090D",
@@ -15,28 +15,81 @@
     },
     "android": {
       "package": "com.lenstedreal.nexorawatch",
-      "versionCode": 80000,
+      "versionCode": 110000,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#09090D"
       },
-      "permissions": ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"],
-      "blockedPermissions": ["android.permission.RECORD_AUDIO"]
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "nexora.lenstedreal.info",
+              "pathPrefix": "/room/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "ios": {
       "bundleIdentifier": "com.lenstedreal.nexorawatch",
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": [
+          "audio"
+        ],
         "NSPhotoLibraryUsageDescription": "Odaya video yüklemek için galerine erişim gerekiyor."
       }
     },
     "plugins": [
-      ["expo-video", { "supportsBackgroundPlayback": false, "supportsPictureInPicture": true }],
-      ["expo-image-picker", { "photosPermission": "Odaya video yüklemek için galerine erişim gerekiyor." }],
-      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }],
-      "expo-secure-store"
-    ]
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Odaya video yüklemek için galerine erişim gerekiyor."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "DEFAULT"
+        }
+      ]
+    ],
+    "description": "Nexora Watch — synchronized watch parties. Better than Rave."
   }
 }

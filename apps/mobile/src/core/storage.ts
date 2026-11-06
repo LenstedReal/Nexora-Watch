@@ -6,6 +6,8 @@ const k = {
   server: "nx.server",
   nick: "nx.nick",
   recent: "nx.recent",
+  consent: "nx.consent.v1",
+  blocked: "nx.blocked",
   ident: (code: string) => `nx.ident.${code.toUpperCase()}`,
 };
 
@@ -29,6 +31,17 @@ async function set(key: string, value: string | null) {
 export type RecentRoom = { code: string; name: string; at: number };
 
 export const store = {
+  hasConsent: async () => (await get(k.consent)) === "yes",
+  setConsent: () => set(k.consent, "yes"),
+  async getBlocked(): Promise<string[]> {
+    try {
+      const v = JSON.parse((await get(k.blocked)) || "[]");
+      return Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(-50) : [];
+    } catch {
+      return [];
+    }
+  },
+  setBlocked: (ids: string[]) => set(k.blocked, JSON.stringify(ids.slice(-50))),
   getServer: () => get(k.server),
   setServer: (url: string | null) => set(k.server, url),
   getNickname: async () => (await get(k.nick)) ?? "",

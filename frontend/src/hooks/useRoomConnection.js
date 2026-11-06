@@ -6,7 +6,7 @@ const PING_MS = 10000;
 const DEAD_MS = 25000;
 export const EMOJI_LIST = ["😀", "😂", "❤️", "🔥", "👍", "😎", "😭", "😡", "👀", "🎉", "💀", "🤣"];
 const EMOJI = new Set(EMOJI_LIST);
-const TERMINAL = new Set(["room_closed", "room_expired", "room_not_found", "unauthorized", "replaced"]);
+const TERMINAL = new Set(["room_closed", "room_expired", "room_not_found", "unauthorized", "replaced", "kicked"]);
 
 export function useRoomConnection(code, ident, initialRoom, onNotice) {
   const [room, setRoom] = useState(initialRoom);
@@ -149,6 +149,10 @@ export function useRoomConnection(code, ident, initialRoom, onNotice) {
           stop("room_closed");
           break;
         case "error":
+          if (data.code === "kicked") {
+            stop("kicked");
+            break;
+          }
           lastErrorRef.current = data.code;
           if (!TERMINAL.has(data.code) && data.code !== "not_participant") noticeRef.current?.(data);
           break;

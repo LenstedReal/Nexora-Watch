@@ -21,7 +21,7 @@ export const PeopleStrip = ({ room, me }) => (
   </div>
 );
 
-export const PeopleList = ({ room, me, peerState }) => {
+export const PeopleList = ({ room, me, peerState, isHost, onReport, onKick }) => {
   const t = useT();
   const online = room.participants.filter((p) => p.online).length;
   return (
@@ -37,6 +37,12 @@ export const PeopleList = ({ room, me, peerState }) => {
             </div>
             {peerState[p.id]?.buffering && <Loader2 size={14} className="spin" />}
             {p.is_host && <span className="tag">HOST</span>}
+            {p.id !== me && onReport && (
+              <button className="pact" onClick={() => onReport(p)} title={t("report_title")} data-testid={`report-${p.id}`}>{t("report_short")}</button>
+            )}
+            {isHost && !p.is_host && p.id !== me && onKick && (
+              <button className="pact danger" onClick={() => onKick(p)} data-testid={`kick-${p.id}`}>{t("kick")}</button>
+            )}
           </div>
         ))}
       </div>

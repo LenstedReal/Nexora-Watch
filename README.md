@@ -25,8 +25,8 @@ Notlar:
 - `NEXORA_API_URL` boş bırakılırsa uygulama açılınca sunucu adresini sorar.
 
 ## Uygulama içi sunucu adresi
-
-Ana ekrandaki **dişli simgesi** → sunucu adresini gir → "Test et". Derlemeyle gelen adresi geçersiz kılar; test için `http://192.168.x.x:8001` gibi yerel adresler de çalışır (HTTP'ye izin verilmiştir).
+Varsayılan sunucu `https://nexora.lenstedreal.info` uygulamaya gömülüdür (GitHub değişkeni `NEXORA_API_URL` ile değiştirilebilir).
+Test için ⚙️ Ayarlar → **Gelişmiş** altından geçici olarak başka bir sunucu girilebilir; normal kullanıcıların bunu değiştirmesi gerekmez.
 
 ## Backend'i çalıştırmak (Docker)
 
@@ -82,3 +82,19 @@ Sınırlar:
 ## Oracle Cloud adımları
 
 Ayrıca eklenecek.
+
+
+## Dokümanlar
+- [docs/DEPLOY.md](docs/DEPLOY.md): Oracle sunucusu, güncelleme komutları, DNS, moderasyon, yedek
+- [docs/RELEASE.md](docs/RELEASE.md): keystore oluşturma, GitHub Secrets, imzalı APK/AAB, Google Play kontrol listesi
+- [docs/PLAYBACK-SYNC.md](docs/PLAYBACK-SYNC.md): senkron protokolü
+
+## Sürüm 1.1.0 özeti
+- Diller: Türkçe, English, Deutsch (mobil + web)
+- Mavi-pembe neon tema, açılış animasyonu, "Better than Rave"
+- İlk açılışta yaş (13+) ve koşul onayı; mesaj/kişi bildirme, engelleme, host için odadan çıkarma
+- Siteden algılama yalnızca desteklenen kamuya açık sitelerde; DRM/abonelik platformları engelli
+- Google Drive: herkese açık dosya sunucuya içe aktarılır, tam senkron oynar
+- Yatay mod / tam ekran ve yatayda yan sohbet paneli
+- Otomatik silme (videolar en geç 7 gün), yasal sayfalar (Gizlilik, Koşullar, KVKK, Telif, Veri silme, Çocuk güvenliği)
+- Gerçek anahtarla imzalı APK + AAB (GitHub Actions)

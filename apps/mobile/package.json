@@ -1,6 +1,6 @@
 {
   "name": "nexora-mobile",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -19,7 +19,9 @@
     "expo-file-system": "~18.0.0",
     "expo-haptics": "~14.0.0",
     "expo-image-picker": "~16.0.0",
+    "expo-linear-gradient": "~14.0.0",
     "expo-linking": "~7.0.0",
+    "expo-screen-orientation": "~8.0.0",
     "expo-secure-store": "~14.0.0",
     "expo-status-bar": "~2.0.0",
     "expo-video": "~2.0.0",

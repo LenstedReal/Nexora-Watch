@@ -252,4 +252,4 @@ async def send_message(code: str, p: RoomParticipant, text_in, client_id=None) -
 
 async def close_room(room: Room, host: RoomParticipant):
     require_host(host)
-    await db.rooms.update_one({"code": room.code}, {"$set": {"status": "closed"}, "$inc": {"version": 1}})
+    await db.rooms.update_one({"code": room.code}, {"$set": {"status": "closed", "closed_at": utcnow()}, "$inc": {"version": 1}})
