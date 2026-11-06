@@ -1,10 +1,26 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Zap, Youtube, Cloud, Film, Upload, Sparkles, ArrowRight, Loader2, Globe } from "lucide-react";
+import { Zap, Youtube, Cloud, Film, Upload, Sparkles, ArrowRight, Loader2, Globe, History, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useI18n } from "@/i18n";
 import { api } from "@/lib/api";
 import { lastNickname, saveIdent, saveNickname } from "@/lib/session";
+
+const recentRooms = () => {
+  try {
+    return Object.keys(localStorage)
+      .filter((k) => k.startsWith("nx:ident:"))
+      .map((k) => {
+        const v = JSON.parse(localStorage.getItem(k) || "null");
+        return v && { code: k.slice(9), nickname: v.nickname || "" };
+      })
+      .filter((r) => r && /^[A-Z2-9]{6}$/.test(r.code))
+      .slice(-5)
+      .reverse();
+  } catch {
+    return [];
+  }
+};
 
 export default function Home() {
   const { t, lang, setLang, langs } = useI18n();
@@ -15,6 +31,7 @@ export default function Home() {
   const [name, setName] = useState("");
   const [code, setCode] = useState((params.get("join") || "").toUpperCase());
   const [busy, setBusy] = useState(false);
+  const [recent] = useState(recentRooms);
 
   useEffect(() => { document.title = "Nexora Watch"; }, []);
 
@@ -80,6 +97,18 @@ export default function Home() {
         </button>
         <p className="note">{t("home_note")}</p>
       </form>
+      {recent.length > 0 && (
+        <section className="recent" data-testid="recent-rooms">
+          <div className="recent-h"><History size={14} /> {t("recent_rooms")}</div>
+          {recent.map((r) => (
+            <button key={r.code} className="recent-row" onClick={() => nav(`/room/${r.code}`)} data-testid={`recent-room-${r.code}`}>
+              <span className="recent-code">{r.code}</span>
+              <span className="recent-nick">{r.nickname}</span>
+              <span className="recent-go">{t("rejoin")} <ChevronRight size={14} /></span>
+            </button>
+          ))}
+        </section>
+      )}
     </main>
   );
 }

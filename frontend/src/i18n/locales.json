@@ -92,7 +92,11 @@
     "host_empty": "İzlemeye başlamak için bir bağlantı yapıştır veya video yükle.",
     "paused": "Duraklatıldı",
     "menu": "Menü",
-    "host_paused": "Oda sahibi duraklattı"
+    "host_paused": "Oda sahibi duraklattı",
+    "recent_rooms": "Son odalar",
+    "chat_empty": "Sohbet sessiz",
+    "chat_empty_sub": "İlk mesajı sen yaz ya da bir emoji gönder.",
+    "rejoin": "Geri dön"
   },
   "en": {
     "chip": "SYNCED WATCHING",
@@ -187,7 +191,11 @@
     "host_empty": "Paste a link or upload a video to start watching.",
     "paused": "Paused",
     "menu": "Menu",
-    "host_paused": "Host paused"
+    "host_paused": "Host paused",
+    "recent_rooms": "Recent rooms",
+    "chat_empty": "It's quiet here",
+    "chat_empty_sub": "Say hi or send a reaction.",
+    "rejoin": "Rejoin"
   },
   "es": {
     "chip": "VER EN SINCRONÍA",

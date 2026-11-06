@@ -1,0 +1,42 @@
+# Nexora Watch backend: MongoDB + FastAPI (+ optional Caddy for HTTPS).
+#   docker compose up -d                      -> API on http://<host>:8001
+#   DOMAIN=api.example.com docker compose --profile tls up -d   -> HTTPS via Caddy (ports 80/443)
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes: [mongo-data:/data/db]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on: [mongo]
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      DB_NAME: nexora
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:?set MEDIA_SIGNING_SECRET in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      OCI_S3_ENDPOINT: ${OCI_S3_ENDPOINT:-}
+      OCI_REGION: ${OCI_REGION:-}
+      OCI_ACCESS_KEY: ${OCI_ACCESS_KEY:-}
+      OCI_SECRET_KEY: ${OCI_SECRET_KEY:-}
+      OCI_BUCKET: ${OCI_BUCKET:-}
+    volumes: [media-data:/data/media]
+    ports: ["8001:8001"]
+
+  caddy:
+    image: caddy:2
+    profiles: [tls]
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  mongo-data:
+  media-data:
+  caddy-data:

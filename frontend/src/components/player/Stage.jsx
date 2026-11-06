@@ -41,6 +41,7 @@ export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVi
       {video && sync.stats.buffering && !fatal && <div className="loader" data-testid="buffering-indicator"><span className="ring" /></div>}
       {showPaused && <div className="stage-chip" data-testid="paused-chip"><Pause size={12} /> {t("host_paused")}</div>}
       {video?.warning && <div className="stage-warn" data-testid="source-warning"><TriangleAlert size={13} /> {video.warning}</div>}
+      {video?.title && !video?.warning && !fatal && <div className="stage-title" data-testid="stage-title">{video.title}</div>}
       {sync.needsGesture && !fatal && !isHost && (
         <button className="gesture" onClick={sync.resolveGesture} data-testid="tap-to-sync-btn"><Hand size={18} /> {t("tap_sync")}</button>
       )}

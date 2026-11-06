@@ -3,8 +3,10 @@
 ## Sürücüler
 | Sürücü | Ne zaman | Not |
 |---|---|---|
-| `oci` | `OCI_S3_ENDPOINT, OCI_REGION, OCI_ACCESS_KEY, OCI_SECRET_KEY, OCI_BUCKET` backend `.env`'de varsa | Oracle Object Storage S3-uyumlu API, ön-imzalı `upload_part` / `get_object` URL'leri. İstemci dosyayı **doğrudan** bucket'a yükler. |
-| `emergent` | OCI anahtarı yokken (şu an aktif) | Geçici: parçalar backend üzerinden ayrı nesneler olarak saklanır, okuma Range→parça eşlemesiyle yapılır. Silme API'si yok (soft-delete). |
+| `local` (varsayılan) | OCI değişkenleri eksikse | Parçalar `MEDIA_DIR/parts/<media_id>/<n>` altına yazılır, `complete` sırasında tek dosyada birleştirilir (`MEDIA_DIR/rooms/<kod>/<media_id>.<uzantı>`). Okuma `/api/media/{id}/stream` üzerinden HTTP Range (206) ile. Docker'da `media-data` volume'u. |
+| `oci` | `OCI_S3_ENDPOINT, OCI_REGION, OCI_ACCESS_KEY, OCI_SECRET_KEY, OCI_BUCKET` beşi de doluysa | Oracle Object Storage S3-uyumlu API, ön-imzalı `upload_part` / `get_object` URL'leri. İstemci dosyayı **doğrudan** bucket'a yükler. |
+
+Eski geçici `emergent` sürücüsü kaldırıldı. `/api/media/{id}/stream` her iki sürücüde de geçerli HMAC imzası (`exp` + `sig`) ister; OCI'de imza doğrulandıktan sonra ön-imzalı URL'ye yönlendirir. Mobil uygulama CORS'a ihtiyaç duymaz; tarayıcıdan doğrudan OCI'ye PUT için bucket CORS'u gerekir (aşağıya bakın).
 
 ## OCI kurulumu (kullanıcının yapacağı)
 1. OCI Console → Object Storage → Bucket oluştur (Standard tier, **Private**).
@@ -30,5 +32,6 @@
 | `STALE_UPLOAD_HOURS` | 24 → yarım multipart abort + `failed` |
 
 - İstek sayacı yalnızca backend'in yaptığı OCI çağrılarını sayar; istemcinin doğrudan PUT/GET istekleri sayılmaz (yaklaşık). Kesin değer için OCI Metrics/Usage Reports kullanılmalı.
+- `local` sürücüsünde disk kullanımı `STORAGE_QUOTA_BYTES` ile sınırlanır; sunucu diskinin bu değerden büyük olduğundan emin olun.
 - Transcode/HLS üretimi **yok** ve otomatik ücretli kaynak açılmaz. MP4 olduğu gibi Range ile oynatılır.
 - Oda kapandığında dosya hemen silinmez (ürün kararı bekliyor); retention politikası belgelendi, otomatik silme **henüz uygulanmadı**.

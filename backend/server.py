@@ -32,7 +32,8 @@ async def _api_error(_req, exc: ApiError):
 @app.middleware("http")
 async def rate_limit(request: Request, call_next):
     if request.method in ("POST", "PUT", "DELETE") and "/parts/" not in request.url.path:
-        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "?")).split(",")[0].strip()
+        # Client IP comes from uvicorn (--proxy-headers rewrites it only for trusted proxies); X-Forwarded-For is not trusted directly.
+        ip = request.client.host if request.client else "?"
         if not write_limiter.allow(ip):
             return JSONResponse({"detail": "Çok fazla istek, biraz bekleyin", "code": "rate_limited"}, status_code=429)
     return await call_next(request)
@@ -103,7 +104,7 @@ async def put_video(code: str, request: Request):
     room = await R.get_room(code)
     p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
     R.require_host(p)
-    video = None if b.get("url") in (None, "") and b.get("clear") else await resolve(b.get("url"))
+    video = None if b.get("url") in (None, "") and b.get("clear") else await resolve(b.get("url"), b.get("referer"), b.get("title"))
     view = await R.set_video(room, p, video)
     await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})
     return view
@@ -144,7 +145,7 @@ async def close(code: str, request: Request):
 @app.post("/api/resolve")
 async def resolve_url(request: Request):
     b = await body(request)
-    return {"ok": True, **(await resolve(b.get("url")))}
+    return {"ok": True, **(await resolve(b.get("url"), b.get("referer"), b.get("title")))}
 
 
 @app.post("/api/rooms/{code}/metrics")
@@ -170,8 +171,9 @@ async def post_metrics(code: str, request: Request):
 
 
 @app.get("/api/rooms/{code}/metrics/summary")
-async def metrics_summary(code: str):
+async def metrics_summary(code: str, participant_id: str = "", token: str = ""):
     code = R.normalize_code(code)
+    await R.auth_participant(code, participant_id, token)
     rows = await db.sync_metrics.find({"room_code": code}, {"_id": 0}).sort("t", 1).to_list(20000)
     by: dict[str, dict] = {}
     for r in rows:
@@ -204,11 +206,12 @@ async def metrics_summary(code: str):
 app.include_router(storage_router)
 
 
-async def _ws_handle(ws: WebSocket, code: str, p: R.RoomParticipant, data: dict, chat_limiter: RateLimiter):
+async def _ws_handle(ws: WebSocket, code: str, p: R.RoomParticipant, data: dict, chat_limiter: RateLimiter, seen: dict):
     t = data.get("type")
     if t == "ping":
         await hub.send(ws, {"type": "pong", "client_time": data.get("client_time"), "server_time": R.now_ms()})
-        if int(time.time()) % 3 == 0:
+        if time.monotonic() - seen.get("at", 0) > 30:
+            seen["at"] = time.monotonic()
             await R.set_online(code, p.participant_id, True)
     elif t == "playback":
         pb, applied = await R.apply_playback(code, p, data.get("playing"), data.get("position"), data.get("seq"), data.get("media_id"))
@@ -253,6 +256,7 @@ async def ws_endpoint(ws: WebSocket):
     await hub.broadcast(code, {"type": "presence", "participant_id": pid, "online": True, "nickname": p.nickname, "server_time": R.now_ms()}, exclude=pid)
     chat_limiter = RateLimiter(8, 5)
     frame_limiter = RateLimiter(40, 1)
+    seen: dict = {"at": time.monotonic()}
     try:
         while True:
             raw = await asyncio.wait_for(ws.receive_text(), timeout=45)
@@ -265,7 +269,7 @@ async def ws_endpoint(ws: WebSocket):
             if not isinstance(data, dict):
                 continue
             try:
-                await _ws_handle(ws, code, p, data, chat_limiter)
+                await _ws_handle(ws, code, p, data, chat_limiter, seen)
             except ApiError as e:
                 await hub.send(ws, {"type": "error", "code": e.code, "detail": e.detail, "status": e.status})
                 if e.status == 410:

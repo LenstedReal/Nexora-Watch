@@ -33,10 +33,13 @@ async def _guard(request: httpx.Request):
     await _assert_public(request.url.host)
 
 
-async def _probe(url: str) -> dict:
+async def _probe(url: str, referer: str | None = None) -> dict:
+    headers = {"Range": "bytes=0-2047", "User-Agent": "NexoraWatch/1.0"}
+    if referer:
+        headers["Referer"] = referer
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=8, max_redirects=5, event_hooks={"request": [_guard]}) as c:
-            async with c.stream("GET", url, headers={"Range": "bytes=0-2047", "User-Agent": "NexoraWatch/1.0"}) as r:
+            async with c.stream("GET", url, headers=headers) as r:
                 head = b""
                 async for chunk in r.aiter_bytes():
                     head += chunk
@@ -82,7 +85,33 @@ def _classify(url: str, p: dict, provider: str) -> dict | None:
     return None
 
 
-async def resolve(url_in) -> dict:
+def _clean_referer(referer_in) -> str | None:
+    if referer_in in (None, ""):
+        return None
+    ref = referer_in.strip() if isinstance(referer_in, str) else ""
+    p = urlparse(ref)
+    if not ref or len(ref) > 2000 or p.scheme not in ("http", "https") or not p.hostname:
+        raise ApiError(400, "invalid_referer", "Geçersiz kaynak sayfa adresi (referer)")
+    return ref
+
+
+def _clean_title(title_in) -> str | None:
+    t = title_in.strip() if isinstance(title_in, str) else ""
+    return t[:120] or None
+
+
+async def resolve(url_in, referer=None, title=None) -> dict:
+    ref = _clean_referer(referer)
+    custom_title = _clean_title(title)
+    res = await _resolve(url_in, ref)
+    if custom_title:
+        res["title"] = custom_title
+    if ref and res.get("kind") in ("direct", "hls"):
+        res["headers"] = {"Referer": ref}
+    return res
+
+
+async def _resolve(url_in, referer: str | None) -> dict:
     url = url_in.strip() if isinstance(url_in, str) else ""
     if not url or len(url) > 4000:
         raise ApiError(400, "invalid_url", "Geçerli bir video adresi gerekli")
@@ -102,7 +131,7 @@ async def resolve(url_in) -> dict:
         fid = drive.group(1)
         direct = f"https://drive.google.com/uc?export=download&id={fid}"
         try:
-            p = await _probe(direct)
+            p = await _probe(direct, referer)
             if p["status"] < 400:
                 c = _classify(direct, p, "drive")
                 if c:
@@ -115,7 +144,7 @@ async def resolve(url_in) -> dict:
                 "warning": "Drive bu dosyayı doğrudan akış olarak sunmuyor (izin, boyut veya virüs tarama sayfası). Resmî Drive oynatıcısı açılır; senkron kontrol yok."}
 
     await _assert_public(parsed.hostname)
-    p = await _probe(url)
+    p = await _probe(url, referer)
     _http_errors(p)
     c = _classify(url, p, parsed.hostname)
     if c:

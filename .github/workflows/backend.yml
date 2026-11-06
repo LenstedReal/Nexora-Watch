@@ -1,0 +1,54 @@
+name: Backend
+
+on:
+  push:
+    paths: ["backend/**", "tests/**", ".github/workflows/backend.yml"]
+  pull_request:
+    paths: ["backend/**", "tests/**", ".github/workflows/backend.yml"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mongo:
+        image: mongo:7
+        ports: ["27017:27017"]
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      MEDIA_SIGNING_SECRET: ci-secret
+      MONGO_URL: mongodb://localhost:27017
+      DB_NAME: nexora_ci
+      MEDIA_DIR: ${{ github.workspace }}/backend/data/media
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Start API
+        run: |
+          nohup uvicorn server:app --port 8001 > uvicorn.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8001/api/ && exit 0
+            sleep 1
+          done
+          echo "API did not start"; cat uvicorn.log; exit 1
+      - name: Tests
+        run: pytest -q
+        env:
+          NEXORA_API_URL: http://localhost:8001
+      - name: API log
+        if: failure()
+        run: cat uvicorn.log
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t nexora-backend ./backend

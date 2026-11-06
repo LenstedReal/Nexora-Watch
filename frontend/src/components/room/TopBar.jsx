@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Copy, Share2, LogOut, Power, MoreVertical } from "lucide-react";
+import { ArrowLeft, Copy, Share2, LogOut, Power, MoreVertical, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useT } from "@/i18n";
 
@@ -21,6 +21,7 @@ export const TopBar = ({ room, status, attempt, isHost, onBack, onLeave, onClose
         <b data-testid="room-name">{room.name}</b>
         <button className="code" onClick={() => copy(room.code, t("code_copied"))} data-testid="room-code-copy-btn">{room.code} <Copy size={11} /></button>
       </div>
+      <span className="online-pill" title={t("online")} data-testid="online-count"><Users size={12} /> {room.participants.filter((p) => p.online).length}</span>
       <span className={`dot ${DOT[status] ?? ""}`} title={label} data-testid="connection-status" />
       <span className="status-txt">{label}</span>
       <button className="invite" onClick={share} data-testid="invite-btn"><Share2 size={15} /> {t("invite")}</button>

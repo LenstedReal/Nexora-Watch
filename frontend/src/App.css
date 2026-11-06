@@ -1,4 +1,4 @@
-:root{--bg:#07070b;--s1:#0e0e15;--s2:#141420;--s3:#1c1c2b;--s4:#262638;--bd:#23232f;--bd2:#33334a;--tx:#f5f5fa;--mut:#8d8da3;--cy:#22e5ff;--pu:#a855f7;--pu-d:#6d28d9;--ok:#34d399;--err:#ff4d6d;--warn:#fbbf24;--r:18px;--font:'DM Sans','Noto Sans',system-ui,sans-serif;--head:Outfit,'DM Sans',sans-serif}
+:root{--bg:#09090d;--s1:#0f0f17;--s2:#151521;--s3:#1d1d2c;--s4:#272739;--bd:#242431;--bd2:#34344b;--tx:#f5f5fa;--mut:#8f8fa6;--cy:#00f3ff;--pu:#b952ff;--grad:linear-gradient(90deg,#6ef3ff,#a78bfa 55%,#b952ff);--pu-d:#6d28d9;--ok:#34d399;--err:#ff4d6d;--warn:#fbbf24;--r:18px;--font:'DM Sans','Noto Sans',system-ui,sans-serif;--head:Outfit,'DM Sans',sans-serif}
 *{box-sizing:border-box;margin:0}
 html,body,#root{height:100%;background:var(--bg)}
 body{color:var(--tx);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
@@ -185,3 +185,61 @@ input:focus{border-color:var(--pu)}
   .status-txt{display:none}
   .stage{max-height:62dvh}
 }
+
+
+/* ---------- Polish (v2) ---------- */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--cy);outline-offset:2px;border-radius:10px}
+input:focus-visible{outline:none;border-color:var(--pu);box-shadow:0 0 0 3px #b952ff33}
+input::placeholder{color:#5f5f76}
+.card{box-shadow:0 30px 80px -40px #b952ff55, inset 0 1px 0 #ffffff08}
+.go{box-shadow:0 12px 32px -12px #b952ffaa}
+.go:disabled{filter:grayscale(.3)}
+.logo{animation:pop .5s ease both}
+
+/* Recent rooms */
+.recent{margin:4px 16px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px;animation:rise .55s .14s ease both}
+.recent-h{display:flex;align-items:center;gap:7px;color:var(--mut);font-size:11px;letter-spacing:2px;text-transform:uppercase;margin:6px 4px}
+.recent-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;background:var(--s2);border:1px solid var(--bd);border-radius:16px;text-align:start;transition:border-color .2s,background-color .2s,transform .15s}
+.recent-row:hover{border-color:var(--bd2);background:var(--s3)}.recent-row:active{transform:scale(.99)}
+.recent-code{font:700 15px var(--head);letter-spacing:3px;color:var(--cy)}
+.recent-nick{flex:1;min-width:0;color:var(--mut);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-go{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:600;color:#d6d6e0}
+
+/* Top bar */
+.top{backdrop-filter:blur(14px);background:#0f0f17e6}
+.code{background:var(--s3);border-radius:99px;padding:2px 8px;margin-top:2px}
+.online-pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#d6d6e0;background:var(--s3);border:1px solid var(--bd);border-radius:99px;padding:4px 9px;flex-shrink:0}
+
+/* Stage */
+.stage-title{position:absolute;top:10px;left:12px;right:60px;z-index:3;font:600 12px var(--font);color:#fff;text-shadow:0 1px 6px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;opacity:.9}
+.empty{background:radial-gradient(70% 90% at 50% 40%,#1c1036 0,#050508 100%)}
+.empty svg{color:var(--pu);filter:drop-shadow(0 0 18px #b952ff88)}
+
+/* Chat */
+.msgs{gap:6px}
+.msg{margin-top:6px}
+.msg.cont{margin-top:0}
+.msg .av-gap{width:28px;flex-shrink:0}
+.msg.cont .bub{border-radius:16px 16px 16px 5px}
+.msg.mine.cont .bub{border-radius:16px 5px 5px 16px}
+.msg .bub{box-shadow:inset 0 1px 0 #ffffff0a}
+.chat-empty{margin:auto;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--mut);font-size:13px;text-align:center;padding:24px}
+.chat-empty svg{color:var(--pu);margin-bottom:4px}
+.chat-empty b{color:#fff;font:700 15px var(--head)}
+.send{background:var(--s1);border-top:1px solid var(--bd)}
+.emo{padding-top:10px}
+
+/* Desktop home: hero + form side by side */
+@media(min-width:960px){
+  .home{max-width:1040px;display:grid;grid-template-columns:1fr 440px;grid-template-areas:"hero card" "hero recent";align-items:start;column-gap:24px;padding:48px 24px}
+  .hero{grid-area:hero;border-radius:28px;padding:36px;min-height:420px}
+  .home .card{grid-area:card;margin:0}
+  .recent{grid-area:recent;margin:12px 0 0}
+  h1{font-size:44px}
+  .stage-title{font-size:13px}
+}
+@media(max-width:959px){
+  .stage{border-radius:0}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}

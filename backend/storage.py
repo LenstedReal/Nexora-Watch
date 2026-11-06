@@ -1,19 +1,18 @@
 import asyncio
 import math
-
-import httpx
 import os
 import re
+import shutil
 import time
 import uuid
-from collections import OrderedDict
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, Response, StreamingResponse
 
 import rooms as R
-from config import (MAX_UPLOAD_BYTES, OCI_ACCESS_KEY, OCI_BUCKET, OCI_MONTHLY_REQUEST_LIMIT, OCI_REGION,
+from config import (MAX_UPLOAD_BYTES, MEDIA_DIR, OCI_ACCESS_KEY, OCI_BUCKET, OCI_MONTHLY_REQUEST_LIMIT, OCI_REGION,
                     OCI_S3_ENDPOINT, OCI_SECRET_KEY, PARTICIPANT_QUOTA_BYTES, STORAGE_DRIVER, STORAGE_QUOTA_BYTES,
                     STORAGE_WARN_RATIO)
 from db import db
@@ -40,78 +39,57 @@ async def month_requests() -> int:
     return int(doc["requests"]) if doc else 0
 
 
-class EmergentDriver:
-    """Interim driver until OCI keys exist. Each part is its own object; reads map Range -> parts. No presign/delete API (soft delete)."""
-    name = "emergent"
+class LocalDriver:
+    """Default driver: parts are written to MEDIA_DIR on the backend host, then concatenated on complete.
+    Reads are served by /api/media/{id}/stream with HTTP Range support. Works on any VM (e.g. Oracle Always Free)."""
+    name = "local"
 
     def __init__(self):
-        self.key = None
-        base = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
-        self.url = base.rstrip("/") + "/objstore/api/v1/storage"
-        self.http = httpx.AsyncClient(timeout=120)
-        self.cache: "OrderedDict[str, bytes]" = OrderedDict()
-        self.cache_max = int(os.environ.get("PART_CACHE_PARTS", "24"))
-        self.locks: dict[str, asyncio.Lock] = {}
+        self.root = MEDIA_DIR
+        self.root.mkdir(parents=True, exist_ok=True)
 
-    async def _key(self, force=False) -> str:
-        if self.key and not force:
-            return self.key
-        r = await self.http.post(f"{self.url}/init", json={"emergent_key": os.environ["EMERGENT_LLM_KEY"]})
-        r.raise_for_status()
-        self.key = r.json()["storage_key"]
-        return self.key
+    def _parts_dir(self, m: Media) -> Path:
+        return self.root / "parts" / m.media_id
 
-    async def _req(self, method: str, path: str, **kw) -> httpx.Response:
-        for attempt in range(2):
-            headers = {"X-Storage-Key": await self._key(force=attempt > 0), **kw.pop("headers", {})}
-            r = await self.http.request(method, f"{self.url}/objects/{path}", headers=headers, **kw)
-            if r.status_code == 439:
-                raise ApiError(507, "storage_quota", "Depolama kotası dolu")
-            if r.status_code != 404 or attempt:
-                r.raise_for_status()
-                return r
-        return r
-
-    def part_key(self, m: Media, n: int) -> str:
-        return f"nexora-watch/{m.object_key}.parts/{n}"
+    def path(self, m: Media) -> Path:
+        return self.root / m.object_key
 
     async def init(self, m: Media) -> str:
+        self._parts_dir(m).mkdir(parents=True, exist_ok=True)
         return uuid.uuid4().hex
 
     def part_url(self, m: Media, n: int) -> str:
         exp = int(time.time()) + URL_TTL
         return f"/api/uploads/{m.media_id}/parts/{n}?exp={exp}&sig={sign(f'part:{m.media_id}:{n}', exp)}"
 
-    async def put_part(self, m: Media, n: int, data: bytes):
-        await self._req("PUT", self.part_key(m, n), content=data, headers={"Content-Type": "application/octet-stream"})
-        await db.media.update_one({"media_id": m.media_id}, {"$set": {f"parts.{n}": len(data)}})
-
-    async def get_part(self, m: Media, n: int) -> bytes:
-        key = self.part_key(m, n)
-        if key in self.cache:
-            self.cache.move_to_end(key)
-            return self.cache[key]
-        lock = self.locks.setdefault(key, asyncio.Lock())
-        async with lock:
-            if key not in self.cache:
-                self.cache[key] = (await self._req("GET", key)).content
-                while len(self.cache) > self.cache_max:
-                    self.cache.popitem(last=False)
-        self.locks.pop(key, None)
-        return self.cache.get(key) or (await self._req("GET", key)).content
-
     async def list_parts(self, m: Media) -> dict[int, int]:
-        doc = await db.media.find_one({"media_id": m.media_id}, {"parts": 1})
-        return {int(k): v for k, v in ((doc or {}).get("parts") or {}).items()}
+        d = self._parts_dir(m)
+        if not d.is_dir():
+            return {}
+        return {int(p.name): p.stat().st_size for p in d.iterdir() if p.name.isdigit()}
 
     async def complete(self, m: Media) -> int:
-        return sum((await self.list_parts(m)).values())
+        def _concat() -> int:
+            dest = self.path(m)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            tmp = dest.with_suffix(dest.suffix + ".tmp")
+            with open(tmp, "wb") as out:
+                for n in range(1, m.part_count + 1):
+                    with open(self._parts_dir(m) / str(n), "rb") as src:
+                        shutil.copyfileobj(src, out, 1024 * 1024)
+            os.replace(tmp, dest)
+            shutil.rmtree(self._parts_dir(m), ignore_errors=True)
+            return dest.stat().st_size
+        return await asyncio.to_thread(_concat)
 
     async def abort(self, m: Media):
-        await db.media.update_one({"media_id": m.media_id}, {"$set": {"parts": {}}})
+        await asyncio.to_thread(shutil.rmtree, self._parts_dir(m), True)
 
     async def delete(self, m: Media):
-        return None
+        try:
+            await asyncio.to_thread(self.path(m).unlink)
+        except FileNotFoundError:
+            pass
 
     async def read_url(self, m: Media, ttl: int) -> str:
         exp = int(time.time()) + ttl
@@ -175,7 +153,7 @@ class OciDriver:
         return self.s3.generate_presigned_url("get_object", ExpiresIn=ttl, Params={"Bucket": OCI_BUCKET, "Key": m.object_key})
 
 
-driver = OciDriver() if STORAGE_DRIVER == "oci" else EmergentDriver()
+driver = OciDriver() if STORAGE_DRIVER == "oci" else LocalDriver()
 
 
 async def audit(action: str, actor: str, media_id: str, room_code: str, extra: dict | None = None):
@@ -283,7 +261,7 @@ async def upload_part_urls(media_id: str, request: Request):
 
 @router.put("/uploads/{media_id}/parts/{n}")
 async def upload_part_local(media_id: str, n: int, request: Request, exp: int = 0, sig: str = ""):
-    if driver.name != "emergent":
+    if driver.name != "local":
         raise ApiError(404, "not_found", "Yok")
     if not verify_sig(f"part:{media_id}:{n}", exp, sig):
         raise ApiError(403, "url_expired", "Yükleme bağlantısının süresi doldu")
@@ -291,14 +269,23 @@ async def upload_part_local(media_id: str, n: int, request: Request, exp: int = 
     if m.status != "uploading" or not 1 <= n <= m.part_count:
         raise ApiError(409, "not_uploading", "Yükleme aktif değil")
     expected = m.part_size if n < m.part_count else m.size - m.part_size * (m.part_count - 1)
-    buf = bytearray()
-    async for chunk in request.stream():
-        buf += chunk
-        if len(buf) > expected:
-            raise ApiError(413, "part_too_large", "Parça boyutu hatalı")
-    if len(buf) != expected:
-        raise ApiError(400, "part_incomplete", "Parça eksik geldi")
-    await driver.put_part(m, n, bytes(buf))
+    pdir = driver._parts_dir(m)
+    pdir.mkdir(parents=True, exist_ok=True)
+    tmp = pdir / f"{n}.{uuid.uuid4().hex}.tmp"
+    got = 0
+    try:
+        with open(tmp, "wb") as f:
+            async for chunk in request.stream():
+                got += len(chunk)
+                if got > expected:
+                    raise ApiError(413, "part_too_large", "Parça boyutu hatalı")
+                f.write(chunk)
+        if got != expected:
+            raise ApiError(400, "part_incomplete", "Parça eksik geldi")
+        os.replace(tmp, pdir / str(n))
+    finally:
+        if tmp.exists():
+            tmp.unlink()
     return Response(status_code=200, headers={"ETag": f'"{media_id}-{n}"'})
 
 
@@ -368,14 +355,18 @@ async def media_url(media_id: str, participant_id: str = "", token: str = ""):
 
 @router.get("/media/{media_id}/stream")
 async def media_stream(media_id: str, request: Request, exp: int = 0, sig: str = ""):
-    m = await _media(media_id)
-    if driver.name != "emergent":
-        return RedirectResponse(await driver.read_url(m, 3600))
+    # Signature is checked for every driver (previously the OCI path redirected without any check).
     if not verify_sig(f"media:{media_id}", exp, sig):
         raise ApiError(403, "url_expired", "Medya bağlantısının süresi doldu")
+    m = await _media(media_id)
     if m.status != "completed":
         raise ApiError(404, "media_not_found", "Medya bulunamadı")
-    size = m.size
+    if driver.name != "local":
+        return RedirectResponse(await driver.read_url(m, 3600))
+    path = driver.path(m)
+    if not path.is_file():
+        raise ApiError(404, "media_not_found", "Medya dosyası bulunamadı")
+    size = path.stat().st_size
     start, end, status = 0, size - 1, 200
     rng = request.headers.get("range")
     if rng:
@@ -392,18 +383,18 @@ async def media_stream(media_id: str, request: Request, exp: int = 0, sig: str =
         status = 206
 
     async def chunks():
-        pos = start
-        while pos <= end:
-            n = pos // m.part_size + 1
-            data = await driver.get_part(m, n)
-            if n < m.part_count:
-                asyncio.create_task(driver.get_part(m, n + 1))
-            off = pos - (n - 1) * m.part_size
-            piece = data[off: off + (end - pos + 1)]
-            if not piece:
-                break
-            pos += len(piece)
-            yield piece
+        remaining = end - start + 1
+        f = await asyncio.to_thread(open, path, "rb")
+        try:
+            await asyncio.to_thread(f.seek, start)
+            while remaining > 0:
+                data = await asyncio.to_thread(f.read, min(512 * 1024, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+        finally:
+            f.close()
 
     headers = {"Accept-Ranges": "bytes", "Content-Length": str(end - start + 1), "Cache-Control": "private, max-age=3600"}
     if status == 206:

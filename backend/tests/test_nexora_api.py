@@ -8,7 +8,7 @@ import pytest
 import requests
 import websockets
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
+BASE_URL = (os.environ.get("NEXORA_API_URL") or os.environ.get("REACT_APP_BACKEND_URL") or "http://localhost:8001").rstrip("/")
 API = f"{BASE_URL}/api"
 WS = BASE_URL.replace("http", "ws", 1) + "/api/ws"
 MP4 = "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_20MB.mp4"
@@ -131,6 +131,17 @@ def test_resolve_youtube():
     assert r.status_code == 200 and r.json()["kind"] == "youtube" and r.json()["video_id"] == "aqz-KE-bpKQ"
 
 
+def test_resolve_with_referer_and_title():
+    r = requests.post(f"{API}/resolve", json={"url": "https://youtu.be/aqz-KE-bpKQ", "referer": "https://example.com/watch/1", "title": "Bunny"})
+    assert r.status_code == 200 and r.json()["kind"] == "youtube" and r.json()["title"] == "Bunny"
+    assert "headers" not in r.json()
+
+
+def test_resolve_invalid_referer():
+    r = requests.post(f"{API}/resolve", json={"url": "https://youtu.be/aqz-KE-bpKQ", "referer": "javascript:x"})
+    assert r.status_code == 400 and r.json()["code"] == "invalid_referer"
+
+
 # WebSocket
 def test_ws_bad_token_and_presence(room):
     async def run():
@@ -159,13 +170,16 @@ def test_ws_bad_token_and_presence(room):
     asyncio.run(run())
 
 
-# Upload (emergent driver) + Range stream
+# Upload (local driver) + Range stream
+SAMPLE = os.environ.get("SAMPLE_VIDEO", os.path.join(os.path.dirname(__file__), "..", "..", "tests", "sample_vp9.webm"))
+
+
 def test_upload_and_range(room):
-    path = "/app/tests/sample.mp4"
+    path = SAMPLE
     size = os.path.getsize(path)
     h = cred(room["host"])
-    init = requests.post(f"{API}/uploads/init", json={"code": room["code"], **h, "filename": "TEST.mp4", "size": size,
-                                                     "mime": "video/mp4", "fingerprint": f"TEST:{uuid.uuid4()}"})
+    init = requests.post(f"{API}/uploads/init", json={"code": room["code"], **h, "filename": "TEST.webm", "size": size,
+                                                     "mime": "video/webm", "fingerprint": f"TEST:{uuid.uuid4()}"})
     assert init.status_code == 200, init.text
     d = init.json()
     mid, ps, pc = d["media_id"], d["part_size"], d["part_count"]
@@ -187,6 +201,14 @@ def test_upload_and_range(room):
     assert s.status_code == 206 and len(s.content) == 100
     with open(path, "rb") as f:
         assert s.content == f.read(100)
+    # stream URL without a valid signature must be rejected
+    assert requests.get(f"{API}/media/{mid}/stream", timeout=10).status_code == 403
+
+
+def test_metrics_summary_requires_auth(room):
+    assert requests.get(f"{API}/rooms/{room['code']}/metrics/summary").status_code == 401
+    r = requests.get(f"{API}/rooms/{room['code']}/metrics/summary", params=cred(room["host"]))
+    assert r.status_code == 200
 
 
 # Close
