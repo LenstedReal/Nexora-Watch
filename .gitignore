@@ -94,3 +94,7 @@ apps/android/local.properties
 apps/ios/*.xcodeproj/
 apps/ios/DerivedData/
 tests/sample.mp4
+.env.*
+credentials.json
+*.key
+.credentials
