@@ -174,6 +174,7 @@ const tr = {
 
   b_ph: "Desteklenen site veya YouTube'da ara",
   b_unsupported: "Bu site desteklenmiyor. Yalnızca listedeki kamuya açık siteler açılabilir.",
+  b_no_login: "Google girişi uygulama içi tarayıcıda desteklenmiyor. Giriş gerektirmeyen herkese açık videoları kullan.",
   b_blocked_nav: "Geçiş engellendi: desteklenen siteler dışında gezinilemez.",
   b_title: "Desteklenen siteler",
   b_sub: "Bir site aç, videoyu bir kez oynat; Nexora videoyu bulur ve odaya getirir. Abonelikli/DRM korumalı platformlar (Netflix, Disney+, Prime Video vb.) desteklenmez.",
@@ -358,6 +359,7 @@ const en: Dict = {
 
   b_ph: "Supported site or search YouTube",
   b_unsupported: "This site isn't supported. Only the listed public sites can be opened.",
+  b_no_login: "Google sign-in is not supported in the in-app browser. Use public videos that do not need a login.",
   b_blocked_nav: "Navigation blocked: you can only browse supported sites.",
   b_title: "Supported sites",
   b_sub: "Open a site and play the video once; Nexora finds it and brings it to the room. Subscription/DRM platforms (Netflix, Disney+, Prime Video…) are not supported.",
@@ -539,6 +541,7 @@ const de: Dict = {
 
   b_ph: "Unterstützte Seite oder YouTube durchsuchen",
   b_unsupported: "Diese Seite wird nicht unterstützt. Nur die gelisteten öffentlichen Seiten können geöffnet werden.",
+  b_no_login: "Google-Anmeldung wird im In-App-Browser nicht unterstützt. Nutze öffentliche Videos ohne Anmeldung.",
   b_blocked_nav: "Navigation blockiert: nur unterstützte Seiten sind erlaubt.",
   b_title: "Unterstützte Seiten",
   b_sub: "Öffne eine Seite und spiele das Video einmal ab; Nexora findet es und bringt es in den Raum. Abo-/DRM-Plattformen (Netflix, Disney+, Prime Video…) werden nicht unterstützt.",

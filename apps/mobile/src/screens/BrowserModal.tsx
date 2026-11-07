@@ -82,6 +82,9 @@ export function hostOf(url: string): string {
   return m ? m[1].toLowerCase() : "";
 }
 
+// Pages the supported sites send you through (cookie consent). Allowed for navigation only; never a video source.
+const HELPER_HOSTS = ["consent.google.com", "consent.youtube.com"];
+
 export function isAllowedHost(host: string, sites: SiteInfo[]): boolean {
   return !!host && sites.some((s) => host === s.domain || host.endsWith(`.${s.domain}`) || (s.domain === "youtube.com" && host === "youtu.be"));
 }
@@ -115,7 +118,7 @@ export function BrowserModal({
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const web = useRef<WebView>(null);
-  const [sites, setSites] = useState<SiteInfo[]>(FALLBACK_CONFIG.allowed_sites);
+  const [sites, setSites] = useState<SiteInfo[]>(FALLBACK_CONFIG.allowed_sites.filter((x) => x.domain !== "drive.google.com"));
   const [url, setUrl] = useState<string | null>(null); // null = start page with supported sites
   const [address, setAddress] = useState("");
   const [nav, setNav] = useState({ back: false, fwd: false, loading: false });
@@ -126,7 +129,9 @@ export function BrowserModal({
   const pageHost = useRef("");
 
   useEffect(() => {
-    if (visible) loadConfig().then((c) => setSites(c.allowed_sites));
+    // Drive needs a Google sign-in, which Google blocks inside in-app browsers: Drive links are added by pasting
+    // the share link in the Video tab instead, so it is not offered here.
+    if (visible) loadConfig().then((c) => setSites(c.allowed_sites.filter((x) => x.domain !== "drive.google.com")));
   }, [visible]);
 
   useEffect(() => {
@@ -178,7 +183,7 @@ export function BrowserModal({
   const remove = (u: string) => setFound((prev) => prev.filter((x) => x.url !== u));
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" statusBarTranslucent>
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={[styles.bar, { paddingTop: insets.top + 8 }]}>
           <IconButton icon="close" onPress={onClose} label={t("close")} />
@@ -258,9 +263,15 @@ export function BrowserModal({
                 if (!/^https?:/i.test(r.url)) return false; // intent://, market:// etc.
                 if ((r as any).isTopFrame === false) return true;
                 if (r.url === "about:blank") return true;
-                const ok = isAllowedHost(hostOf(r.url), sites);
-                if (!ok) setNotice(t("b_blocked_nav"));
-                return ok;
+                const host = hostOf(r.url);
+                if (isAllowedHost(host, sites) || HELPER_HOSTS.includes(host)) return true;
+                setNotice(host === "accounts.google.com" ? t("b_no_login") : t("b_blocked_nav"));
+                // Nothing loaded yet (the site redirected straight away): go back to the site list, not a black page.
+                if (!nav.back) {
+                  setUrl(null);
+                  setAddress("");
+                }
+                return false;
               }}
               onNavigationStateChange={(s) => {
                 setNav({ back: s.canGoBack, fwd: s.canGoForward, loading: s.loading });
