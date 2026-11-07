@@ -4,6 +4,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { WebView } from "react-native-webview";
 import { C } from "../theme";
 import { t } from "../i18n";
+import { WEB_URL } from "../core/api";
 
 /** What the sync engine needs from any player. */
 export interface PlayerHandle {
@@ -146,7 +147,8 @@ export const NativePlayer = forwardRef<PlayerHandle, CommonProps & { uri: string
 // ---------------------------------------------------------------------------------------------------------------
 // YouTube through the official IFrame Player API inside a WebView.
 // ---------------------------------------------------------------------------------------------------------------
-const YT_ORIGIN = "https://nexorawatch.app";
+// Must be a real https origin we own: YouTube rejects embeds without a valid referrer (error 152/153).
+const YT_ORIGIN = WEB_URL;
 
 function ytHtml(videoId: string, controls: boolean) {
   return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
@@ -171,7 +173,7 @@ window.nx=function(c){if(!ready||!player)return;
 }
 
 const ytError = (code: number) =>
-  code === 100 ? t("yt_notfound") : code === 101 || code === 150 ? t("yt_embed") : t("yt_error", { c: code });
+  code === 100 ? t("yt_notfound") : code === 101 || code === 150 || code === 152 || code === 153 ? t("yt_embed") : t("yt_error", { c: code });
 
 export const YouTubePlayer = forwardRef<PlayerHandle, CommonProps & { videoId: string }>(function YouTubePlayer(
   { videoId, controls, onError },

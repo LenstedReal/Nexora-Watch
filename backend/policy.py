@@ -1,7 +1,7 @@
 """Content policy: which pages may be used as video sources (Play/KVKK compliance)."""
 from urllib.parse import urlparse
 
-from config import (ALLOWED_SITES, APK_URL, BLOCKED_HOSTS, CONTACT_EMAIL, PLAY_URL, WEB_URL)
+from config import (ALLOWED_SITES, APK_URL, BLOCKED_HOSTS, CONTACT_EMAIL, OWNER_ADDRESS, OWNER_NAME, PLAY_URL, WEB_URL)
 from security import ApiError
 
 
@@ -44,6 +44,7 @@ def public_config() -> dict:
         "play_url": PLAY_URL,
         "apk_url": APK_URL,
         "contact_email": CONTACT_EMAIL,
+        "owner": {"name": OWNER_NAME, "address": OWNER_ADDRESS},
         "legal": {
             "privacy": f"{WEB_URL}/gizlilik",
             "terms": f"{WEB_URL}/kosullar",

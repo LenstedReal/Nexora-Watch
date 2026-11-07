@@ -81,6 +81,22 @@ function LegalLayout({ title, children }) {
   );
 }
 
+/** Data controller from server config (OWNER_NAME / OWNER_ADDRESS in .env), falling back to OWNER. */
+const useOwner = () => {
+  const cfg = useAppConfig();
+  const name = cfg.owner?.name?.trim();
+  return {
+    controller: name ? `${name} (${OWNER.brand} — Nexora Watch geliştiricisi)` : OWNER.controller,
+    address: cfg.owner?.address?.trim() || OWNER.address,
+  };
+};
+const Ctl = () => useOwner().controller;
+const Addr = ({ pre = ", ", wrap }) => {
+  const a = useOwner().address;
+  if (!a) return null;
+  return wrap ? ` (${a})` : `${pre}${a}`;
+};
+
 const Mail = () => {
   const cfg = useAppConfig();
   return <a href={`mailto:${cfg.contact_email}`}>{cfg.contact_email}</a>;
@@ -138,9 +154,9 @@ export function Privacy() {
       </div>
       <h2>1. Kim olduğumuz</h2>
       <p>
-        Nexora Watch, {OWNER.controller} tarafından geliştirilen ve işletilen ortak video izleme uygulamasıdır (mobil uygulama ve
+        Nexora Watch, <Ctl /> tarafından geliştirilen ve işletilen ortak video izleme uygulamasıdır (mobil uygulama ve
         nexora.lenstedreal.info). Bu politika mobil uygulama ile web sitesi için geçerlidir. İletişim: <Mail />
-        {OWNER.address ? `, ${OWNER.address}` : ""}.
+        <Addr />.
       </p>
       <h2>2. İşlediğimiz veriler</h2>
       <ul>
@@ -283,8 +299,8 @@ export function Kvkk() {
   return (
     <LegalLayout title="KVKK Aydınlatma Metni">
       <p>
-        6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") md. 10 uyarınca, veri sorumlusu sıfatıyla {OWNER.controller}
-        {OWNER.address ? ` (${OWNER.address})` : ""} olarak Nexora Watch kapsamında işlenen kişisel verilerin hakkında seni bilgilendiriyoruz.
+        6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") md. 10 uyarınca, veri sorumlusu sıfatıyla <Ctl />
+        <Addr wrap /> olarak Nexora Watch kapsamında işlenen kişisel verilerin hakkında seni bilgilendiriyoruz.
       </p>
       <h2>1. İşlenen kişisel veriler</h2>
       <ul>
@@ -433,7 +449,7 @@ export function ChildSafety() {
       </ul>
       <h2>İletişim noktası</h2>
       <p>
-        Çocuk güvenliği konularındaki irtibat kişisi: {OWNER.controller}, <Mail />.
+        Çocuk güvenliği konularındaki irtibat kişisi: <Ctl />, <Mail />.
       </p>
     </LegalLayout>
   );

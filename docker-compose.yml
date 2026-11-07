@@ -29,6 +29,8 @@ services:
       PLAY_URL: ${PLAY_URL:-}
       APK_URL: ${APK_URL:-https://github.com/LenstedReal/Nexora-Watch/releases/latest}
       CONTACT_EMAIL: ${CONTACT_EMAIL:-destek@lenstedreal.info}
+      OWNER_NAME: ${OWNER_NAME:-}
+      OWNER_ADDRESS: ${OWNER_ADDRESS:-}
       MEDIA_RETENTION_DAYS: ${MEDIA_RETENTION_DAYS:-7}
       MEDIA_DELETE_AFTER_CLOSE_HOURS: ${MEDIA_DELETE_AFTER_CLOSE_HOURS:-1}
       # Comma lists; "domain|Name" for ALLOWED_SITES. Defaults live in backend/config.py too.

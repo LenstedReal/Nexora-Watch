@@ -74,19 +74,27 @@ export function HomeScreen({ onEnter, onOpenCode }: { onEnter: (code: string, re
       <GlowBackground />
       <ScrollView contentContainerStyle={[styles.wrap, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled">
         <View style={styles.topRow}>
-          <LangSwitch />
+          <Image source={require("../../assets/logo.png")} style={styles.navLogo} />
+          <Text style={styles.navBrand}>
+            Nexora<Text style={{ color: C.purple }}>Watch</Text>
+          </Text>
           <View style={{ flex: 1 }} />
+          <LangSwitch />
           <IconButton icon="settings-outline" onPress={() => setSettings(true)} label={t("settings")} />
         </View>
 
         <View style={styles.hero}>
-          <View style={styles.logoGlow}>
-            <Image source={require("../../assets/logo.png")} style={styles.logo} />
-          </View>
           <RaveBadge />
-          <Text style={styles.brand}>Nexora Watch</Text>
-          <Text style={styles.slogan}>{t("slogan")}</Text>
+          <Text style={styles.brand}>{t("slogan")}</Text>
           <Text style={styles.tagline}>{t("tagline")}</Text>
+          <View style={styles.features}>
+            {features.map(([icon, k]) => (
+              <View key={k} style={styles.feature}>
+                <Ionicons name={icon as any} size={13} color={C.muted} />
+                <Text style={styles.featureText}>{t(k)}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {serverDown && (
@@ -154,14 +162,6 @@ export function HomeScreen({ onEnter, onOpenCode }: { onEnter: (code: string, re
           </View>
         )}
 
-        <View style={styles.features}>
-          {features.map(([icon, k]) => (
-            <View key={k} style={styles.feature}>
-              <Ionicons name={icon as any} size={16} color={C.purple} />
-              <Text style={styles.featureText}>{t(k)}</Text>
-            </View>
-          ))}
-        </View>
         <Text style={styles.copy}>© LenstedReal · {cfg.contact_email}</Text>
       </ScrollView>
 
@@ -275,12 +275,14 @@ function SettingsSheet({ visible, cfg, onClose, onServerChanged }: { visible: bo
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 18, gap: 18 },
   topRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  hero: { alignItems: "center", gap: 10, paddingVertical: 4 },
+  hero: { alignItems: "flex-start", gap: 12, paddingTop: 10 },
+  navLogo: { width: 34, height: 34, borderRadius: 10 },
+  navBrand: { color: C.text, fontSize: 18, fontWeight: "800" },
   logoGlow: { borderRadius: 30, shadowColor: C.purple, shadowOpacity: 0.8, shadowRadius: 26, elevation: 14, backgroundColor: C.card, marginBottom: 4 },
   logo: { width: 96, height: 96, borderRadius: 28 },
-  brand: { color: C.text, fontSize: 36, fontWeight: "900", letterSpacing: 0.3, textShadowColor: C.purple, textShadowRadius: 18 },
+  brand: { color: C.text, fontSize: 34, lineHeight: 38, fontWeight: "800", letterSpacing: -0.8 },
   slogan: { color: C.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
-  tagline: { color: C.muted, fontSize: 14, textAlign: "center" },
+  tagline: { color: "#D6D6E0", fontSize: 15, lineHeight: 22 },
   down: { flexDirection: "row", gap: 8, alignItems: "center", padding: 12, borderRadius: R.md, backgroundColor: C.warning + "14", borderWidth: 1, borderColor: C.warning + "55" },
   downText: { flex: 1, color: C.text, fontSize: 13 },
   error: { color: C.error, fontSize: 13 },
@@ -290,8 +292,8 @@ const styles = StyleSheet.create({
   recentName: { color: C.text, fontSize: 15, fontWeight: "700" },
   recentCode: { color: C.cyan, fontSize: 12, fontWeight: "800", letterSpacing: 1.5, marginTop: 2 },
   features: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  feature: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.card, borderRadius: R.pill, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: C.border },
-  featureText: { color: C.text, fontSize: 12, fontWeight: "600" },
+  feature: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#ffffff0a", borderRadius: R.pill, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: C.border },
+  featureText: { color: C.muted, fontSize: 12 },
   copy: { color: C.dim, fontSize: 11, textAlign: "center" },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
   sheet: { maxHeight: "86%", backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, borderTopWidth: 1, borderColor: C.border },

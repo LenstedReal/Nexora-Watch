@@ -2,7 +2,7 @@ name: Android (APK + AAB)
 
 on:
   push:
-    branches: [main, nexora-v2]
+    branches: [main]
     paths:
       - "apps/mobile/**"
       - ".github/workflows/android.yml"
@@ -110,3 +110,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+
+      # Keeps https://github.com/LenstedReal/Nexora-Watch/releases/latest (linked from the website) pointing at
+      # the newest signed APK. Only the APK is public; the AAB is for Play Console and stays in the artifact.
+      - name: Publish latest APK release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ env.NEXORA_VERSION_CODE }}
+          name: Nexora Watch (build ${{ env.NEXORA_VERSION_CODE }})
+          make_latest: "true"
+          files: dist/*.apk

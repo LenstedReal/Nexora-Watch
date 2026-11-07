@@ -47,6 +47,9 @@ WEB_URL = os.environ.get("WEB_URL", "https://nexora.lenstedreal.info").rstrip("/
 PLAY_URL = os.environ.get("PLAY_URL", "")
 APK_URL = os.environ.get("APK_URL", "https://github.com/LenstedReal/Nexora-Watch/releases/latest")
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "destek@lenstedreal.info")
+# KVKK data controller shown on the legal pages (set OWNER_NAME to your full legal name in .env).
+OWNER_NAME = os.environ.get("OWNER_NAME", "").strip()
+OWNER_ADDRESS = os.environ.get("OWNER_ADDRESS", "").strip()
 
 _DEFAULT_SITES = ("youtube.com|YouTube,vimeo.com|Vimeo,dailymotion.com|Dailymotion,archive.org|Internet Archive,"
                   "twitch.tv|Twitch,drive.google.com|Google Drive")

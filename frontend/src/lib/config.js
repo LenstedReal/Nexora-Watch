@@ -15,6 +15,7 @@ export const DEFAULT_CONFIG = {
   apk_url: "https://github.com/LenstedReal/Nexora-Watch/releases/latest",
   contact_email: "destek@lenstedreal.info",
   min_age: 13,
+  owner: { name: "", address: "" },
 };
 
 let cache = null;

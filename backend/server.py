@@ -357,12 +357,25 @@ async def maintenance_loop():
         try:
             now = datetime.now(timezone.utc)
             await db.rooms.update_many({"status": "active", "expires_at": {"$lt": now}}, {"$set": {"status": "expired"}})
+            await cleanup_once()
+            # Privacy policy: room data (room, participants, chat, playback, metrics) is deleted at most
+            # ROOM_PURGE_GRACE after the room ended (closed_at for closed rooms, expires_at otherwise).
             purge_before = now - timedelta(seconds=ROOM_PURGE_GRACE_S)
-            old = [d["code"] async for d in db.rooms.find({"status": {"$in": ["expired", "closed"]}, "expires_at": {"$lt": purge_before}}, {"code": 1})]
-            for c in old:
+            async for d in db.rooms.find({"status": {"$in": ["expired", "closed"]}}, {"code": 1, "status": 1, "expires_at": 1, "closed_at": 1}):
+                ended_at = d.get("closed_at") if d.get("status") == "closed" else None
+                ended_at = ended_at or d.get("expires_at")
+                if ended_at and ended_at.tzinfo is None:
+                    ended_at = ended_at.replace(tzinfo=timezone.utc)
+                if ended_at and ended_at > purge_before:
+                    continue
+                c = d["code"]
+                if await db.media.count_documents({"room_code": c, "status": {"$in": ["completed", "uploading", "importing"]}}):
+                    continue  # media cleanup runs first; retry on the next pass
                 await db.room_messages.delete_many({"room_code": c})
                 await db.sync_metrics.delete_many({"room_code": c})
-            await cleanup_once()
+                await db.room_participants.delete_many({"room_code": c})
+                await db.room_playback.delete_many({"room_code": c})
+                await db.rooms.delete_one({"code": c})
             # Retention promised in the privacy policy: reports 180 days, audit/security logs 90 days.
             await db.reports.delete_many({"created_at": {"$lt": now - timedelta(days=180)}})
             await db.audit_log.delete_many({"at": {"$lt": now - timedelta(days=90)}})

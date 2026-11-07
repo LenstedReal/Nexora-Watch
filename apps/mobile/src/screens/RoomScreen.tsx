@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { C, R } from "../theme";
 import { ApiError, WEB_URL, api, errorText, type ReportReason } from "../core/api";
@@ -34,7 +35,7 @@ import { People } from "../components/People";
 import { SourcePanel, isDriveUrl, type UploadState } from "../components/SourcePanel";
 import { Reactions } from "../components/Reactions";
 import { ActionSheet, type SheetOption } from "../components/ActionSheet";
-import { Button, Field, IconButton, Segmented } from "../components/ui";
+import { Button, Field, IconButton } from "../components/ui";
 import { BrowserModal, type DetectedMedia } from "./BrowserModal";
 
 const GATE_KEY: Partial<Record<string, TKey>> = {
@@ -492,39 +493,57 @@ function RoomView({
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <StatusBar style="light" />
       <View style={[styles.top, { paddingTop: insets.top + 6 }]}>
-        <IconButton icon="chevron-back" onPress={onExit} label={t("home")} />
-        <View style={{ flex: 1 }}>
+        <IconButton icon="arrow-back" onPress={onExit} label={t("home")} />
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.roomName} numberOfLines={1}>
             {room.name}
           </Text>
           <Pressable
-            style={styles.codeRow}
+            style={styles.codeChip}
             onPress={async () => {
               await Clipboard.setStringAsync(code);
               toast(t("code_copied"));
             }}
           >
-            <View style={[styles.dot, { backgroundColor: conn.status === "connected" ? C.success : conn.status === "failed" ? C.error : C.warning }]} />
             <Text style={styles.code}>{code}</Text>
-            <Ionicons name="copy-outline" size={12} color={C.cyan} />
-            <Text style={styles.online}> · {t("online_n", { n: online })}</Text>
+            <Ionicons name="copy-outline" size={11} color={C.muted} />
           </Pressable>
         </View>
-        <IconButton icon="person-add" onPress={share} color={C.cyan} label="+" />
-        <IconButton icon="ellipsis-horizontal" onPress={menu} label="..." />
+        <View style={styles.onlinePill}>
+          <Ionicons name="people" size={12} color="#D6D6E0" />
+          <Text style={styles.onlineTxt}>{online}</Text>
+        </View>
+        <View style={[styles.dot, { backgroundColor: conn.status === "connected" ? C.success : conn.status === "failed" ? C.error : C.warning }]} />
+        <Pressable onPress={share} accessibilityLabel={t("invite")}>
+          <LinearGradient colors={[C.cyan, C.purple]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.invite}>
+            <Ionicons name="share-social" size={14} color="#000" />
+            <Text style={styles.inviteTxt}>{t("invite")}</Text>
+          </LinearGradient>
+        </Pressable>
+        <IconButton icon="ellipsis-vertical" onPress={menu} label="..." />
       </View>
       <ConnectionBanner status={conn.status} attempt={conn.attempt} onRetry={conn.retryNow} />
       {stage}
-      <View style={{ paddingHorizontal: 12, paddingTop: 10 }}>
-        <Segmented
-          value={tab}
-          onChange={switchTab}
-          options={[
-            { key: "chat", label: t("tab_chat"), icon: "chatbubble-ellipses", badge: tab === "chat" ? 0 : unread },
-            { key: "people", label: t("tab_people"), icon: "people" },
-            ...(isHost ? [{ key: "video" as const, label: t("tab_video"), icon: "film" as const }] : []),
-          ]}
-        />
+      <View style={styles.tabsBar}>
+        {([
+          ["chat", "chatbubble-ellipses-outline", t("tab_chat")],
+          ["people", "people-outline", t("tab_people")],
+          ...(isHost ? [["video", "film-outline", t("tab_video")]] : []),
+        ] as [typeof tab, any, string][]).map(([k, icon, label]) => {
+          const on = tab === k;
+          return (
+            <Pressable key={k} style={styles.tabBtn} onPress={() => switchTab(k)}>
+              <Ionicons name={icon} size={16} color={on ? "#fff" : C.muted} />
+              <Text style={[styles.tabTxt, on && { color: "#fff" }]}>{label}</Text>
+              {k === "chat" && !on && unread > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeTxt}>{unread > 99 ? "99+" : unread}</Text>
+                </View>
+              )}
+              {on && <LinearGradient colors={[C.cyan, C.purple]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.tabLine} />}
+            </Pressable>
+          );
+        })}
       </View>
       <View style={{ flex: 1, paddingBottom: insets.bottom }}>
         {tab === "chat" && chat}
@@ -584,11 +603,20 @@ function Gate({ title, onExit, error, children }: { title: string; onExit: () =>
 }
 
 const styles = StyleSheet.create({
-  top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingBottom: 10, backgroundColor: C.bg },
-  roomName: { color: C.text, fontSize: 17, fontWeight: "800" },
-  codeRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  code: { color: C.cyan, fontSize: 12, fontWeight: "800", letterSpacing: 1.5 },
-  online: { color: C.muted, fontSize: 12 },
+  top: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 8, paddingBottom: 8, backgroundColor: "#0F0F17", borderBottomWidth: 1, borderBottomColor: C.border },
+  roomName: { color: C.text, fontSize: 15, fontWeight: "800" },
+  codeChip: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2, alignSelf: "flex-start", backgroundColor: C.cardHi, borderRadius: R.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  code: { color: C.muted, fontSize: 12, fontWeight: "700", letterSpacing: 1.5 },
+  onlinePill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.cardHi, borderWidth: 1, borderColor: C.border, borderRadius: R.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  onlineTxt: { color: "#D6D6E0", fontSize: 12, fontWeight: "700" },
+  invite: { flexDirection: "row", alignItems: "center", gap: 5, height: 34, paddingHorizontal: 12, borderRadius: R.pill },
+  inviteTxt: { color: "#000", fontSize: 13, fontWeight: "800" },
+  tabsBar: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: "#0F0F17" },
+  tabBtn: { flex: 1, height: 46, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  tabTxt: { color: C.muted, fontSize: 13, fontWeight: "700" },
+  tabLine: { position: "absolute", left: "22%", right: "22%", bottom: -1, height: 2, borderRadius: 2 },
+  tabBadge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" },
+  tabBadgeTxt: { color: "#fff", fontSize: 11, fontWeight: "800" },
   dot: { width: 8, height: 8, borderRadius: 4 },
   banner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginBottom: 8, padding: 10, borderRadius: R.md, backgroundColor: C.card, borderWidth: 1, borderColor: C.warning + "66" },
   bannerFloat: { position: "absolute", top: 12, left: 70, right: 12 },
