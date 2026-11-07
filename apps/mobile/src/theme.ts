@@ -1,21 +1,21 @@
 export const C = {
   bg: "#09090D",
-  card: "#14141F",
-  cardHi: "#1B1B2A",
-  input: "#202033",
-  border: "#2A2A3A",
+  card: "#151521",
+  cardHi: "#1D1D2C",
+  input: "#1D1D2C",
+  border: "#242431",
   text: "#F5F5FA",
-  muted: "#8B8B9E",
-  dim: "#5A5A6E",
+  muted: "#8F8FA6",
+  dim: "#5F5F76",
   // Blue / pink neon palette. "cyan" = blue accent, "purple" = pink primary (names kept for compatibility).
   cyan: "#38BDF8",
   blue: "#3B82F6",
-  violet: "#8B5CF6",
+  violet: "#818CF8",
   purple: "#EC4899",
   purpleDeep: "#3A0A2C",
-  success: "#00E096",
-  warning: "#FFC83D",
-  error: "#FF3B5C",
+  success: "#34D399",
+  warning: "#FBBF24",
+  error: "#FF4D6D",
 };
 
 export const R = { sm: 10, md: 14, lg: 20, pill: 999 };
@@ -34,4 +34,4 @@ export function initials(name: string): string {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export const GRAD = ["#3B82F6", "#8B5CF6", "#EC4899"] as const;
+export const GRAD = ["#38BDF8", "#818CF8", "#EC4899"] as const;

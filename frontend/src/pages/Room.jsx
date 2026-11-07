@@ -88,6 +88,7 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
   const playerRef = useRef(null);
   const [tab, setTab] = useState("chat");
   const [unread, setUnread] = useState(0);
+  const [reporting, setReporting] = useState(null);
   const conn = useRoomConnection(code, ident, initialRoom, (e) => toast.error(errorText(t, e)));
   const { room } = conn;
   const isHost = room.host_id === ident.participant_id;
@@ -108,12 +109,13 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
   if (conn.status === "replaced") return <Gate title={t("replaced")} />;
 
   const send = (v) => conn.sendChat(v).catch((e) => toast.error(errorText(t, e)));
-  const report = async (person, messageId) => {
-    const reasons = { "1": "spam", "2": "abuse", "3": "sexual", "4": "violence", "5": "copyright", "6": "other" };
-    const pick = window.prompt(`${t("report_title")} — ${person?.nickname || ""}\n1 Spam · 2 ${t("reason_abuse")} · 3 ${t("reason_sexual")} · 4 ${t("reason_violence")} · 5 ${t("reason_copyright")} · 6 ${t("reason_other")}`, "2");
-    if (!pick || !reasons[pick.trim()]) return;
+  const report = (person, messageId) => setReporting({ person, messageId });
+  const submitReport = async (reason) => {
+    const r = reporting;
+    setReporting(null);
+    if (!r) return;
     try {
-      await api.report(code, ident, { target_id: person?.id || null, message_id: messageId, reason: reasons[pick.trim()] });
+      await api.report(code, ident, { target_id: r.person?.id || null, message_id: r.messageId || null, reason });
       toast.success(t("report_sent"));
     } catch (e) {
       toast.error(errorText(t, e));
@@ -163,6 +165,17 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
           </div>
         </aside>
       </div>
+      {reporting && (
+        <div className="modal-bg" onClick={() => setReporting(null)} data-testid="report-dialog">
+          <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <b>{t("report_title")}{reporting.person?.nickname ? ` · ${reporting.person.nickname}` : ""}</b>
+            {[["spam", "Spam"], ["abuse", t("reason_abuse")], ["sexual", t("reason_sexual")], ["violence", t("reason_violence")], ["copyright", t("reason_copyright")], ["other", t("reason_other")]].map(([k, label]) => (
+              <button key={k} onClick={() => submitReport(k)} data-testid={`report-reason-${k}`}>{label}</button>
+            ))}
+            <button className="cancel" onClick={() => setReporting(null)}>{t("cancel")}</button>
+          </div>
+        </div>
+      )}
       {conn.reactions.map((r) => <div key={r.id} className="fly" style={{ left: `${r.left}%` }}>{r.emoji}</div>)}
     </div>
   );

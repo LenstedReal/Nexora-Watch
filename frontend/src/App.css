@@ -255,3 +255,12 @@ input::placeholder{color:#5f5f76}
 .drive-prog{margin-top:10px;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--mut)}
 .drive-prog .bar{height:6px;background:var(--s3);border-radius:9px;overflow:hidden}
 .drive-prog .bar i{display:block;height:100%;background:var(--grad);transition:width .4s}
+
+/* report dialog */
+.modal-bg{position:fixed;inset:0;z-index:60;background:#000a;display:flex;align-items:flex-end;justify-content:center;padding:16px;animation:fade .15s ease both}
+.modal{width:100%;max-width:420px;background:var(--s2);border:1px solid var(--bd2);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:6px;animation:pop .2s ease both;margin-bottom:env(safe-area-inset-bottom)}
+.modal b{font:700 15px var(--head);padding:6px 6px 8px}
+.modal button{text-align:start;padding:13px 12px;border-radius:12px;background:var(--s3);font-size:14px;transition:background-color .15s}
+.modal button:hover{background:var(--s4)}
+.modal .cancel{background:none;text-align:center;color:var(--mut);margin-top:4px}
+@media(min-width:960px){.modal-bg{align-items:center}}

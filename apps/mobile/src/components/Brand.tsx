@@ -47,12 +47,12 @@ export function GradientButton({
 }) {
   return (
     <Pressable onPress={onPress} disabled={disabled || loading} style={({ pressed }) => [{ opacity: disabled ? 0.45 : pressed ? 0.85 : 1 }, style]}>
-      <LinearGradient colors={[...GRAD]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.btn}>
+      <LinearGradient colors={[...GRAD]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btn}>
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color="#000" />
         ) : (
           <>
-            {icon && <Ionicons name={icon} size={18} color="#fff" />}
+            {icon && <Ionicons name={icon} size={18} color="#000" />}
             <Text style={styles.btnText}>{title}</Text>
           </>
         )}
@@ -81,7 +81,7 @@ export function GlowCard({ children, style }: { children: ReactNode; style?: Sty
 const styles = StyleSheet.create({
   blob: { position: "absolute", width: 320, height: 320, borderRadius: 160, opacity: 0.16 },
   btn: { height: 54, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 18 },
-  btnText: { color: "#fff", fontSize: 16, fontWeight: "900", letterSpacing: 0.3 },
+  btnText: { color: "#000", fontSize: 16, fontWeight: "800", letterSpacing: 0.2 },
   badge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: C.cyan + "55" },
   badgeText: { color: C.text, fontSize: 11, fontWeight: "900", letterSpacing: 1.6 },
   cardOuter: { borderRadius: 22, padding: 1 },
