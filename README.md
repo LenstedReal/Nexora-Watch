@@ -6,27 +6,20 @@ Arkadaşlarınla aynı videoyu **aynı anda** izlediğin, Rave benzeri senkron i
 
 | Klasör | İçerik |
 |---|---|
-| `backend/` | FastAPI + MongoDB API: odalar, WebSocket senkron, sohbet, parçalı video yükleme (yerel disk veya Oracle Object Storage) |
-| `apps/mobile/` | **Yeni mobil uygulama** — Expo (React Native, TypeScript). Android ve iOS tek kod tabanı |
-| `frontend/` | React web istemcisi (aynı API) |
-| `docs/` | Mimari, senkron protokolü, depolama, güvenlik, test |
-| `archive/` | Eski, derlenmeyen Kotlin / SwiftUI / Next.js kodları (yalnızca referans, kullanılmıyor) |
+| `backend/` | FastAPI + MongoDB API: odalar, WebSocket senkron, sohbet, parçalı video yükleme, Drive içe aktarma, moderasyon |
+| `frontend/` | React web uygulaması — **web sitesi ve mobil uygulamanın arayüzü** (tek kod) |
+| `apps/mobile/` | Expo (React Native) kabuk: web arayüzünü WebView'da açar + yerel özellikler (sitelerde video algılama, yatay ekran, ekranı açık tutma, derin bağlantı, geri tuşu, açılış animasyonu) |
+| `site/personal/` | me.lenstedreal.info kişisel sayfa |
+| `deploy/` | Caddy (HTTPS) + web derleme |
+| `docs/` | Kurulum, yayın, mimari |
 
-## APK'yı GitHub Actions'tan almak
+## Otomasyon (GitHub Actions)
 
-1. Repo → **Settings → Secrets and variables → Actions → Variables** → `NEXORA_API_URL` değişkenini ekle (ör. `https://api.alanadin.com`). İsteğe bağlı: `NEXORA_WEB_URL` (davet linklerinde kullanılır).
-2. `apps/mobile/` altında bir değişiklik push'la ya da **Actions → Android APK → Run workflow**.
-3. Çalışma bitince (≈10–15 dk) ilgili run sayfasında **Artifacts → nexora-watch-apk** indir, zip'i aç, APK'yı telefona kur.
-4. `v1.0.0` gibi bir tag push'larsan APK otomatik olarak GitHub Release'e de eklenir.
+- **Deploy server** (`deploy.yml`): `main`'e push → sunucu kendini günceller (web, API, kişisel site). Kurulum: `docs/DEPLOY.md`.
+- **Android** (`android.yml`): `apps/mobile/` değişince imzalı APK + AAB üretir; APK'yı otomatik olarak GitHub Releases'e (latest) koyar.
+- **Backend** (`backend.yml`): API testleri + Docker derleme.
 
-Notlar:
-- APK debug anahtarıyla imzalanır: her telefona kurulur ama Google Play'e yüklenemez (Play için ayrı upload keystore gerekir).
-- Eski Nexora APK'sı kuruluysa imza farklı olduğu için önce onu kaldır.
-- `NEXORA_API_URL` boş bırakılırsa uygulama açılınca sunucu adresini sorar.
-
-## Uygulama içi sunucu adresi
-Varsayılan sunucu `https://nexora.lenstedreal.info` uygulamaya gömülüdür (GitHub değişkeni `NEXORA_API_URL` ile değiştirilebilir).
-Test için ⚙️ Ayarlar → **Gelişmiş** altından geçici olarak başka bir sunucu girilebilir; normal kullanıcıların bunu değiştirmesi gerekmez.
+Arayüz web'de olduğu için web'deki her düzeltme uygulamaya da yeni APK gerekmeden yansır.
 
 ## Backend'i çalıştırmak (Docker)
 
@@ -67,7 +60,7 @@ Her push'ta `.github/workflows/backend.yml` aynı testleri MongoDB servisiyle ç
 ```bash
 cd apps/mobile
 npm install
-npx expo start        # Expo Go yerine development build önerilir (expo-video, WebView native modül)
+npx expo start        # uygulama web arayüzünü (EXPO_PUBLIC_WEB_URL) WebView içinde açar; bkz. docs/DEPLOY.md
 ```
 
 ## Web'den video algılama

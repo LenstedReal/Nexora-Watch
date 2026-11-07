@@ -65,8 +65,10 @@ export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal })
       },
     };
     Object.entries(on).forEach(([k, fn]) => el.addEventListener(k, fn));
+    // Prefer hls.js wherever MSE exists (Chrome/Android WebView report "maybe" for HLS but often can't play it);
+    // fall back to native HLS only where MSE is missing (older iPhone Safari / iOS WebView).
     const nativeHls = el.canPlayType("application/vnd.apple.mpegurl");
-    if (video.kind === "hls" && !nativeHls && Hls.isSupported()) {
+    if (video.kind === "hls" && Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hls.on(Hls.Events.ERROR, (_e, d) => {
         if (!d.fatal) return;

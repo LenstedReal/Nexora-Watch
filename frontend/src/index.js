@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
 import App from "@/App";
+import { inApp } from "@/lib/native";
+
+if (inApp()) document.documentElement.classList.add("in-app");
 
 const queryClient = new QueryClient({
   defaultOptions: {

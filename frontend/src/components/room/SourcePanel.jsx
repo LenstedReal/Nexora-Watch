@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Link2, Upload, Loader2, Film, PlayCircle } from "lucide-react";
+import { Link2, Upload, Loader2, Film, PlayCircle, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useT } from "@/i18n";
 import { api } from "@/lib/api";
 import { UploadPanel } from "./UploadPanel";
+import { inApp, pickFromNativeBrowser } from "@/lib/native";
 
 export const SourcePanel = ({ code, ident, video, upload, onRoom }) => {
   const t = useT();
@@ -58,6 +59,21 @@ export const SourcePanel = ({ code, ident, video, upload, onRoom }) => {
     }
   };
 
+  const browse = async () => {
+    const res = await pickFromNativeBrowser();
+    if (!res) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      onRoom(await api.setVideo(code, ident, res.url, { referer: res.referer || undefined, title: res.title || undefined }));
+    } catch (ex) {
+      setErr(ex);
+      toast.error(errorText(t, ex));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="src-card" data-testid="source-panel">
       <div className="src-head">
@@ -76,6 +92,9 @@ export const SourcePanel = ({ code, ident, video, upload, onRoom }) => {
         </form>
       ) : (
         <UploadPanel upload={upload} />
+      )}
+      {tab === "link" && inApp() && (
+        <button className="browse" onClick={browse} disabled={busy} data-testid="source-browse-btn"><Globe size={15} /> {t("browse_sites")}</button>
       )}
       {tab === "link" && isDrive && <div className="hint" data-testid="drive-hint">{t("drive_hint")}</div>}
       {imp && (

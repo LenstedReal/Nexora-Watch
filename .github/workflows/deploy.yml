@@ -1,0 +1,58 @@
+name: Deploy server (web + API + personal site)
+
+# Every push to main that touches the server side updates the Oracle server automatically:
+# git reset to origin/main (works after force pushes too; .env and data volumes are untouched), rebuild, restart.
+# Needs repository secrets: DEPLOY_HOST (158.101.173.231), DEPLOY_USER (ubuntu), DEPLOY_SSH_KEY (private deploy key).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "site/**"
+      - "deploy/**"
+      - "docker-compose.yml"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check secrets
+        id: chk
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$HOST" ] || [ -z "$KEY" ]; then
+            echo "::warning::DEPLOY_HOST / DEPLOY_SSH_KEY secrets are not set — skipping automatic deploy (see docs/DEPLOY.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update and rebuild on the server
+        if: steps.chk.outputs.ok == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER || 'ubuntu' }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 55m
+          script_stop: true
+          script: |
+            set -e
+            cd ~/Nexora-Watch
+            git fetch --prune origin main
+            git reset --hard origin/main
+            sudo docker compose --profile tls up -d --build --remove-orphans
+            sudo docker image prune -f >/dev/null
+            sleep 8
+            curl -fsS https://nexora.lenstedreal.info/api/config >/dev/null && echo "API OK"
+            sudo docker compose ps

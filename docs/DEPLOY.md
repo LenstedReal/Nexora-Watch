@@ -71,3 +71,31 @@ df -h /                                  # disk
 sudo docker system df                    # docker kullanımı
 sudo docker compose exec mongo mongodump --db nexora --archive > ~/nexora-$(date +%F).archive   # veritabanı yedeği
 ```
+
+## Otomatik deploy (GitHub Actions)
+
+`main`'e her push'ta `.github/workflows/deploy.yml` sunucuya bağlanır, `git reset --hard origin/main` yapar
+(force push sonrası da çalışır; `.env` ve veriler korunur), imajları yeniden derler ve servisleri yeniden başlatır.
+
+Tek seferlik kurulum:
+
+```bash
+# 1) Sunucuda (ubuntu@zeppelin): sadece deploy için ayrı bir anahtar
+ssh-keygen -t ed25519 -N "" -C nexora-deploy -f ~/.ssh/nexora_deploy
+cat ~/.ssh/nexora_deploy.pub >> ~/.ssh/authorized_keys
+
+# 2) Termux'ta: anahtarı GitHub secret olarak kaydet (dosya telefona kopyalanmaz)
+ssh -i ~/.ssh/oracle ubuntu@158.101.173.231 'cat ~/.ssh/nexora_deploy' | gh secret set DEPLOY_SSH_KEY -R LenstedReal/Nexora-Watch
+gh secret set DEPLOY_HOST -R LenstedReal/Nexora-Watch -b 158.101.173.231
+gh secret set DEPLOY_USER -R LenstedReal/Nexora-Watch -b ubuntu
+```
+
+Secret'lar yoksa iş uyarı verip atlanır; elle güncelleme yine `git pull && sudo docker compose --profile tls up -d --build`.
+
+## Mobil uygulama mimarisi
+
+Android/iOS uygulaması, web uygulamasının (`frontend/`) kendisini WebView içinde gösterir; ekranlar ve akış
+web ile birebir aynıdır ve web güncellendiğinde uygulama da yeni APK gerekmeden güncellenir. Uygulamaya özel
+parçalar (`apps/mobile/App.tsx`): sitelerde gezip video algılama (`BrowserModal`), yatay ekran, oda açıkken ekranın
+kapanmaması, `/room/KOD` bağlantıları, Android geri tuşu, açılış animasyonu ve bağlantı hatası ekranı.
+Web tarafında köprü: `frontend/src/lib/native.js`.

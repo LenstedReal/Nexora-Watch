@@ -14,6 +14,7 @@ import { ConnectionBanner } from "@/components/room/ConnectionBanner";
 import { SourcePanel } from "@/components/room/SourcePanel";
 import { PeopleList, PeopleStrip } from "@/components/room/Participants";
 import { Chat } from "@/components/room/Chat";
+import { inApp, setKeepAwake, setOrientation } from "@/lib/native";
 
 const Gate = ({ title, children }) => {
   const nav = useNavigate();
@@ -50,7 +51,10 @@ export default function RoomPage() {
       setIdent(next);
       setGate(null);
     } catch (e) {
-      if (e.status === 404 || e.status === 410) setGate(e.code);
+      if (e.status === 404 || e.status === 410) {
+        clearIdent(code); // dead room: drop it from "recent rooms"
+        setGate(e.code);
+      }
       else setGate({ error: e });
     }
   }, [code]);
@@ -102,6 +106,10 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
     if (conn.status === "unauthorized") onIdentLost();
   }, [conn.status, onIdentLost]);
   useEffect(() => { document.title = `${room.name} · Nexora Watch`; }, [room.name]);
+  useEffect(() => {
+    setKeepAwake(true);
+    return () => { setKeepAwake(false); setOrientation("portrait"); };
+  }, []);
   useEffect(() => { if (tabRef.current !== "chat") setUnread((u) => u + 1); }, [msgCount]);
   const switchTab = (k) => { setTab(k); if (k === "chat") setUnread(0); };
 
@@ -175,6 +183,9 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
             <button className="cancel" onClick={() => setReporting(null)}>{t("cancel")}</button>
           </div>
         </div>
+      )}
+      {inApp() && (
+        <button className="rotate-fab" onClick={() => setOrientation(window.innerWidth > window.innerHeight ? "portrait" : "landscape")} aria-label={t("rotate")} data-testid="rotate-btn">⤢</button>
       )}
       {conn.reactions.map((r) => <div key={r.id} className="fly" style={{ left: `${r.left}%` }}>{r.emoji}</div>)}
     </div>

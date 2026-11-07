@@ -7,7 +7,7 @@ import {
 import { toast } from "sonner";
 import { errorText, useI18n } from "@/i18n";
 import { api } from "@/lib/api";
-import { lastNickname, saveIdent, saveNickname } from "@/lib/session";
+import { getIdent, lastNickname, saveIdent, saveNickname } from "@/lib/session";
 import { useAppConfig } from "@/lib/config";
 import { SiteFooter } from "@/pages/Legal";
 import "@/landing.css";
@@ -83,7 +83,7 @@ export default function Home() {
     if (mode === "j" && c.length !== 6) return toast.error(t("need_code"));
     setBusy(true);
     try {
-      const res = mode === "c" ? await api.createRoom(n, name.trim()) : await api.joinRoom(c, n);
+      const res = mode === "c" ? await api.createRoom(n, name.trim()) : await api.joinRoom(c, n, getIdent(c)); // reuse the seat instead of creating a duplicate participant
       saveNickname(n);
       saveIdent(res.room.code, { participant_id: res.participant.id, token: res.token, nickname: n });
       nav(`/room/${res.room.code}`, { state: { room: res.room } });

@@ -22,7 +22,7 @@ function loadYT() {
   return ytReady;
 }
 
-const YT_ERR = { 2: "invalid_url", 5: "codec", 100: "yt_notfound", 101: "yt_embed", 150: "yt_embed" };
+const YT_ERR = { 2: "invalid_url", 5: "codec", 100: "yt_notfound", 101: "yt_embed", 150: "yt_embed", 152: "yt_embed", 153: "yt_embed" };
 
 export const YouTubePlayer = ({ videoId, isHost, playerRef, events, onFatal }) => {
   const hostRef = useRef(null);

@@ -264,3 +264,23 @@ input::placeholder{color:#5f5f76}
 .modal button:hover{background:var(--s4)}
 .modal .cancel{background:none;text-align:center;color:var(--mut);margin-top:4px}
 @media(min-width:960px){.modal-bg{align-items:center}}
+
+/* in-app site browser (mobile app only) */
+.browse{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 12px 12px;padding:11px;border-radius:12px;border:1px solid var(--bd2);color:var(--cy);font-size:13px;font-weight:700;width:calc(100% - 24px);transition:background-color .2s}
+.browse:hover{background:var(--s3)}
+
+/* consent gate */
+.consent .chk{display:flex;gap:12px;align-items:flex-start;width:100%;max-width:380px;text-align:start;margin:0;font-size:14px;letter-spacing:0;color:var(--tx);background:var(--s2);border:1px solid var(--bd);border-radius:14px;padding:14px;cursor:pointer}
+.consent .chk input{width:20px;height:20px;padding:0;flex-shrink:0;accent-color:#ec4899;margin-top:1px}
+.consent .note a{color:var(--cy)}
+/* inside the mobile app: no "download the app" calls to action */
+html.in-app .lp-nav-cta,html.in-app [data-testid="cta-store"],html.in-app .lp-final .lp-btn.primary,html.in-app .lp-soon{display:none!important}
+
+/* app: rotate button + phone landscape = video fills the screen */
+.rotate-fab{position:fixed;z-index:40;right:12px;top:calc(env(safe-area-inset-top) + 66px);width:38px;height:38px;border-radius:12px;background:#000a;border:1px solid #fff3;color:#fff;font-size:18px;display:grid;place-items:center;backdrop-filter:blur(10px)}
+@media (orientation:landscape) and (max-height:520px){
+  .room .top,.room .side,.room .banner,.room .hint,.room .desk-only{display:none!important}
+  .room .body{display:block;padding:0}
+  .room .stage{height:100dvh;max-height:100dvh;aspect-ratio:auto;border-radius:0;border:0}
+  .rotate-fab{top:12px}
+}

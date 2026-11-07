@@ -265,7 +265,8 @@ export function useRoomConnection(code, ident, initialRoom, onNotice) {
 
   const sendChat = useCallback(
     async (text) => {
-      const client_id = crypto.randomUUID();
+      // crypto.randomUUID is missing on older Android WebViews / non-secure contexts.
+      const client_id = window.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
       if (!sendRaw({ type: "message", text, client_id })) {
         addMessages([await api.sendMessage(code, ident, text, client_id)]);
         if (EMOJI.has(text)) fly(text);

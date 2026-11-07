@@ -169,7 +169,14 @@
     "err_site_not_supported": "Bu site desteklenmiyor",
     "err_drive_not_public": "Drive dosyası herkese açık değil",
     "err_not_drive": "Yalnızca Google Drive bağlantıları içe aktarılabilir",
-    "err_kicked": "Odadan çıkarıldın"
+    "err_kicked": "Odadan çıkarıldın",
+    "browse_sites": "Sitelerde gez ve video bul",
+    "rotate": "Yatay ekran",
+    "age_title": "Başlamadan önce",
+    "age_13": "13 yaşından büyüğüm",
+    "age_terms": "Kullanım Koşulları'nı ve Gizlilik Politikası'nı kabul ediyorum",
+    "age_go": "Devam et",
+    "age_read": "Metinleri oku"
   },
   "en": {
     "chip": "BETTER THAN RAVE",
@@ -341,7 +348,14 @@
     "err_site_not_supported": "This site is not supported",
     "err_drive_not_public": "The Drive file is not public",
     "err_not_drive": "Only Google Drive links can be imported",
-    "err_kicked": "You were removed from the room"
+    "err_kicked": "You were removed from the room",
+    "browse_sites": "Browse sites & find a video",
+    "rotate": "Landscape",
+    "age_title": "Before you start",
+    "age_13": "I am 13 or older",
+    "age_terms": "I accept the Terms of Use and the Privacy Policy",
+    "age_go": "Continue",
+    "age_read": "Read the documents"
   },
   "de": {
     "chip": "BETTER THAN RAVE",
@@ -513,6 +527,13 @@
     "err_site_not_supported": "Diese Seite wird nicht unterstützt",
     "err_drive_not_public": "Die Drive-Datei ist nicht öffentlich",
     "err_not_drive": "Nur Google-Drive-Links können importiert werden",
-    "err_kicked": "Du wurdest aus dem Raum entfernt"
+    "err_kicked": "Du wurdest aus dem Raum entfernt",
+    "browse_sites": "Seiten durchsuchen & Video finden",
+    "rotate": "Querformat",
+    "age_title": "Bevor du startest",
+    "age_13": "Ich bin mindestens 13 Jahre alt",
+    "age_terms": "Ich akzeptiere die Nutzungsbedingungen und die Datenschutzerklärung",
+    "age_go": "Weiter",
+    "age_read": "Dokumente lesen"
   }
 }
