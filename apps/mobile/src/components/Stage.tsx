@@ -79,13 +79,13 @@ export function Stage({
       </View>
     );
   } else if (video.kind === "youtube" && video.video_id) {
-    body = <YouTubePlayer key={`${video.media_id}-${nonce}`} ref={playerRef} videoId={video.video_id} controls={isHost} onError={onError} />;
+    body = <YouTubePlayer key={`${video.media_id}-${nonce}`} ref={playerRef as RefObject<PlayerHandle>} videoId={video.video_id} controls={isHost} onError={onError} />;
   } else if (video.kind === "drive_embed" && video.embed_url) {
     body = <EmbedPlayer url={video.embed_url} />;
   } else if (video.kind === "upload") {
     body =
       uploadUrl && uploadUrl.id === video.media_id ? (
-        <NativePlayer key={`${uploadUrl.url}-${nonce}`} ref={playerRef} uri={uploadUrl.url} controls={isHost} onError={onError} />
+        <NativePlayer key={`${uploadUrl.url}-${nonce}`} ref={playerRef as RefObject<PlayerHandle>} uri={uploadUrl.url} controls={isHost} onError={onError} />
       ) : (
         <View style={styles.center}>
           <ActivityIndicator color={C.cyan} />
@@ -93,7 +93,7 @@ export function Stage({
       );
   } else {
     const uri = video.stream_url || video.url;
-    body = <NativePlayer key={`${uri}-${nonce}`} ref={playerRef} uri={uri} headers={video.headers} controls={isHost} onError={onError} />;
+    body = <NativePlayer key={`${uri}-${nonce}`} ref={playerRef as RefObject<PlayerHandle>} uri={uri} headers={video.headers} controls={isHost} onError={onError} />;
   }
 
   return (
