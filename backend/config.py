@@ -51,8 +51,8 @@ CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "destek@lenstedreal.info")
 OWNER_NAME = os.environ.get("OWNER_NAME", "").strip()
 OWNER_ADDRESS = os.environ.get("OWNER_ADDRESS", "").strip()
 
-_DEFAULT_SITES = ("youtube.com|YouTube,vimeo.com|Vimeo,dailymotion.com|Dailymotion,archive.org|Internet Archive,"
-                  "twitch.tv|Twitch,drive.google.com|Google Drive")
+# Public, free video platforms only (no DRM / subscription services). Override with ALLOWED_SITES in .env.
+_DEFAULT_SITES = ("youtube.com|YouTube,twitch.tv|Twitch,kick.com|Kick,rumble.com|Rumble,odysee.com|Odysee,dailymotion.com|Dailymotion,vimeo.com|Vimeo,streamable.com|Streamable,reddit.com|Reddit,x.com|X (Twitter),twitter.com|Twitter,facebook.com|Facebook,bilibili.tv|Bilibili,archive.org|Internet Archive,drive.google.com|Google Drive")
 ALLOWED_SITES: list[dict] = []
 for _item in (os.environ.get("ALLOWED_SITES") or _DEFAULT_SITES).split(","):
     _dom, _, _name = _item.strip().partition("|")

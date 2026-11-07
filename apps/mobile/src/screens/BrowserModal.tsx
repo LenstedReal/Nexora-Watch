@@ -82,11 +82,15 @@ export function hostOf(url: string): string {
   return m ? m[1].toLowerCase() : "";
 }
 
+// Short-link domains of supported sites.
+const ALIASES: Record<string, string> = { "youtu.be": "youtube.com", "fb.watch": "facebook.com", "redd.it": "reddit.com", "v.redd.it": "reddit.com" };
+
 // Pages the supported sites send you through (cookie consent). Allowed for navigation only; never a video source.
 const HELPER_HOSTS = ["consent.google.com", "consent.youtube.com"];
 
 export function isAllowedHost(host: string, sites: SiteInfo[]): boolean {
-  return !!host && sites.some((s) => host === s.domain || host.endsWith(`.${s.domain}`) || (s.domain === "youtube.com" && host === "youtu.be"));
+  const h = ALIASES[host] ?? host;
+  return !!h && sites.some((s) => h === s.domain || h.endsWith(`.${s.domain}`));
 }
 
 function classify(url: string, blocked: boolean): DetectedMedia["kind"] {
