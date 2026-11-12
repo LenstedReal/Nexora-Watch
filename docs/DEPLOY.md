@@ -8,15 +8,32 @@ Mevcut kurulum: Oracle Cloud **zeppelin** (Ubuntu 24.04, 1 GB RAM + 2 GB swap), 
 | `https://me.lenstedreal.info` | Kişisel site (`site/personal/index.html`) |
 
 ## Güncelleme (her yeni sürümde)
+
+`main` dalına push yeterli. Sunucuda komut çalıştırmak gerekmez:
+
+1. GitHub Actions (`.github/workflows/deploy.yml`) iki imajı derler ve GHCR'a yükler:
+   API (`nexora-watch-backend`) ve web + Caddy + kişisel site (`nexora-watch-web`).
+2. Sunucu yalnızca bu imajları indirir ve servisleri yeniden başlatır (`deploy/server-update.sh`).
+   1 GB'lık makinede artık derleme yapılmaz.
+3. Yeni sürüm cevap vermezse iş kırmızıya döner ve sebebi GitHub'daki çalışma sayfasında yazar.
+
+Canlıdaki sürüm: <https://nexora.lenstedreal.info/version.txt> (`<uygulama sürümü> <commit>`).
+
+**Sunucuda `--build` çalıştırma.** Elle yeniden başlatmak gerekirse (imajlar zaten sunucudadır):
 ```bash
-ssh -i ~/.ssh/oracle ubuntu@158.101.173.231
 cd ~/Nexora-Watch
-git pull
-sudo docker compose --profile tls up -d --build
+sudo docker compose --profile tls up -d --no-build
 sudo docker compose ps
-curl -s https://nexora.lenstedreal.info/api/config | head -c 300; echo
 ```
-Web derlemesi (React) 1 GB RAM'de 5–12 dk sürebilir; swap sayesinde tamamlanır.
+
+### Sorun giderme
+| GitHub'daki hata | Ne yapmalı |
+|---|---|
+| Sunucuya SSH ile bağlanılamadı | `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` secret'larını kontrol et; sunucu açık mı? |
+| Sunucudaki kopya ileri sarılamıyor | Sunucuda `cd ~/Nexora-Watch && git status`: değişmiş dosya varsa `git stash` ile kenara al, sonra işi GitHub'dan yeniden çalıştır. `.env` ve `docker-compose.override.yml` izlenmeyen dosyalardır, etkilenmez. |
+| İmaj indirilemedi | Disk dolu olabilir: `df -h /` ve `sudo docker system df` |
+| Yeni sürüm cevap vermiyor | Hata satırının üstündeki `docker compose logs` çıktısına bak; `.env` eksik ya da hatalı olabilir |
+| Başka bir güncelleme hâlâ çalışıyor | Bitmesini bekle, sonra işi yeniden çalıştır |
 
 ## .env (sunucuda `~/Nexora-Watch/.env`)
 ```
@@ -72,12 +89,10 @@ sudo docker system df                    # docker kullanımı
 sudo docker compose exec mongo mongodump --db nexora --archive > ~/nexora-$(date +%F).archive   # veritabanı yedeği
 ```
 
-## Otomatik deploy (GitHub Actions)
+## Otomatik deploy: tek seferlik kurulum
 
-`main`'e her push'ta `.github/workflows/deploy.yml` sunucuya bağlanır, `git reset --hard origin/main` yapar
-(force push sonrası da çalışır; `.env` ve veriler korunur), imajları yeniden derler ve servisleri yeniden başlatır.
-
-Tek seferlik kurulum:
+Akış yukarıda ("Güncelleme"). GHCR için ayar gerekmez: sunucu, işin kendi geçici anahtarıyla giriş yapar ve
+iş bitince çıkış yapar. Gereken tek şey sunucuya SSH erişimi için üç secret:
 
 ```bash
 # 1) Sunucuda (ubuntu@zeppelin): sadece deploy için ayrı bir anahtar
@@ -85,12 +100,15 @@ ssh-keygen -t ed25519 -N "" -C nexora-deploy -f ~/.ssh/nexora_deploy
 cat ~/.ssh/nexora_deploy.pub >> ~/.ssh/authorized_keys
 
 # 2) Termux'ta: anahtarı GitHub secret olarak kaydet (dosya telefona kopyalanmaz)
-ssh -i ~/.ssh/oracle ubuntu@158.101.173.231 'cat ~/.ssh/nexora_deploy' | gh secret set DEPLOY_SSH_KEY -R LenstedReal/Nexora-Watch
-gh secret set DEPLOY_HOST -R LenstedReal/Nexora-Watch -b 158.101.173.231
-gh secret set DEPLOY_USER -R LenstedReal/Nexora-Watch -b ubuntu
+ssh -i ~/.ssh/oracle ubuntu@158.101.173.231 'cat ~/.ssh/nexora_deploy' | gh secret set DEPLOY_SSH_KEY -R LenstedReal/nexora-watch
+gh secret set DEPLOY_HOST -R LenstedReal/nexora-watch -b 158.101.173.231
+gh secret set DEPLOY_USER -R LenstedReal/nexora-watch -b ubuntu
 ```
 
-Secret'lar yoksa iş uyarı verip atlanır; elle güncelleme yine `git pull && sudo docker compose --profile tls up -d --build`.
+Secret'lar yoksa imajlar yine derlenir, sunucu adımı uyarı verip atlanır.
+
+Kurallar: sunucudaki kopya yalnızca ileri sarılır (`git merge --ff-only`); `git reset --hard` ve force push
+kullanılmaz. `.env`, `docker-compose.override.yml` ve veri birimlerine dokunulmaz.
 
 ## Mobil uygulama mimarisi
 

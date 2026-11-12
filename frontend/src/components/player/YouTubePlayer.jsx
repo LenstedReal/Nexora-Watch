@@ -39,7 +39,8 @@ export const YouTubePlayer = ({ videoId, isHost, playerRef, events, onFatal }) =
         if (cancelled) return;
         player = new YT.Player(mount, {
           videoId, width: "100%", height: "100%",
-          playerVars: { playsinline: 1, controls: isHost ? 1 : 0, disablekb: isHost ? 0 : 1, rel: 0, modestbranding: 1, origin: window.location.origin },
+          // Only the host gets player controls; guests watch what the host plays.
+          playerVars: { playsinline: 1, controls: isHost ? 1 : 0, disablekb: isHost ? 0 : 1, rel: 0, origin: window.location.origin },
           events: {
             onReady: () => {
               const state = () => player.getPlayerState?.();

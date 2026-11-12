@@ -77,6 +77,9 @@ def playback_view(pb: RoomPlayback) -> dict:
         "revision": pb.revision,
         "media_id": pb.media_id,
         "updated_by": pb.updated_by,
+        # Highest command sequence stored for this room: the host continues from here, so a device whose clock is
+        # behind an earlier command (other device, clock correction) is never ignored as "stale".
+        "seq": pb.last_seq,
     }
 
 
@@ -146,6 +149,8 @@ async def create_room(nickname_in, name_in) -> dict:
 async def join_room(code: str, nickname_in, participant_id: Optional[str], token: Optional[str]) -> dict:
     room = await get_room(code)
     nickname = _text(nickname_in, "nickname", 24)
+    if await is_banned(room.code, participant_id, token):
+        raise ApiError(403, "kicked", "Oda sahibi seni bu odadan çıkardı")
     if participant_id and token:
         doc = await db.room_participants.find_one_and_update(
             {"room_code": room.code, "participant_id": participant_id, "token_hash": hash_token(token)},
@@ -155,8 +160,36 @@ async def join_room(code: str, nickname_in, participant_id: Optional[str], token
         if doc:
             return {"room": await room_view(room), "participant": participant_view(RoomParticipant.from_mongo(doc)), "token": token, "rejoined": True}
     p, new_tok = await _add_participant(room.code, nickname, "guest")
-    await system_message(room.code, f"{nickname} odaya katıldı")
-    return {"room": await room_view(room), "participant": participant_view(p), "token": new_tok, "rejoined": False}
+    msg = await system_message(room.code, f"{nickname} odaya katıldı")
+    return {"room": await room_view(room), "participant": participant_view(p), "token": new_tok, "rejoined": False, "_message": msg}
+
+
+async def is_banned(code: str, participant_id, token) -> bool:
+    """True when this identity was removed from the room by the host (kick = ban for the lifetime of the room)."""
+    if not isinstance(participant_id, str) or not isinstance(token, str) or not participant_id or not token:
+        return False
+    return bool(await db.room_bans.find_one({"room_code": code, "participant_id": participant_id, "token_hash": hash_token(token)}))
+
+
+async def ban(code: str, target: dict):
+    await db.room_bans.insert_one({"room_code": code, "participant_id": target.get("participant_id"),
+                                   "token_hash": target.get("token_hash"), "nickname": target.get("nickname"), "created_at": utcnow()})
+
+
+async def transfer_host(room: Room, new_host_id: str) -> Optional[dict]:
+    """Makes new_host_id the host of the room. Returns the system message, or None when nothing changed."""
+    if not isinstance(new_host_id, str) or not new_host_id or new_host_id == room.host_id:
+        return None
+    target = await db.room_participants.find_one({"room_code": room.code, "participant_id": new_host_id})
+    if not target:
+        raise ApiError(404, "not_participant", "Kişi odada değil")
+    res = await db.rooms.update_one({"code": room.code, "host_id": room.host_id, "status": "active"},
+                                    {"$set": {"host_id": new_host_id}, "$inc": {"version": 1}})
+    if not res.matched_count:
+        return None  # someone else changed the host meanwhile
+    await db.room_participants.update_one({"room_code": room.code, "participant_id": room.host_id}, {"$set": {"role": "guest"}})
+    await db.room_participants.update_one({"room_code": room.code, "participant_id": new_host_id}, {"$set": {"role": "host"}})
+    return await system_message(room.code, f"{target.get('nickname', 'Biri')} artık oda sahibi")
 
 
 async def auth_participant(code: str, participant_id, token) -> RoomParticipant:

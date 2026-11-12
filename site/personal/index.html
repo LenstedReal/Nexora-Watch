@@ -3,19 +3,38 @@
   ============================================================================================
   LenstedReal kişisel sitesi — DÜZENLEME REHBERİ
   - Hakkımda metni:  id="about" bölümündeki <p> etiketleri
-  - Projeler:        id="projects" içindeki .proj kartları (kopyala-yapıştır ile yenisini ekle)
-  - Bağlantılar:     id="links" içindeki <a> etiketleri
-  Değiştirdikten sonra sunucuda:  cd ~/Nexora-Watch && git pull && sudo docker compose --profile tls up -d --build
+  - Sistemler:       id="skills" içindeki "sys" listesi
+  - Diller/seviye:   id="skills" içindeki "lv" listesi
+  - Hizmetler:       id="services" içindeki .proj kartları
+  - APK sayfası:     sayfanın en altındaki kodda  var APK_SITE = "https://..."  (boşsa kart "Yakında" yazar)
+  - Projeler:        id="projects" içindeki .proj kartları: oyunlar, uygulamalar (kopyala-yapıştır ile yenisini ekle)
+  - Bağlantılar:     id="links" içindeki a etiketleri
+  Yayına alma: main dalına push yeterli; GitHub Actions siteyi kendisi günceller.
+  Kurallar: bu sayfada 18+ uygulama adı ya da görseli yer almaz; Google Play'deki oyunların yanında
+  APK ya da kısaltılmış bağlantı olmaz.
   ============================================================================================
 -->
 <html lang="tr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LenstedReal // x-69 Wormdemon</title>
-<meta name="description" content="LenstedReal — bağımsız geliştirici. Full-stack web, HLS/streaming, VoIP ve AI altyapıları. Nexora Watch ve diğer projeler.">
+<title>LenstedReal — Bağımsız geliştirici</title>
+<meta name="description" content="LenstedReal — bağımsız geliştirici. Full-stack web, HLS/yayın altyapıları, VoIP, botlar, mobil oyunlar ve yapay zeka. Nexora Watch, İstanbul Street Runner, Derby Arena.">
+<link rel="canonical" href="https://me.lenstedreal.info/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LenstedReal">
+<meta property="og:url" content="https://me.lenstedreal.info/">
+<meta property="og:title" content="LenstedReal — Bağımsız geliştirici">
+<meta property="og:description" content="Full-stack web, HLS/yayın altyapıları, VoIP, botlar, mobil oyunlar ve yapay zeka. Nexora Watch, İstanbul Street Runner, Derby Arena.">
+<meta property="og:image" content="https://me.lenstedreal.info/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="tr_TR">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#09090d">
-<link rel="icon" href="nexora.jpg">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" type="image/png" href="icon-180.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -87,6 +106,24 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
 .gate .go.on{display:inline-flex}
 .gate small{display:block;text-align:center;color:#5c5c72;font-size:12px;margin-top:12px}
 @media (max-width:560px){nav .links{display:none}}
+/* --- eklenenler: sistem ve seviye listeleri, hizmet ve uygulama kartları (mevcut kurallar değişmedi) --- */
+.proj .ph svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.proj .act{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.btn.s{padding:10px 14px;font-size:14px;border-radius:12px}
+.btn.off{opacity:.55;cursor:default;pointer-events:none}
+.proj .st.test{background:#38bdf818;color:#7dd3fc;border-color:#38bdf855}
+.proj ul{list-style:none;margin-top:10px;display:grid;gap:5px;color:var(--mut);font-size:14px}
+.proj ul li,.sys li{padding-left:16px;position:relative}
+.proj ul li::before,.sys li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--grad)}
+.sub{font:700 20px Outfit,sans-serif;margin:38px 0 6px}
+.note{color:var(--mut);font-size:14px;max-width:720px}
+.sys{list-style:none;display:grid;gap:10px 26px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));margin-top:14px;color:var(--mut);font-size:15px}
+.sys li b{color:#e4e4ee;font-weight:700}
+.lv{list-style:none;display:grid;gap:12px;margin-top:14px;max-width:720px}
+.lv li{display:grid;grid-template-columns:minmax(110px,150px) 1fr 58px;align-items:center;gap:12px;font-size:15px}
+.lv li>i{height:8px;border-radius:99px;background:var(--s2);border:1px solid var(--bd);position:relative;overflow:hidden}
+.lv li>i::after{content:"";position:absolute;inset:0;width:var(--w);background:var(--grad);border-radius:99px}
+.lv li>b{font-size:12px;font-weight:700;text-align:center;padding:4px 0;border-radius:99px;background:var(--s2);border:1px solid var(--bd);color:#c9c9d8}
 @media (prefers-reduced-motion:reduce){.bg i{animation:none}.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
 </style>
 </head>
@@ -95,15 +132,16 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
 <main>
   <nav>
     <div class="logo">Lensted<span>Real</span></div>
-    <div class="links"><a href="#about">Hakkımda</a><a href="#skills">Yetenekler</a><a href="#projects">Projeler</a><a href="#downloads" id="nav-dl" hidden>İndir</a><a href="#links">İletişim</a></div>
+    <div class="links"><a href="#about">Hakkımda</a><a href="#skills">Yetenekler</a><a href="#projects">Projeler</a><a href="#services">Hizmetler</a><a href="#links">İletişim</a></div>
   </nav>
 
   <header class="hero">
     <span class="tag">Yeni projelere açık</span>
     <h1>Merhaba, ben<br><span class="g">LenstedReal.</span></h1>
-    <p class="lead">Bağımsız geliştirici · <b>x-69 Wormdemon</b>. Full-stack web sistemleri, HLS/yayın altyapıları, VoIP ve yapay zeka üzerine çalışıyorum. Son projem <b>Nexora Watch</b>: arkadaşlarınla ve sevdiklerinle aynı saniyede video izlemenin en kolay yolu.</p>
+    <p class="lead">Bağımsız geliştirici. Full-stack web sistemleri, HLS/yayın altyapıları, VoIP, mobil oyunlar ve yapay zeka üzerine çalışıyorum. Son projem <b>Nexora Watch</b>: arkadaşlarınla ve sevdiklerinle aynı saniyede video izlemenin en kolay yolu.</p>
     <div class="cta">
       <a class="btn p" href="https://nexora.lenstedreal.info">Nexora Watch'u dene →</a>
+      <a class="btn g" href="#projects">Projeler</a>
       <a class="btn g" href="https://github.com/LenstedReal" target="_blank" rel="noopener">GitHub</a>
     </div>
   </header>
@@ -112,130 +150,124 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
     <span class="k">Hakkımda</span>
     <h2>Fikirden yayına, uçtan uca.</h2>
     <p>Selam, ben sanal kimliğimle <b>LenstedReal</b>. Full-stack web sistemleri, yayıncılık/HLS altyapıları, otomasyon araçları ve özel API mimarileri üzerinde çalışan bağımsız bir geliştiriciyim.</p>
-    <p>Aynı zamanda <b>x-69 Wormdemon</b> ekosistemi bünyesinde bağımsız yapay zeka modülleri, Cloudflare tunnel servisleri ve terminal tabanlı otomasyon betikleri geliştiriyorum. Sadece arayüz değil; arayüzden backend'e, altyapıdan yayın ve servis entegrasyonuna kadar sistemin tamamında çalışıyorum.</p>
-    <div class="skills"><span>Next.js / React</span><span>React Native</span><span>Python · FastAPI</span><span>HLS / M3U8</span><span>WebSocket</span><span>VoIP</span><span>Cloudflare R2 &amp; Tunnels</span><span>Oracle Cloud</span><span>Docker</span><span>MongoDB</span><span>AI Agents</span><span>Termux &amp; Linux</span></div>
+    <p>Bağımsız yapay zeka modülleri, Cloudflare tunnel servisleri, botlar ve terminal tabanlı otomasyon betikleri de geliştiriyorum. Sadece arayüz değil; arayüzden backend'e, altyapıdan yayın ve servis entegrasyonuna kadar sistemin tamamında çalışıyorum.</p>
+    <p>Bir fikri tek başıma yayına kadar götürebiliyorum: tasarım, kod, sunucu kurulumu, mağaza süreci ve sonrasındaki bakım. Web uygulamaları, mobil oyunlar, yayın sistemleri ve sesli iletişim altyapıları kurdum ve işletiyorum.</p>
+    <div class="skills"><span>Next.js / React</span><span>React Native</span><span>Python · FastAPI</span><span>HLS / M3U8</span><span>WebSocket</span><span>VoIP</span><span>Cloudflare R2 &amp; Tunnels</span><span>Oracle Cloud</span><span>Docker</span><span>MongoDB</span><span>AI Agents</span><span>Termux &amp; Linux</span><span>C++</span><span>Unity</span><span>Botlar &amp; Otomasyon</span></div>
   </section>
 
   <section id="skills" class="reveal">
     <span class="k">Yetenekler</span>
     <h2>Neler yapıyorum?</h2>
     <div class="grid">
-      <div class="proj"><div class="ph">▶</div><h3>HLS &amp; Streaming</h3><p>M3U8 yayın sistemleri, medya akışları, yayın filtreleme, proxy/stream katmanları ve yüksek performanslı yayın altyapıları.</p></div>
-      <div class="proj"><div class="ph">⇄</div><h3>Gerçek zamanlı sistemler</h3><p>WebSocket tabanlı senkron oynatma, saat eşitleme, sohbet ve canlı durum altyapıları.</p></div>
-      <div class="proj"><div class="ph">☎</div><h3>VoIP &amp; Servis Altyapıları</h3><p>VoIP servisleri, bağlantı altyapıları ve özel servis entegrasyonları; kurulum, yapılandırma ve sürdürülebilir işletim.</p></div>
-      <div class="proj"><div class="ph">⌘</div><h3>Web, Mobil &amp; Backend</h3><p>Modern web ve mobil uygulamalar, API mimarileri; FastAPI, Next.js, React / React Native.</p></div>
-      <div class="proj"><div class="ph">✦</div><h3>Cloud &amp; AI</h3><p>Cloudflare R2/Tunnels, Oracle Cloud, Docker, Linux; özel AI modülleri, agent tabanlı sistemler ve otomasyon.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.500z"/></svg></div><h3>HLS &amp; Streaming</h3><p>M3U8 yayın sistemleri, medya akışları, yayın filtreleme, proxy/stream katmanları ve yüksek performanslı yayın altyapıları.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></svg></div><h3>Gerçek zamanlı sistemler</h3><p>WebSocket tabanlı senkron oynatma, saat eşitleme, sohbet ve canlı durum altyapıları.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></div><h3>VoIP &amp; Servis Altyapıları</h3><p>VoIP servisleri, bağlantı altyapıları ve özel servis entegrasyonları; kurulum, yapılandırma ve sürdürülebilir işletim.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></svg></div><h3>Web, Mobil &amp; Backend</h3><p>Modern web ve mobil uygulamalar, API mimarileri; FastAPI, Next.js, React / React Native.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.800a2 2 0 0 0 1.300 1.300L21 12l-5.800 1.900a2 2 0 0 0-1.300 1.300L12 21l-1.900-5.800a2 2 0 0 0-1.300-1.300L3 12l5.800-1.900a2 2 0 0 0 1.300-1.300z"/></svg></div><h3>Cloud &amp; AI</h3><p>Cloudflare R2/Tunnels, Oracle Cloud, Docker, Linux; özel AI modülleri, agent tabanlı sistemler ve otomasyon.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 14h.01M15 14h.01M2 13v3M22 13v3"/><circle cx="12" cy="3" r="1"/></svg></div><h3>Botlar &amp; Otomasyon</h3><p>Telegram ve Discord botları, zamanlanmış görevler, terminal betikleri; bir işi insan eli değmeden baştan sona yürüten sistemler.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="11" rx="5.5"/><path d="M7 11v3M5.5 12.5h3M15.5 11.5h.01M18 13.5h.01"/></svg></div><h3>Mobil oyun</h3><p>Fikirden mağazaya mobil oyun: oynanış, liderlik tablosu, görevler, reklam entegrasyonu, hukuk sayfaları ve Google Play yayın süreci.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/></svg></div><h3>Entegrasyonlar</h3><p>Üçüncü taraf API'ler, reklam SDK'ları (AdMob, InMobi), abonelik, depolama ve bildirim servisleri; farklı sistemleri tek akışta birbirine bağlama.</p></div>
     </div>
+
+    <h3 class="sub">Kurabildiğim sistemler</h3>
+    <p class="note">Hepsi kendi projelerimde kurup çalıştırdığım şeyler.</p>
+    <ul class="sys">
+      <li><b>Canlı yayın altyapısı</b> — HLS/M3U8 akışı, proxy ve filtreleme katmanı, web oynatıcı</li>
+      <li><b>Senkron izleme ve sohbet</b> — WebSocket, saat eşitleme, oda sistemi</li>
+      <li><b>Telegram / Discord botları</b> — komutlar, bildirimler, zamanlanmış görevler</li>
+      <li><b>VoIP ve sanal numara</b> — kod sistemi, santral ve uygulama yönlendirmesi</li>
+      <li><b>Mobil oyun ve sunucusu</b> — liderlik tablosu, görevler, hesap silme</li>
+      <li><b>Android VPN istemcisi</b> — uygulama ve sunucu tarafı</li>
+      <li><b>Yapay zeka sohbet uygulaması</b> — sohbet, görsel üretimi ve sesli yanıt</li>
+      <li><b>Reklam ve abonelik</b> — yaşa göre reklam ayarı, rıza formu, uygulama içi abonelik</li>
+      <li><b>Sunucu kurulumu</b> — Oracle Cloud, Docker, HTTPS, Cloudflare Tunnels ve R2</li>
+      <li><b>Otomatik derleme ve yayın</b> — GitHub Actions ile APK/AAB derleme ve sürüm çıkarma</li>
+    </ul>
+
+    <h3 class="sub">Diller ve araçlar</h3>
+    <p class="note">Seviyeler kendi değerlendirmem.</p>
+    <ul class="lv">
+      <li><span>Python</span><i style="--w:92%"></i><b>İleri</b></li>
+      <li><span>C++ (Visual Studio)</span><i style="--w:88%"></i><b>İleri</b></li>
+      <li><span>Modelleme</span><i style="--w:86%"></i><b>İleri</b></li>
+      <li><span>Excel</span><i style="--w:68%"></i><b>İyi</b></li>
+      <li><span>JavaScript</span><i style="--w:40%"></i><b>Temel</b></li>
+      <li><span>SQL</span><i style="--w:36%"></i><b>Temel</b></li>
+    </ul>
   </section>
 
   <section id="projects" class="reveal">
     <span class="k">Projeler</span>
     <h2>Neler yaptım?</h2>
     <div class="grid">
-      <a class="proj" href="https://nexora.lenstedreal.info">
-        <span class="st">Yayında</span>
-        <img src="nexora.jpg" alt="Nexora Watch">
+      <div class="proj">
+        <span class="st">Google Play'de</span>
+        <img src="isr.png" alt="İstanbul Street Runner" width="52" height="52">
+        <h3>İstanbul Street Runner</h3>
+        <p>İstanbul sokaklarında sonsuz koşu oyunu. Tramvaydan kaç, simit arabasının üstünden atla; İstiklal'den Boğaz'a beş semt, her semt bir seviye.</p>
+        <div class="act"><a class="btn p s" href="https://play.google.com/store/apps/details?id=com.lenstedreal.istanbulrunner" target="_blank" rel="noopener">Google Play →</a><a class="btn g s" href="https://lenstedreal.github.io/istanbulstreetrunner/" target="_blank" rel="noopener">Oyun sayfası</a></div>
+      </div>
+      <div class="proj">
+        <span class="st test">Kapalı testte</span>
+        <img src="derby.png" alt="Derby Arena" width="52" height="52">
+        <h3>Derby Arena</h3>
+        <p>Zırhlı araçlarla arena derbisi: 120 bölüm, 6 sezon, 6 araç, garaj ve kişiselleştirilebilir kontroller.</p>
+        <div class="act"><a class="btn g s" href="https://lenstedreal.github.io/derbyarena/" target="_blank" rel="noopener">Oyun sayfası</a><span class="btn g s off">Yakında Google Play'de</span></div>
+      </div>
+      <div class="proj">
+        <span class="st">Web'de yayında</span>
+        <img src="nexora.jpg" alt="Nexora Watch" width="52" height="52">
         <h3>Nexora Watch</h3>
         <p>Senkronize birlikte izleme. Oda kur, kodu paylaş; YouTube, video bağlantıları ve kendi videolarınla aynı anda izle. Better than Rave.</p>
-      </a>
-      <a class="proj" href="https://stream.lenstedreal.xyz" target="_blank" rel="noopener">
-        <span class="st">Yayında</span>
-        <div class="ph">◉</div>
-        <h3>Stream Hub</h3>
-        <p>Cloudflare R2 ve HLS (.m3u8) video altyapısı ile desteklenen özel medya ve yayın platformu.</p>
-      </a>
-      <a class="proj" href="#links">
-        <div class="ph">☎</div>
-        <h3>VoIP &amp; Servis Altyapısı</h3>
-        <p>VoIP servisleri, farklı hizmet altyapıları, özel bağlantı sistemleri ve servis entegrasyonları.</p>
-      </a>
+        <div class="act"><a class="btn p s" href="https://nexora.lenstedreal.info">Web'de dene →</a><span class="btn g s off">Yakında Google Play'de</span></div>
+      </div>
+      <div class="proj" id="apk-card">
+        <div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg></div>
+        <h3>APK indirmeler</h3>
+        <p>Google Play dışında dağıttığım Android uygulamaları ayrı bir sayfada duruyor.</p>
+        <div class="act"><a class="btn g s off" id="apk-link" href="#projects" aria-disabled="true">Yakında</a></div>
+      </div>
     </div>
   </section>
 
-  <section id="downloads" class="reveal" hidden>
-    <span class="k">İndir</span>
-    <h2>Uygulamalar</h2>
-    <div class="grid" id="dl-list"></div>
+  <section id="services" class="reveal">
+    <span class="k">Hizmetler</span>
+    <h2>Senin için ne kurabilirim?</h2>
+    <div class="grid">
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></div><h3>VoIP sanal numara</h3><p>Ülke çapında sanal numara satışı ve kurulumu.</p>
+        <ul><li>Kod sistemi: numaraya gelen doğrulama kodlarını alma</li><li>Garantili hizmetler</li><li>Numaranın telefona, santrale ya da uygulamaya yönlendirilmesi</li><li>Kurulum, yapılandırma ve sonrasında destek</li></ul>
+        <div class="act"><a class="btn p s" href="mailto:lenstedreal@gmail.com?subject=VoIP%20sanal%20numara">İletişime geç →</a></div></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.500z"/></svg></div><h3>HLS yayın kurulumu</h3><p>Sitene çalışan bir yayın oynatıcısı.</p>
+        <ul><li>HLS.js ile web oynatıcı</li><li>M3U8 yayın akışının kurulması</li><li>Oynatıcının sitene gömülmesi</li></ul>
+        <div class="act"><a class="btn p s" href="mailto:lenstedreal@gmail.com?subject=HLS%20yay%C4%B1n%20kurulumu">İletişime geç →</a></div></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 14h.01M15 14h.01M2 13v3M22 13v3"/><circle cx="12" cy="3" r="1"/></svg></div><h3>Bot ve otomasyon</h3><p>İhtiyacına göre bot ya da otomasyon.</p>
+        <ul><li>Telegram ya da Discord botu</li><li>Zamanlanmış görevler ve bildirimler</li><li>Mevcut sistemlerinle entegrasyon</li></ul>
+        <div class="act"><a class="btn p s" href="mailto:lenstedreal@gmail.com?subject=Bot%20ve%20otomasyon">İletişime geç →</a></div></div>
+    </div>
   </section>
 
   <section id="links" class="reveal">
     <span class="k">İletişim</span>
     <h2>Birlikte bir şey yapalım.</h2>
     <div class="row">
-      <a class="btn p" href="mailto:destek@lenstedreal.info">destek@lenstedreal.info</a>
+      <a class="btn p" href="mailto:lenstedreal@gmail.com">lenstedreal@gmail.com</a>
       <a class="btn g" href="https://github.com/LenstedReal" target="_blank" rel="noopener">GitHub</a>
-      <a class="btn g" href="https://x.com/lenstedreal" target="_blank" rel="noopener">X @lenstedreal</a>
+      <a class="btn g" href="https://www.instagram.com/lenstedreal/" target="_blank" rel="noopener">Instagram @lenstedreal</a>
       <a class="btn g" href="https://www.tiktok.com/@lenstedreal" target="_blank" rel="noopener">TikTok</a>
       <a class="btn g" href="https://nexora.lenstedreal.info">Nexora Watch</a>
     </div>
   </section>
 
-  <footer><span>© <span id="y"></span> LenstedReal // x-69 Wormdemon</span><span><a href="https://nexora.lenstedreal.info/gizlilik">Gizlilik</a></span></footer>
+  <footer><span>© <span id="y"></span> LenstedReal</span><span><a href="https://nexora.lenstedreal.info/gizlilik">Gizlilik</a></span></footer>
 </main>
-<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gate-title" aria-hidden="true">
-  <div class="card">
-    <button class="x" id="gate-x" aria-label="Kapat">×</button>
-    <span class="k" id="gate-app"></span>
-    <h3 id="gate-title">İndirmeden önce</h3>
-    <p>LenstedReal'ı sosyal medyada takip et. Devam etmek için iki bağlantıyı da açman yeterli.</p>
-    <div class="socials">
-      <a class="btn g" id="gx" href="https://x.com/lenstedreal" target="_blank" rel="noopener">X'te takip et →</a>
-      <a class="btn g" id="gt" href="https://www.tiktok.com/@lenstedreal" target="_blank" rel="noopener">TikTok'ta takip et →</a>
-    </div>
-    <div class="count" id="gate-count">İki bağlantıyı da aç · <b>0/2</b></div>
-    <a class="btn p go" id="gate-go" href="#" download>İndir ↓</a>
-    <small>Takip zorunlu değil · bağlantıyı açmak yeterli</small>
-  </div>
-</div>
 <script>
-/* ---- İndirmeler: APK dosyasını site/personal/apk/ klasörüne koy ve buraya ekle ---- */
-var DOWNLOADS = [
-  // { name: "Uygulama adı", version: "v1.0 • Android", file: "apk/dosya.apk", size: "25 MB", icon: "▼" }
-];
+/* ---- APK sayfası: adresi buraya yaz; boş kalırsa kart "Yakında" yazar ---- */
+var APK_SITE = "";
 (function () {
-  if (!DOWNLOADS.length) return;
-  var list = document.getElementById("dl-list");
-  document.getElementById("downloads").hidden = false;
-  document.getElementById("nav-dl").hidden = false;
-  DOWNLOADS.forEach(function (d, i) {
-    var card = document.createElement("div");
-    card.className = "proj dl";
-    var ph = document.createElement("div"); ph.className = "ph"; ph.textContent = d.icon || "▼";
-    var meta = document.createElement("div"); meta.className = "meta";
-    var h = document.createElement("h3"); h.textContent = d.name;
-    var p = document.createElement("p"); p.textContent = [d.version, d.size].filter(Boolean).join(" · ");
-    meta.append(h, p);
-    var b = document.createElement("button"); b.className = "btn p"; b.type = "button"; b.textContent = "İndir ↓";
-    b.addEventListener("click", function () { openGate(i); });
-    card.append(ph, meta, b);
-    list.appendChild(card);
-  });
-
-  var gate = document.getElementById("gate"), go = document.getElementById("gate-go"), cnt = document.getElementById("gate-count");
-  var gx = document.getElementById("gx"), gt = document.getElementById("gt"), seen = {}, active = null;
-  function update() {
-    var n = (seen.x ? 1 : 0) + (seen.t ? 1 : 0);
-    cnt.innerHTML = n < 2 ? "İki bağlantıyı da aç · <b>" + n + "/2</b>" : "<b>✓</b> Hazır, indirebilirsin";
-    go.classList.toggle("on", n === 2);
-    go.href = n === 2 && active ? active.file : "#";
-  }
-  function mark(el, key, label) { seen[key] = true; el.classList.add("done"); el.textContent = "✓ " + label + " açıldı"; update(); }
-  gx.addEventListener("click", function () { mark(gx, "x", "X"); });
-  gt.addEventListener("click", function () { mark(gt, "t", "TikTok"); });
-  go.addEventListener("click", function (e) { if (!(seen.x && seen.t)) e.preventDefault(); });
-  function openGate(i) {
-    active = DOWNLOADS[i]; seen = {};
-    gx.classList.remove("done"); gx.textContent = "X'te takip et →";
-    gt.classList.remove("done"); gt.textContent = "TikTok'ta takip et →";
-    document.getElementById("gate-app").textContent = active.name;
-    go.setAttribute("download", (active.file.split("/").pop()));
-    update();
-    gate.classList.add("on"); gate.setAttribute("aria-hidden", "false");
-  }
-  function close() { gate.classList.remove("on"); gate.setAttribute("aria-hidden", "true"); }
-  document.getElementById("gate-x").addEventListener("click", close);
-  gate.addEventListener("click", function (e) { if (e.target === gate) close(); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+  var a = document.getElementById("apk-link");
+  if (!a || !/^https:\/\/[^\s"<>]+$/.test(APK_SITE)) return;
+  a.href = APK_SITE; a.target = "_blank"; a.rel = "noopener"; a.textContent = "APK sayfasına git →";
+  a.classList.remove("off"); a.removeAttribute("aria-disabled");
 })();
 document.getElementById("y").textContent=new Date().getFullYear();
 var io="IntersectionObserver"in window?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{threshold:.12}):null;

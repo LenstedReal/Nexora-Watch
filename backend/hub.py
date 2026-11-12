@@ -11,11 +11,15 @@ class Hub:
 
     def __init__(self):
         self.rooms: dict[str, dict[str, WebSocket]] = {}
+        # Live participant objects of connected sockets, so a role change (host handover) reaches open connections.
+        self.people: dict[str, dict[str, object]] = {}
 
-    async def add(self, code: str, pid: str, ws: WebSocket):
+    async def add(self, code: str, pid: str, ws: WebSocket, participant=None):
         peers = self.rooms.setdefault(code, {})
         old = peers.get(pid)
         peers[pid] = ws
+        if participant is not None:
+            self.people.setdefault(code, {})[pid] = participant
         if old is not None and old is not ws:
             try:
                 await old.close(code=4000, reason="replaced")
@@ -26,10 +30,17 @@ class Hub:
         peers = self.rooms.get(code, {})
         if peers.get(pid) is ws:
             del peers[pid]
+            self.people.get(code, {}).pop(pid, None)
             if not peers:
                 self.rooms.pop(code, None)
+                self.people.pop(code, None)
             return True
         return False
+
+    def set_role(self, code: str, pid: str, role: str):
+        p = self.people.get(code, {}).get(pid)
+        if p is not None:
+            p.role = role
 
     def online_ids(self, code: str) -> list[str]:
         return list(self.rooms.get(code, {}).keys())
@@ -62,14 +73,15 @@ class Hub:
         except Exception:
             pass
 
-    async def close_room(self, code: str, data: dict):
+    async def close_room(self, code: str, data: dict, reason: str = "room_closed"):
         await self.broadcast(code, data)
         for pid, ws in list(self.rooms.get(code, {}).items()):
             try:
-                await ws.close(code=4410, reason="room_closed")
+                await ws.close(code=4410, reason=reason)
             except Exception:
                 pass
         self.rooms.pop(code, None)
+        self.people.pop(code, None)
 
 
 hub = Hub()

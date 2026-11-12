@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
 import rooms as R
-from config import CORS_ORIGINS, ROOM_PURGE_GRACE_S
+from config import CORS_ORIGINS, HOST_HANDOVER_S, ROOM_PURGE_GRACE_S
 from db import db, ensure_indexes
 from hub import hub
 from policy import check_source, public_config
@@ -23,6 +23,7 @@ log = logging.getLogger("nexora")
 app = FastAPI(title="Nexora Watch API")
 app.add_middleware(CORSMiddleware, allow_credentials=False, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 write_limiter = RateLimiter(120, 60)
+metrics_limiter = RateLimiter(12, 60)  # per participant; telemetry must not use up the shared per-IP budget
 
 
 @app.exception_handler(ApiError)
@@ -32,7 +33,8 @@ async def _api_error(_req, exc: ApiError):
 
 @app.middleware("http")
 async def rate_limit(request: Request, call_next):
-    if request.method in ("POST", "PUT", "DELETE") and "/parts/" not in request.url.path:
+    path = request.url.path
+    if request.method in ("POST", "PUT", "DELETE") and "/parts/" not in path and not path.endswith("/metrics"):
         # Client IP comes from uvicorn (--proxy-headers rewrites it only for trusted proxies); X-Forwarded-For is not trusted directly.
         ip = request.client.host if request.client else "?"
         if not write_limiter.allow(ip):
@@ -77,7 +79,10 @@ async def get_room(code: str):
 async def join_room(code: str, request: Request):
     b = await body(request)
     res = await R.join_room(code, b.get("nickname"), b.get("participant_id"), b.get("token"))
+    msg = res.pop("_message", None)
     if not res["rejoined"]:
+        if msg:  # "X joined" must show up in everyone's chat right away, not only after a reload
+            await hub.broadcast(res["room"]["code"], {"type": "message", "message": msg, "server_time": R.now_ms()})
         await hub.broadcast(res["room"]["code"], {"type": "room", "room": res["room"], "server_time": R.now_ms()})
     return res
 
@@ -202,6 +207,7 @@ async def kick(code: str, request: Request):
     target = await db.room_participants.find_one_and_delete({"room_code": room.code, "participant_id": target_id})
     if not target:
         raise ApiError(404, "not_participant", "Kişi odada değil")
+    await R.ban(room.code, target)  # kicked people cannot rejoin this room with the same identity
     await hub.kick(room.code, target_id, {"type": "error", "code": "kicked", "detail": "Oda sahibi seni odadan çıkardı"})
     msg = await R.system_message(room.code, f"{target.get('nickname', 'Biri')} odadan çıkarıldı")
     await hub.broadcast(room.code, {"type": "message", "message": msg, "server_time": R.now_ms()})
@@ -212,11 +218,91 @@ async def kick(code: str, request: Request):
     return view
 
 
+# --- host handover ------------------------------------------------------------------------------------------
+# A room must never be left without anyone who can control it: when the host has been disconnected for
+# HOST_HANDOVER_S, the longest-present online participant becomes the host. The host can also hand over manually.
+_host_left: dict[str, float] = {}
+
+
+async def _announce_host(code: str, old_id: str, new_id: str, msg: dict | None):
+    hub.set_role(code, old_id, "guest")
+    hub.set_role(code, new_id, "host")
+    if msg:
+        await hub.broadcast(code, {"type": "message", "message": msg, "server_time": R.now_ms()})
+    view = await R.room_view(await R.get_room(code))
+    await hub.broadcast(code, {"type": "room", "room": view, "server_time": R.now_ms()})
+    return view
+
+
+async def handover_if_needed(code: str):
+    left = _host_left.get(code)
+    if left is None or time.monotonic() - left < HOST_HANDOVER_S:
+        return
+    try:
+        room = await R.get_room(code)
+    except ApiError:
+        _host_left.pop(code, None)
+        return
+    online = set(hub.online_ids(code))
+    if room.host_id in online:
+        _host_left.pop(code, None)
+        return
+    if not online:
+        return  # nobody to hand over to yet; checked again when someone connects
+    nxt = None
+    async for d in db.room_participants.find({"room_code": code}).sort("joined_at", 1):
+        if d["participant_id"] in online:
+            nxt = d["participant_id"]
+            break
+    if not nxt:
+        return
+    msg = await R.transfer_host(room, nxt)
+    _host_left.pop(code, None)
+    if msg:
+        await _announce_host(code, room.host_id, nxt, msg)
+        await db.audit_log.insert_one({"action": "host_handover", "actor": "system", "media_id": None, "room_code": code,
+                                       "extra": {"from": room.host_id, "to": nxt}, "at": datetime.now(timezone.utc)})
+
+
+async def _handover_later(code: str):
+    await asyncio.sleep(HOST_HANDOVER_S + 0.05)
+    try:
+        await handover_if_needed(code)
+    except Exception:
+        log.exception("host handover failed")
+
+
+def _watch_host(code: str):
+    """Start the handover clock for a room whose host is not connected."""
+    if code not in _host_left:
+        _host_left[code] = time.monotonic()
+    asyncio.create_task(_handover_later(code))
+
+
+@app.post("/api/rooms/{code}/host")
+async def make_host(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    R.require_host(p)
+    target_id = b.get("target_id")
+    if not isinstance(target_id, str) or not target_id or target_id == p.participant_id:
+        raise ApiError(400, "invalid_target", "Oda sahipliği bu kişiye verilemez")
+    msg = await R.transfer_host(room, target_id)
+    _host_left.pop(room.code, None)
+    view = await _announce_host(room.code, p.participant_id, target_id, msg)
+    if target_id not in hub.online_ids(room.code):
+        _watch_host(room.code)
+    return view
+
+
 @app.post("/api/rooms/{code}/metrics")
 async def post_metrics(code: str, request: Request):
     b = await body(request)
     room = await R.get_room(code)
     p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    if not metrics_limiter.allow(p.participant_id):
+        return {"stored": 0, "limited": True}
     samples = b.get("samples") if isinstance(b.get("samples"), list) else []
     docs = []
     for s in samples[:120]:
@@ -313,8 +399,12 @@ async def ws_endpoint(ws: WebSocket):
         await ws.close(code=4410 if e.status == 410 else 4404 if e.status == 404 else 4403)
         return
     code = room.code
-    await hub.add(code, pid, ws)
+    await hub.add(code, pid, ws, p)
     await R.set_online(code, pid, True)
+    if pid == room.host_id:
+        _host_left.pop(code, None)
+    elif room.host_id not in hub.online_ids(code):
+        _watch_host(code)  # e.g. after a server restart: the first guest back starts the clock
     view = await R.room_view(room)
     await hub.send(ws, {"type": "hello", "room": view, "participant_id": pid, "server_time": R.now_ms()})
     await hub.broadcast(code, {"type": "presence", "participant_id": pid, "online": True, "nickname": p.nickname, "server_time": R.now_ms()}, exclude=pid)
@@ -346,39 +436,55 @@ async def ws_endpoint(ws: WebSocket):
         if hub.remove(code, pid, ws):
             await R.set_online(code, pid, False)
             await hub.broadcast(code, {"type": "presence", "participant_id": pid, "online": False, "server_time": R.now_ms()})
+            if p.role == "host" and hub.online_ids(code):
+                _host_left[code] = time.monotonic()
+                asyncio.create_task(_handover_later(code))
         try:
             await ws.close()
         except Exception:
             pass
 
 
+async def maintenance_once(now: datetime | None = None):
+    """One cleanup pass (also called directly by tests): expire rooms, delete media, purge ended rooms, trim logs."""
+    now = now or datetime.now(timezone.utc)
+    expiring = [d["code"] async for d in db.rooms.find({"status": "active", "expires_at": {"$lt": now}}, {"code": 1})]
+    await db.rooms.update_many({"status": "active", "expires_at": {"$lt": now}}, {"$set": {"status": "expired"}})
+    for c in expiring:
+        if hub.online_ids(c):  # people still connected to a room whose 24 hours are over
+            await hub.close_room(c, {"type": "error", "code": "room_expired", "detail": "Odanın süresi doldu (24 saat)", "status": 410},
+                                 reason="room_expired")
+        _host_left.pop(c, None)
+    await cleanup_once()
+    # Privacy policy: room data (room, participants, chat, playback, metrics) is deleted at most
+    # ROOM_PURGE_GRACE after the room ended (closed_at for closed rooms, expires_at otherwise).
+    purge_before = now - timedelta(seconds=ROOM_PURGE_GRACE_S)
+    async for d in db.rooms.find({"status": {"$in": ["expired", "closed"]}}, {"code": 1, "status": 1, "expires_at": 1, "closed_at": 1}):
+        ended_at = d.get("closed_at") if d.get("status") == "closed" else None
+        ended_at = ended_at or d.get("expires_at")
+        if ended_at and ended_at.tzinfo is None:
+            ended_at = ended_at.replace(tzinfo=timezone.utc)
+        if ended_at and ended_at > purge_before:
+            continue
+        c = d["code"]
+        if await db.media.count_documents({"room_code": c, "status": {"$in": ["completed", "uploading", "importing"]}}):
+            continue  # media cleanup runs first; retry on the next pass
+        await db.room_messages.delete_many({"room_code": c})
+        await db.sync_metrics.delete_many({"room_code": c})
+        await db.room_participants.delete_many({"room_code": c})
+        await db.room_playback.delete_many({"room_code": c})
+        await db.room_bans.delete_many({"room_code": c})
+        await db.media.delete_many({"room_code": c})  # only finished/deleted records are left at this point (file names)
+        await db.rooms.delete_one({"code": c})
+    # Retention promised in the privacy policy: reports 180 days, audit/security logs 90 days.
+    await db.reports.delete_many({"created_at": {"$lt": now - timedelta(days=180)}})
+    await db.audit_log.delete_many({"at": {"$lt": now - timedelta(days=90)}})
+
+
 async def maintenance_loop():
     while True:
         try:
-            now = datetime.now(timezone.utc)
-            await db.rooms.update_many({"status": "active", "expires_at": {"$lt": now}}, {"$set": {"status": "expired"}})
-            await cleanup_once()
-            # Privacy policy: room data (room, participants, chat, playback, metrics) is deleted at most
-            # ROOM_PURGE_GRACE after the room ended (closed_at for closed rooms, expires_at otherwise).
-            purge_before = now - timedelta(seconds=ROOM_PURGE_GRACE_S)
-            async for d in db.rooms.find({"status": {"$in": ["expired", "closed"]}}, {"code": 1, "status": 1, "expires_at": 1, "closed_at": 1}):
-                ended_at = d.get("closed_at") if d.get("status") == "closed" else None
-                ended_at = ended_at or d.get("expires_at")
-                if ended_at and ended_at.tzinfo is None:
-                    ended_at = ended_at.replace(tzinfo=timezone.utc)
-                if ended_at and ended_at > purge_before:
-                    continue
-                c = d["code"]
-                if await db.media.count_documents({"room_code": c, "status": {"$in": ["completed", "uploading", "importing"]}}):
-                    continue  # media cleanup runs first; retry on the next pass
-                await db.room_messages.delete_many({"room_code": c})
-                await db.sync_metrics.delete_many({"room_code": c})
-                await db.room_participants.delete_many({"room_code": c})
-                await db.room_playback.delete_many({"room_code": c})
-                await db.rooms.delete_one({"code": c})
-            # Retention promised in the privacy policy: reports 180 days, audit/security logs 90 days.
-            await db.reports.delete_many({"created_at": {"$lt": now - timedelta(days=180)}})
-            await db.audit_log.delete_many({"at": {"$lt": now - timedelta(days=90)}})
+            await maintenance_once()
         except Exception:
             log.exception("maintenance failed")
         await asyncio.sleep(600)

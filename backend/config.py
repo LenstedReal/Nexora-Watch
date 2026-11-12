@@ -20,6 +20,8 @@ if not MEDIA_SIGNING_SECRET:
 
 ROOM_LIFETIME_S = int(os.environ.get("ROOM_LIFETIME_HOURS", "24")) * 3600
 ROOM_PURGE_GRACE_S = int(os.environ.get("ROOM_PURGE_GRACE_HOURS", "24")) * 3600
+# When the host has been disconnected this long, the longest-present online participant becomes the host.
+HOST_HANDOVER_S = float(os.environ.get("HOST_HANDOVER_SECONDS", "60"))
 
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(2 * 1024**3)))
 STORAGE_QUOTA_BYTES = int(os.environ.get("STORAGE_QUOTA_BYTES", str(18 * 1024**3)))
@@ -46,13 +48,16 @@ MEDIA_DELETE_AFTER_CLOSE_HOURS = float(os.environ.get("MEDIA_DELETE_AFTER_CLOSE_
 WEB_URL = os.environ.get("WEB_URL", "https://nexora.lenstedreal.info").rstrip("/")
 PLAY_URL = os.environ.get("PLAY_URL", "")
 APK_URL = os.environ.get("APK_URL", "https://github.com/LenstedReal/Nexora-Watch/releases/latest")
-CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "destek@lenstedreal.info")
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "contact.nexorawatch@protonmail.com")
+# Minimum age asked at first start (under 18: with a parent/guardian). Keep in sync with the Play Console target audience.
+MIN_AGE = int(os.environ.get("MIN_AGE", "16"))
 # KVKK data controller shown on the legal pages (set OWNER_NAME to your full legal name in .env).
 OWNER_NAME = os.environ.get("OWNER_NAME", "").strip()
 OWNER_ADDRESS = os.environ.get("OWNER_ADDRESS", "").strip()
 
-# Public, free video platforms only (no DRM / subscription services). Override with ALLOWED_SITES in .env.
-_DEFAULT_SITES = ("youtube.com|YouTube,twitch.tv|Twitch,kick.com|Kick,rumble.com|Rumble,odysee.com|Odysee,dailymotion.com|Dailymotion,vimeo.com|Vimeo,streamable.com|Streamable,reddit.com|Reddit,x.com|X (Twitter),twitter.com|Twitter,facebook.com|Facebook,bilibili.tv|Bilibili,archive.org|Internet Archive,drive.google.com|Google Drive")
+# Only sources that work by design: YouTube (official player), Internet Archive (direct files) and Drive (link import).
+# Other platforms return when they get an official-player adapter. Override with ALLOWED_SITES in .env ("domain|Name,...").
+_DEFAULT_SITES = "youtube.com|YouTube,archive.org|Internet Archive,drive.google.com|Google Drive"
 ALLOWED_SITES: list[dict] = []
 for _item in (os.environ.get("ALLOWED_SITES") or _DEFAULT_SITES).split(","):
     _dom, _, _name = _item.strip().partition("|")

@@ -132,7 +132,7 @@ def test_resolve_youtube():
 
 
 def test_resolve_with_referer_and_title():
-    r = requests.post(f"{API}/resolve", json={"url": "https://youtu.be/aqz-KE-bpKQ", "referer": "https://example.com/watch/1", "title": "Bunny"})
+    r = requests.post(f"{API}/resolve", json={"url": "https://youtu.be/aqz-KE-bpKQ", "referer": "https://m.youtube.com/watch?v=aqz-KE-bpKQ", "title": "Bunny"})
     assert r.status_code == 200 and r.json()["kind"] == "youtube" and r.json()["title"] == "Bunny"
     assert "headers" not in r.json()
 
@@ -216,7 +216,7 @@ def test_config_shape():
     r = requests.get(f"{API}/config")
     assert r.status_code == 200
     d = r.json()
-    assert d["min_age"] == 13 and d["contact_email"]
+    assert d["min_age"] >= 16 and d["contact_email"]
     assert any(s["domain"] == "youtube.com" for s in d["allowed_sites"])
     for k in ("privacy", "terms", "kvkk", "copyright", "delete_data", "child_safety"):
         assert d["legal"][k].startswith("http")
@@ -255,6 +255,52 @@ def test_kick(room):
     assert all(p["id"] != v["participant_id"] for p in r.json()["participants"])
     r = requests.post(f"{API}/rooms/{room['code']}/messages", json={**v, "text": "hala burada miyim"})
     assert r.status_code == 403
+    # kick is a ban for this room: the same identity cannot come back
+    r = requests.post(f"{API}/rooms/{room['code']}/join", json={"nickname": "TEST_victim", **v})
+    assert r.status_code == 403 and r.json()["code"] == "kicked"
+
+
+def test_playback_seq_is_exposed(room):
+    pb = requests.get(f"{API}/rooms/{room['code']}").json()["playback"]
+    assert isinstance(pb["seq"], int) and pb["seq"] >= 10**13  # set by test_playback_seq
+
+
+def test_metrics_do_not_count_against_write_limit(room):
+    g = cred(room["guest"])
+    for _ in range(15):
+        r = requests.post(f"{API}/rooms/{room['code']}/metrics", json={**g, "samples": [{"event": "sample", "drift": 0.1}]})
+        assert r.status_code == 200
+    assert r.json().get("limited") is True  # per-participant cap, never a 429
+
+
+def test_host_handover_manual_and_automatic():
+    """The host can hand the room over; if the host disappears, the longest-present online guest takes over.
+    Needs HOST_HANDOVER_SECONDS<=2 on the server (set in CI)."""
+    h = requests.post(f"{API}/rooms", json={"nickname": "TEST_h"}).json()
+    code = h["room"]["code"]
+    g = requests.post(f"{API}/rooms/{code}/join", json={"nickname": "TEST_g"}).json()
+    r = requests.post(f"{API}/rooms/{code}/host", json={**cred(g), "target_id": h["participant"]["id"]})
+    assert r.status_code == 403
+    r = requests.post(f"{API}/rooms/{code}/host", json={**cred(h), "target_id": g["participant"]["id"]})
+    assert r.status_code == 200 and r.json()["host_id"] == g["participant"]["id"]
+    r = requests.put(f"{API}/rooms/{code}/video", json={**cred(h), "url": "https://youtu.be/aqz-KE-bpKQ"})
+    assert r.status_code == 403  # the old host is a guest now
+    r = requests.put(f"{API}/rooms/{code}/video", json={**cred(g), "url": "https://youtu.be/aqz-KE-bpKQ"})
+    assert r.status_code == 200
+
+    async def run():
+        hc, gc = cred(h), cred(g)
+        async with websockets.connect(f"{WS}?code={code}&participant_id={hc['participant_id']}&token={hc['token']}") as old_host:
+            await asyncio.wait_for(old_host.recv(), 10)
+            async with websockets.connect(f"{WS}?code={code}&participant_id={gc['participant_id']}&token={gc['token']}") as new_host:
+                await asyncio.wait_for(new_host.recv(), 10)
+            # the current host (g) is gone; h is still connected and must become host again after the grace period
+            for _ in range(40):
+                m = json.loads(await asyncio.wait_for(old_host.recv(), 10))
+                if m["type"] == "room" and m["room"]["host_id"] == hc["participant_id"]:
+                    return True
+        return False
+    assert asyncio.run(run())
 
 
 # Close

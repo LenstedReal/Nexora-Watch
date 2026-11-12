@@ -61,8 +61,8 @@ web sitesindeki "Android APK indir" butonu bunu gösterir.
 - [ ] **Play App Signing**: etkin (varsayılan). AAB'yi yükle, Google uygulama imzalama anahtarını yönetir; senin anahtarın "upload key".
 - [ ] **Gizlilik politikası**: `https://nexora.lenstedreal.info/gizlilik`
 - [ ] **Veri silme**: `https://nexora.lenstedreal.info/veri-silme` (hesap yok; bu sayfa yeterli)
-- [ ] **Çocuk güvenliği standartları (CSAE)**: `https://nexora.lenstedreal.info/cocuk-guvenligi`, irtibat: destek@lenstedreal.info
-- [ ] **Hedef kitle**: 13+ (çocuklara yönelik değil). Uygulamada ilk açılışta yaş beyanı var.
+- [ ] **Çocuk güvenliği standartları (CSAE)**: `https://nexora.lenstedreal.info/cocuk-guvenligi`, irtibat: contact.nexorawatch@protonmail.com
+- [ ] **Hedef kitle**: 16+ (çocuklara yönelik değil; Play Console'da yalnızca "16-17" ve "18+" yaş gruplarını seç). 18 yaş altı için ebeveyn gözetimi şartı koşullarda yazıyor; uygulamada ilk açılışta yaş beyanı var.
 - [ ] **İçerik derecelendirme anketi**: kullanıcılar arası etkileşim (sohbet) VAR, kullanıcı içeriği paylaşımı VAR, konum paylaşımı YOK.
 - [ ] **Veri güvenliği formu** (özet):
   - Toplanan: *Uygulama etkinliği → diğer kullanıcı içeriği* (sohbet mesajları, rumuz), *Fotoğraf ve videolar* (yalnızca kullanıcı yüklediğinde), *Uygulama bilgileri ve performans* (senkron ölçümleri), *Cihaz veya diğer kimlikler* → yok.

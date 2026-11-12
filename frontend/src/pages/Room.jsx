@@ -54,7 +54,7 @@ export default function RoomPage() {
       if (e.status === 404 || e.status === 410) {
         clearIdent(code); // dead room: drop it from "recent rooms"
         setGate(e.code);
-      }
+      } else if (e.code === "kicked") setGate("kicked"); // removed by the host: the stored identity stays so the ban holds
       else setGate({ error: e });
     }
   }, [code]);
@@ -83,7 +83,9 @@ export default function RoomPage() {
     );
   }
   if (!room) return <main className="gate"><Loader2 className="spin" size={28} /></main>;
-  return <RoomView code={code} ident={ident} initialRoom={room} onIdentLost={() => { clearIdent(code); setIdent(null); setRoom(null); }} />;
+  // The server no longer knows this seat (removed by the host, or the room data was reset): ask again with the old
+  // identity. A removed person gets the "kicked" screen; anyone else simply gets a new seat.
+  return <RoomView key={ident.participant_id} code={code} ident={ident} initialRoom={room} onIdentLost={() => { setRoom(null); join(ident.nickname || nick || "?", ident); }} />;
 }
 
 function RoomView({ code, ident, initialRoom, onIdentLost }) {
@@ -106,6 +108,11 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
     if (conn.status === "unauthorized") onIdentLost();
   }, [conn.status, onIdentLost]);
   useEffect(() => { document.title = `${room.name} · Nexora Watch`; }, [room.name]);
+  const wasHost = useRef(isHost);
+  useEffect(() => {
+    if (isHost && !wasHost.current) toast.success(t("you_are_host"));
+    wasHost.current = isHost;
+  }, [isHost, t]);
   useEffect(() => {
     setKeepAwake(true);
     return () => { setKeepAwake(false); setOrientation("portrait"); };
@@ -133,6 +140,14 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
     if (!window.confirm(`${person.nickname} — ${t("kick_confirm")}`)) return;
     try {
       conn.setRoom(await api.kick(code, ident, person.id));
+    } catch (e) {
+      toast.error(errorText(t, e));
+    }
+  };
+  const makeHost = async (person) => {
+    if (!window.confirm(`${person.nickname} ${t("make_host_confirm")}`)) return;
+    try {
+      conn.setRoom(await api.makeHost(code, ident, person.id));
     } catch (e) {
       toast.error(errorText(t, e));
     }
@@ -165,7 +180,7 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
           </nav>
           <div className="desk-only"><PeopleStrip room={room} me={ident.participant_id} /></div>
           <div className="pane">
-            {tab === "people" && <div className="pane-sec mob-only"><PeopleList room={room} me={ident.participant_id} peerState={conn.peerState} isHost={isHost} onReport={report} onKick={kick} /></div>}
+            {tab === "people" && <div className="pane-sec mob-only"><PeopleList room={room} me={ident.participant_id} peerState={conn.peerState} isHost={isHost} onReport={report} onKick={kick} onMakeHost={makeHost} /></div>}
             {tab === "video" && isHost && <div className="pane-sec mob-only video-mob">{source}</div>}
             <div className={`pane-sec chat-sec ${tab === "chat" ? "" : "hidden"}`}>
               <Chat messages={conn.messages} me={ident.participant_id} onSend={send} onReport={(m) => report({ id: m.participant_id, nickname: m.nickname }, m.id)} />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clapperboard, TriangleAlert, Volume2, VolumeX, Hand, Pause, Plus } from "lucide-react";
+import { Clapperboard, TriangleAlert, Volume2, VolumeX, Hand, Pause, Plus, Maximize } from "lucide-react";
 import { useT } from "@/i18n";
+import { inApp } from "@/lib/native";
 import { HtmlPlayer } from "./HtmlPlayer";
 import { YouTubePlayer } from "./YouTubePlayer";
 
@@ -11,8 +12,16 @@ export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVi
   const onFatal = useCallback((code) => setFatal(code), []);
   const sourceKey = `${video?.media_id || "none"}:${retryKey}`;
   const prev = useRef(video?.media_id);
+  const stageRef = useRef(null);
 
   useEffect(() => { if (prev.current !== video?.media_id) { prev.current = video?.media_id; setFatal(null); } }, [video?.media_id]);
+
+  const toggleFullscreen = () => {
+    const el = stageRef.current;
+    if (document.fullscreenElement) return document.exitFullscreen?.();
+    if (el?.requestFullscreen) return el.requestFullscreen().catch(() => {});
+    return el?.querySelector("video")?.webkitEnterFullscreen?.(); // iPhone Safari: only the <video> itself can go fullscreen
+  };
 
   let body;
   if (!video) {
@@ -33,11 +42,13 @@ export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVi
   }
 
   const embed = video?.kind === "drive_embed";
+  const yt = video?.kind === "youtube";
   const showPaused = video && !isHost && !embed && playback && !playback.playing && !sync.stats.buffering && !fatal;
   return (
-    <div className="stage" data-testid="video-stage">
+    <div className="stage" ref={stageRef} data-testid="video-stage">
       {body}
-      {video && !isHost && !embed && <div className="lock" />}
+      {/* Guests cannot touch the player: only the host controls what the room watches. */}
+      {video && !isHost && !embed && <div className="lock" data-testid="guest-lock" />}
       {video && sync.stats.buffering && !fatal && <div className="loader" data-testid="buffering-indicator"><span className="ring" /></div>}
       {showPaused && <div className="stage-chip" data-testid="paused-chip"><Pause size={12} /> {t("host_paused")}</div>}
       {video?.warning && <div className="stage-warn" data-testid="source-warning"><TriangleAlert size={13} /> {video.warning}</div>}
@@ -56,9 +67,11 @@ export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVi
           <button className="btn" onClick={() => { setFatal(null); setRetryKey((k) => k + 1); }} data-testid="player-retry-btn">{t("retry")}</button>
         </div>
       )}
-      {video && !isHost && !embed && (
+      {video && !embed && (
         <div className="stage-tools">
-          <button onClick={() => sync.setMuted(!sync.muted)} aria-label="mute" data-testid="guest-mute-btn">{sync.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
+          {!isHost && <button onClick={() => sync.setMuted(!sync.muted)} aria-label="mute" data-testid="guest-mute-btn">{sync.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>}
+          {/* The host's YouTube player has its own fullscreen button; everyone else gets ours (the app rotates instead). */}
+          {!inApp() && !(yt && isHost) && <button onClick={toggleFullscreen} aria-label={t("fullscreen")} title={t("fullscreen")} data-testid="fullscreen-btn"><Maximize size={16} /></button>}
         </div>
       )}
     </div>

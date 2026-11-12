@@ -207,7 +207,7 @@ input::placeholder{color:#5f5f76}
 .recent-go{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:600;color:#d6d6e0}
 
 /* Top bar */
-.top{backdrop-filter:blur(14px);background:#0f0f17e6}
+.top{backdrop-filter:blur(14px);background:#0f0f17e6;position:relative;z-index:45}
 .code{background:var(--s3);border-radius:99px;padding:2px 8px;margin-top:2px}
 .online-pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#d6d6e0;background:var(--s3);border:1px solid var(--bd);border-radius:99px;padding:4px 9px;flex-shrink:0}
 
@@ -274,7 +274,7 @@ input::placeholder{color:#5f5f76}
 .consent .chk input{width:20px;height:20px;padding:0;flex-shrink:0;accent-color:#ec4899;margin-top:1px}
 .consent .note a{color:var(--cy)}
 /* inside the mobile app: no "download the app" calls to action */
-html.in-app .lp-nav-cta,html.in-app [data-testid="cta-store"],html.in-app .lp-final .lp-btn.primary,html.in-app .lp-soon{display:none!important}
+html.in-app .lp-nav-cta,html.in-app [data-testid="cta-store"],html.in-app [data-testid="cta-web"],html.in-app .lp-soon{display:none!important}
 
 /* app: rotate button + phone landscape = video fills the screen */
 .rotate-fab{position:fixed;z-index:40;right:12px;top:calc(env(safe-area-inset-top) + 66px);width:38px;height:38px;border-radius:12px;background:#000a;border:1px solid #fff3;color:#fff;font-size:18px;display:grid;place-items:center;backdrop-filter:blur(10px)}
@@ -284,3 +284,7 @@ html.in-app .lp-nav-cta,html.in-app [data-testid="cta-store"],html.in-app .lp-fi
   .room .stage{height:100dvh;max-height:100dvh;aspect-ratio:auto;border-radius:0;border:0}
   .rotate-fab{top:12px}
 }
+
+/* fullscreen: the picture fills the screen */
+.stage:fullscreen{width:100vw;height:100vh;max-height:none;aspect-ratio:auto;border:0;border-radius:0}
+.consent .guardian{max-width:380px;color:var(--mut);font-size:12.5px;line-height:1.5;text-align:center}

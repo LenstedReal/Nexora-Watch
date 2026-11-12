@@ -68,7 +68,8 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     const p = playerRef.current;
     const r = roomRef.current;
     if (!isHost || !p?.ready || !r?.video || Date.now() < suppressUntil.current) return;
-    const seq = Math.max(seqRef.current + 1, Date.now());
+    // Never fall behind the sequence stored for the room (another device, or this clock was corrected backwards).
+    const seq = Math.max(seqRef.current + 1, Date.now(), (r.playback?.seq || 0) + 1);
     seqRef.current = seq;
     const position = Math.max(0, p.getTime());
     lastPubRef.current = { at: Date.now(), playing, position };
@@ -200,7 +201,7 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
       if (!samples.current.length || !ident) return;
       const batch = samples.current.splice(0, 120);
       api.metrics(room.code, ident, batch).catch(() => samples.current.unshift(...batch.slice(-60)));
-    }, 10000);
+    }, 20000);
     return () => {
       clearInterval(s);
       clearInterval(f);

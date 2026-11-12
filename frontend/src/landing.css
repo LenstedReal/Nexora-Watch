@@ -16,6 +16,12 @@
 .lp-nav-r{display:flex;align-items:center;gap:8px}
 .lp-nav-cta{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:12px;background:#ffffff10;border:1px solid #ffffff22;color:var(--tx);font-weight:700;font-size:13px;text-decoration:none;transition:background-color .2s}
 .lp-nav-cta:hover{background:#ffffff1c}
+/* phones: brand + language + download must fit in one row; the hero has the big download button anyway */
+.lp-nav{flex-wrap:wrap}
+.lp-brand span{white-space:nowrap}
+.lp-nav-r{margin-left:auto;flex-shrink:0}
+@media(max-width:480px){.lp-nav{gap:8px}.lp-brand{gap:8px}.lp-nav-cta{padding:9px 11px}.lp-nav-cta span{display:none}}
+@media(max-width:380px){.lp-brand{font-size:16px}.lp-brand img{width:32px;height:32px}}
 
 .lp-hero{display:grid;gap:28px;max-width:1160px;margin:0 auto;padding:28px 16px 40px}
 @media(min-width:960px){.lp-hero{grid-template-columns:1.15fr .85fr;align-items:center;padding-top:56px;gap:48px}}

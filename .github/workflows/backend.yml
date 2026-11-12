@@ -23,6 +23,7 @@ jobs:
       MONGO_URL: mongodb://localhost:27017
       DB_NAME: nexora_ci
       MEDIA_DIR: ${{ github.workspace }}/backend/data/media
+      HOST_HANDOVER_SECONDS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

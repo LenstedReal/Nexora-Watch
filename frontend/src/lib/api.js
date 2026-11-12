@@ -63,4 +63,5 @@ export const api = {
   importStatus: (id, ident) => req("GET", `/uploads/${id}/import-status?${q(ident)}`),
   report: (code, ident, body) => req("POST", `/rooms/${code}/report`, { ...cred(ident), ...body }),
   kick: (code, ident, target_id) => req("POST", `/rooms/${code}/kick`, { ...cred(ident), target_id }),
+  makeHost: (code, ident, target_id) => req("POST", `/rooms/${code}/host`, { ...cred(ident), target_id }),
 };

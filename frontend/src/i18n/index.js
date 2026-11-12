@@ -4,7 +4,12 @@ import data, { FALLBACK, LANGS, RTL } from "./locales";
 const Ctx = createContext(null);
 
 function detect() {
-  const saved = localStorage.getItem("nx:lang");
+  let saved = null;
+  try {
+    saved = localStorage.getItem("nx:lang");
+  } catch {
+    /* storage disabled */
+  }
   if (saved && data[saved]) return saved;
   const nav = (navigator.language || "tr").slice(0, 2).toLowerCase();
   return data[nav] ? nav : "tr";
@@ -17,7 +22,11 @@ export function I18nProvider({ children }) {
     document.documentElement.dir = RTL.has(lang) ? "rtl" : "ltr";
   }, [lang]);
   const setLang = useCallback((l) => {
-    localStorage.setItem("nx:lang", l);
+    try {
+      localStorage.setItem("nx:lang", l);
+    } catch {
+      /* storage disabled: the choice lasts for this visit */
+    }
     setLangState(l);
   }, []);
   const t = useCallback(

@@ -19,3 +19,4 @@ async def ensure_indexes():
     await db.media.create_index([("room_code", 1), ("status", 1)])
     await db.sync_metrics.create_index([("room_code", 1), ("t", 1)])
     await db.usage.create_index("month", unique=True)
+    await db.room_bans.create_index([("room_code", 1), ("participant_id", 1)])

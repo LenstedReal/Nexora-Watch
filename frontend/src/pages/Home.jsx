@@ -9,6 +9,7 @@ import { errorText, useI18n } from "@/i18n";
 import { api } from "@/lib/api";
 import { getIdent, lastNickname, saveIdent, saveNickname } from "@/lib/session";
 import { useAppConfig } from "@/lib/config";
+import { inApp } from "@/lib/native";
 import { SiteFooter } from "@/pages/Legal";
 import "@/landing.css";
 
@@ -41,6 +42,7 @@ const FAQ = ["1", "2", "3", "4", "5"];
 
 function Faq() {
   const { t } = useI18n();
+  const { min_age: age = 16 } = useAppConfig();
   const [open, setOpen] = useState(0);
   return (
     <div className="lp-faq">
@@ -50,7 +52,7 @@ function Faq() {
             <span>{t(`q${n}`)}</span>
             <ChevronDown size={18} />
           </button>
-          {open === i && <p>{t(`a${n}`)}</p>}
+          {open === i && <p>{t(`a${n}`, { age })}</p>}
         </div>
       ))}
     </div>
@@ -69,6 +71,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [recent] = useState(recentRooms);
   const formRef = useRef(null);
+  const app = inApp(); // inside the mobile app there is nothing to download and no "web" to switch to
 
   useEffect(() => {
     document.title = "Nexora Watch — Better than Rave";
@@ -116,7 +119,7 @@ export default function Home() {
               {langs.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </label>
-          <a className="lp-nav-cta" href={storeUrl} target="_blank" rel="noreferrer"><Download size={15} /> {t("lp_download")}</a>
+          {!app && <a className="lp-nav-cta" href={storeUrl} target="_blank" rel="noreferrer" aria-label={t("lp_download")} title={t("lp_download")} data-testid="nav-download"><Download size={15} /> <span>{t("lp_download")}</span></a>}
         </div>
       </header>
 
@@ -127,21 +130,23 @@ export default function Home() {
             {t("lp_title_a")} <span className="grad">{t("lp_title_b")}</span>
           </h1>
           <p className="lp-pitch">{t("lp_pitch")}</p>
-          <div className="lp-ctas">
-            {cfg.play_url ? (
-              <a className="lp-btn primary" href={cfg.play_url} target="_blank" rel="noreferrer" data-testid="cta-store">
-                <Smartphone size={18} /> {t("lp_play")}
-              </a>
-            ) : (
-              <a className="lp-btn primary" href={cfg.apk_url} target="_blank" rel="noreferrer" data-testid="cta-store">
-                <Download size={18} /> {t("lp_apk")}
-              </a>
-            )}
-            <button className="lp-btn ghost" onClick={toForm} data-testid="cta-web">
-              <MonitorPlay size={18} /> {t("lp_web")}
-            </button>
-          </div>
-          {!cfg.play_url && <p className="lp-soon"><Sparkles size={13} /> {t("lp_soon")}</p>}
+          {!app && (
+            <div className="lp-ctas">
+              {cfg.play_url ? (
+                <a className="lp-btn primary" href={cfg.play_url} target="_blank" rel="noreferrer" data-testid="cta-store">
+                  <Smartphone size={18} /> {t("lp_play")}
+                </a>
+              ) : (
+                <a className="lp-btn primary" href={cfg.apk_url} target="_blank" rel="noreferrer" data-testid="cta-store">
+                  <Download size={18} /> {t("lp_apk")}
+                </a>
+              )}
+              <button className="lp-btn ghost" onClick={toForm} data-testid="cta-web">
+                <MonitorPlay size={18} /> {t("lp_web")}
+              </button>
+            </div>
+          )}
+          {!app && !cfg.play_url && <p className="lp-soon"><Sparkles size={13} /> {t("lp_soon")}</p>}
           <div className="lp-src">
             <span><Youtube size={13} /> YouTube</span><span><Film size={13} /> MP4 / HLS</span>
             <span><Upload size={13} /> {t("upload_video")}</span><span><Lock size={13} /> {t("lp_noacc")}</span>
@@ -152,7 +157,7 @@ export default function Home() {
           <form className="card lp-card" onSubmit={go} data-testid="room-form">
             <div className="lp-card-h">
               <b>{t("lp_start")}</b>
-              <span>{t("lp_start_sub")}</span>
+              <span>{t(app ? "lp_start_sub_app" : "lp_start_sub")}</span>
             </div>
             <div className="tabs">
               <button type="button" className={mode === "c" ? "on" : ""} onClick={() => setMode("c")} data-testid="tab-create">{t("tab_create")}</button>
@@ -176,7 +181,7 @@ export default function Home() {
               {mode === "c" ? t("create") : t("join")}
             </button>
             <p className="note">
-              {t("lp_accept")} <Link to="/kosullar">{t("lp_terms")}</Link> · <Link to="/gizlilik">{t("lp_privacy")}</Link>
+              {t("lp_accept", { age: cfg.min_age || 16 })} <Link to="/kosullar">{t("lp_terms")}</Link> · <Link to="/gizlilik">{t("lp_privacy")}</Link>
             </p>
           </form>
 
@@ -248,10 +253,16 @@ export default function Home() {
       <section className="lp-section lp-final">
         <h2>{t("lp_final")}</h2>
         <div className="lp-ctas center">
-          <a className="lp-btn primary" href={storeUrl} target="_blank" rel="noreferrer">
-            <Download size={18} /> {cfg.play_url ? t("lp_play") : t("lp_apk")}
-          </a>
-          <button className="lp-btn ghost" onClick={toForm}><MonitorPlay size={18} /> {t("lp_web")}</button>
+          {app ? (
+            <button className="lp-btn primary" onClick={toForm} data-testid="cta-start"><Sparkles size={18} /> {t("lp_start")}</button>
+          ) : (
+            <>
+              <a className="lp-btn primary" href={storeUrl} target="_blank" rel="noreferrer">
+                <Download size={18} /> {cfg.play_url ? t("lp_play") : t("lp_apk")}
+              </a>
+              <button className="lp-btn ghost" onClick={toForm}><MonitorPlay size={18} /> {t("lp_web")}</button>
+            </>
+          )}
         </div>
       </section>
 

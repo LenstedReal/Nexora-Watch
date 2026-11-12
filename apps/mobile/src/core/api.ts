@@ -77,25 +77,13 @@ export type AppConfig = {
 export const FALLBACK_CONFIG: AppConfig = {
   allowed_sites: [
     { domain: "youtube.com", name: "YouTube" },
-    { domain: "twitch.tv", name: "Twitch" },
-    { domain: "kick.com", name: "Kick" },
-    { domain: "rumble.com", name: "Rumble" },
-    { domain: "odysee.com", name: "Odysee" },
-    { domain: "dailymotion.com", name: "Dailymotion" },
-    { domain: "vimeo.com", name: "Vimeo" },
-    { domain: "streamable.com", name: "Streamable" },
-    { domain: "reddit.com", name: "Reddit" },
-    { domain: "x.com", name: "X (Twitter)" },
-    { domain: "twitter.com", name: "Twitter" },
-    { domain: "facebook.com", name: "Facebook" },
-    { domain: "bilibili.tv", name: "Bilibili" },
     { domain: "archive.org", name: "Internet Archive" },
     { domain: "drive.google.com", name: "Google Drive" },
   ],
   web_url: WEB_URL,
   play_url: "",
   apk_url: "https://github.com/LenstedReal/Nexora-Watch/releases/latest",
-  contact_email: "destek@lenstedreal.info",
+  contact_email: "contact.nexorawatch@protonmail.com",
   legal: {
     privacy: `${WEB_URL}/gizlilik`,
     terms: `${WEB_URL}/kosullar`,
@@ -104,7 +92,7 @@ export const FALLBACK_CONFIG: AppConfig = {
     delete_data: `${WEB_URL}/veri-silme`,
     child_safety: `${WEB_URL}/cocuk-guvenligi`,
   },
-  min_age: 13,
+  min_age: 16,
 };
 
 let configCache: AppConfig | null = null;

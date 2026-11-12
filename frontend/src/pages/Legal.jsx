@@ -60,7 +60,7 @@ function LegalLayout({ title, children }) {
             </span>
           </Link>
           <a className="lp-nav-cta" href={cfg.play_url || cfg.apk_url} target="_blank" rel="noreferrer">
-            <Download size={15} /> İndir
+            <Download size={15} /> <span>İndir</span>
           </a>
         </header>
       </div>
@@ -219,7 +219,7 @@ export function Privacy() {
       </p>
       <h2>7. Çocuklar</h2>
       <p>
-        Nexora Watch 13 yaşın altındaki kullanıcılara yönelik değildir. 13 yaş altı bir kullanıcıya ait veri işlendiğini fark edersek
+        Nexora Watch 16 yaşın altındaki kullanıcılara yönelik değildir; 18 yaşından küçükler hizmeti ebeveyn veya veli gözetiminde kullanmalıdır. 16 yaş altı bir kullanıcıya ait veri işlendiğini fark edersek
         siliriz. Ayrıntılar için <Link to="/cocuk-guvenligi">Çocuk Güvenliği Standartları</Link>.
       </p>
       <h2>8. Hakların</h2>
@@ -241,7 +241,7 @@ export function Terms() {
         Nexora Watch'u (mobil uygulama ve web sitesi) kullanarak bu koşulları kabul etmiş olursun. Kabul etmiyorsan hizmeti kullanma.
       </p>
       <h2>1. Uygunluk</h2>
-      <p>Hizmeti kullanmak için en az 13 yaşında olmalısın. 18 yaşından küçüksen veli/vasinin bilgisi dahilinde kullanmalısın.</p>
+      <p>Hizmeti kullanmak için en az 16 yaşında olmalısın. 18 yaşından küçüksen hizmeti yalnızca ebeveyninin veya velinin izni ve gözetimiyle kullanabilirsin.</p>
       <h2>2. Hizmet</h2>
       <p>
         Nexora Watch; oda oluşturma, kod ile katılma, sohbet, tepki ve odaya eklenen videoların katılımcılar arasında eşzamanlı
@@ -426,7 +426,7 @@ export function ChildSafety() {
       </p>
       <h2>Standartlarımız</h2>
       <ul>
-        <li>Hizmet 13 yaş ve üzeri kullanıcılar içindir; ilk açılışta yaş beyanı ve koşulların kabulü istenir.</li>
+        <li>Hizmet 16 yaş ve üzeri kullanıcılar içindir; 18 yaşından küçükler için ebeveyn gözetimi gerekir. İlk açılışta yaş beyanı ve koşulların kabulü istenir.</li>
         <li>Çocukları cinselleştiren, istismar eden veya tehlikeye atan her türlü içerik, mesaj ve davranış yasaktır.</li>
         <li>Bu tür içerikler tespit edildiğinde veya bildirildiğinde derhal kaldırılır, oda kapatılır ve ilgili kullanıcının erişimi engellenir.</li>
         <li>Yasaların gerektirdiği durumlarda içerik ve ilgili kayıtlar yetkili makamlara (Türkiye'de Emniyet Genel Müdürlüğü, BTK İhbar Web; uluslararası NCMEC vb.) bildirilir ve korunur.</li>

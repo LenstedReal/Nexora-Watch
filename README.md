@@ -15,7 +15,7 @@ Arkadaşlarınla aynı videoyu **aynı anda** izlediğin, Rave benzeri senkron i
 
 ## Otomasyon (GitHub Actions)
 
-- **Deploy server** (`deploy.yml`): `main`'e push → sunucu kendini günceller (web, API, kişisel site). Kurulum: `docs/DEPLOY.md`.
+- **Deploy server** (`deploy.yml`): `main`'e push → GitHub imajları derler, sunucu yalnızca indirip yeniden başlar (web, API, kişisel site). Canlı sürüm: `/version.txt`. Kurulum: `docs/DEPLOY.md`.
 - **Android** (`android.yml`): `apps/mobile/` değişince imzalı APK + AAB üretir; APK'yı otomatik olarak GitHub Releases'e (latest) koyar.
 - **Backend** (`backend.yml`): API testleri + Docker derleme.
 
@@ -85,7 +85,7 @@ Ayrıca eklenecek.
 ## Sürüm 1.1.0 özeti
 - Diller: Türkçe, English, Deutsch (mobil + web)
 - Mavi-pembe neon tema, açılış animasyonu, "Better than Rave"
-- İlk açılışta yaş (13+) ve koşul onayı; mesaj/kişi bildirme, engelleme, host için odadan çıkarma
+- İlk açılışta yaş (16+, 18 yaş altı ebeveyn gözetimiyle) ve koşul onayı; mesaj/kişi bildirme, engelleme, host için odadan çıkarma
 - Siteden algılama yalnızca desteklenen kamuya açık sitelerde; DRM/abonelik platformları engelli
 - Google Drive: herkese açık dosya sunucuya içe aktarılır, tam senkron oynar
 - Yatay mod / tam ekran ve yatayda yan sohbet paneli

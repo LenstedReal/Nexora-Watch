@@ -1,7 +1,7 @@
 """Content policy: which pages may be used as video sources (Play/KVKK compliance)."""
 from urllib.parse import urlparse
 
-from config import (ALLOWED_SITES, APK_URL, BLOCKED_HOSTS, CONTACT_EMAIL, OWNER_ADDRESS, OWNER_NAME, PLAY_URL, WEB_URL)
+from config import (ALLOWED_SITES, APK_URL, BLOCKED_HOSTS, CONTACT_EMAIL, MIN_AGE, OWNER_ADDRESS, OWNER_NAME, PLAY_URL, WEB_URL)
 from security import ApiError
 
 
@@ -33,8 +33,12 @@ def check_source(url, referer) -> None:
     rhost = host_of(referer) if referer else ""
     if (uhost and is_blocked(uhost)) or (rhost and is_blocked(rhost)):
         raise ApiError(403, "drm_not_allowed", "Telif korumalı/abonelikli platformlardan içerik paylaşılamaz")
-    if referer not in (None, "") and not is_allowed_site(rhost):
-        raise ApiError(403, "site_not_supported", "Bu site desteklenmiyor")
+    if referer not in (None, ""):
+        scheme = urlparse(referer.strip()).scheme if isinstance(referer, str) else ""
+        if not rhost or scheme not in ("http", "https"):
+            raise ApiError(400, "invalid_referer", "Geçersiz kaynak sayfa adresi (referer)")
+        if not is_allowed_site(rhost):
+            raise ApiError(403, "site_not_supported", "Bu site desteklenmiyor")
 
 
 def public_config() -> dict:
@@ -53,5 +57,5 @@ def public_config() -> dict:
             "delete_data": f"{WEB_URL}/veri-silme",
             "child_safety": f"{WEB_URL}/cocuk-guvenligi",
         },
-        "min_age": 13,
+        "min_age": MIN_AGE,
     }
