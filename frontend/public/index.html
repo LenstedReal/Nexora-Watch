@@ -2,7 +2,8 @@
 <html lang="tr">
     <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <!-- interactive-widget: on Android the page shrinks when the keyboard opens, so the video stays in view while typing in the chat. -->
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
         <meta name="theme-color" content="#09090d" />
         <meta name="color-scheme" content="dark" />
         <title>Nexora Watch — Arkadaşlarınla aynı anda izle</title>
@@ -17,6 +18,33 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+        <!-- Which build this page is. The image build writes the git commit here (deploy/web.Dockerfile); the app compares it with /version.txt (src/lib/update.js). -->
+        <meta name="nexora-build" content="__NEXORA_BUILD__" />
+        <script>
+            // If an app file of this page cannot be loaded, the page is an old copy asking for files of an older
+            // release (or the connection failed): load the page again once. If that does not help, say so instead of
+            // staying blank.
+            (function () {
+                var KEY = "nx:reloaded-at", handled = false;
+                function recently() { try { return Date.now() - Number(sessionStorage.getItem(KEY) || 0) < 60000; } catch (e) { return true; } }
+                function mark() { try { sessionStorage.setItem(KEY, String(Date.now())); return true; } catch (e) { return false; } }
+                window.addEventListener("error", function (e) {
+                    var el = e.target;
+                    if (handled || !el || el === window || !el.tagName) return;
+                    var url = el.tagName === "SCRIPT" ? el.src : el.tagName === "LINK" && el.rel === "stylesheet" ? el.href : "";
+                    if (!url || url.indexOf(location.origin + "/static/") !== 0) return;
+                    handled = true;
+                    if (!recently() && mark()) { location.reload(); return; }
+                    var root = document.getElementById("root");
+                    if (root && !root.firstChild) {
+                        root.innerHTML = '<div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;font:16px system-ui,sans-serif;color:#f5f5fa">'
+                            + '<p>Nexora Watch y\u00fcklenemedi. Ba\u011flant\u0131n\u0131 kontrol edip yeniden dene.<br><span style="color:#8f8fa6">Nexora Watch could not load. Check your connection and try again.</span></p>'
+                            + '<button id="nx-reload" style="padding:14px 22px;border:0;border-radius:14px;font:700 15px system-ui,sans-serif;color:#000;background:linear-gradient(90deg,#38bdf8,#ec4899)">Yeniden dene \u00b7 Try again</button></div>';
+                        document.getElementById("nx-reload").onclick = function () { location.reload(); };
+                    }
+                }, true);
+            })();
+        </script>
     </head>
     <body>
         <noscript>Nexora Watch'ı kullanmak için JavaScript'i etkinleştir.</noscript>

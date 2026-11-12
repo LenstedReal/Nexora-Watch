@@ -543,9 +543,11 @@ async def _run_import(m: Media, client: httpx.AsyncClient, resp: httpx.Response,
             pass  # room closed meanwhile; retention cleanup removes the file
     except Exception as e:
         detail = e.detail if isinstance(e, ApiError) else "Drive içe aktarma başarısız oldu"
-        await db.media.update_one({"media_id": m.media_id}, {"$set": {"status": "failed", "bytes_done": done, "error": detail}})
-        await audit("import_failed", owner_id, m.media_id, m.room_code, {"error": detail})
-        await hub.broadcast(m.room_code, {"type": "error", "code": "import_failed", "detail": detail})
+        reason = e.code if isinstance(e, ApiError) else "import_failed"
+        await db.media.update_one({"media_id": m.media_id}, {"$set": {"status": "failed", "bytes_done": done, "error": detail, "error_code": reason}})
+        await audit("import_failed", owner_id, m.media_id, m.room_code, {"error": detail, "code": reason})
+        # Only the person who started the import is told; everyone else in the room has nothing to do with it.
+        await hub.send_to(m.room_code, owner_id, {"type": "error", "code": "import_failed", "reason": reason, "detail": detail, "media_id": m.media_id})
     finally:
         try:
             await resp.aclose()
@@ -562,9 +564,9 @@ async def _run_import(m: Media, client: httpx.AsyncClient, resp: httpx.Response,
 @router.get("/uploads/{media_id}/import-status")
 async def import_status(media_id: str, participant_id: str = "", token: str = ""):
     m, _ = await _owner_session(media_id, {"participant_id": participant_id, "token": token})
-    doc = await db.media.find_one({"media_id": media_id}, {"bytes_done": 1, "error": 1})
+    doc = await db.media.find_one({"media_id": media_id}, {"bytes_done": 1, "error": 1, "error_code": 1})
     return {"media_id": media_id, "status": m.status, "size": m.size, "bytes_done": int((doc or {}).get("bytes_done") or 0),
-            "error": (doc or {}).get("error")}
+            "error": (doc or {}).get("error"), "error_code": (doc or {}).get("error_code")}
 
 
 async def _expire_media(m: Media, reason: str):
@@ -602,7 +604,7 @@ async def cleanup_once():
     running = len([t for t in _import_tasks if not t.done()])
     q = {"status": "importing"} if running == 0 else {"status": "importing", "created_at": {"$lt": stuck}}
     async for d in db.media.find(q):
-        await db.media.update_one({"media_id": d["media_id"]}, {"$set": {"status": "failed", "error": "interrupted"}})
+        await db.media.update_one({"media_id": d["media_id"]}, {"$set": {"status": "failed", "error": "Sunucu yeniden başladı; aktarma yarım kaldı", "error_code": "import_failed"}})
         await audit("import_cleanup", "system", d["media_id"], d["room_code"])
 
     # (a) rooms that were closed or expired: delete their videos after a short grace period.

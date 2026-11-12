@@ -9,16 +9,24 @@ export class ApiError extends Error {
   }
 }
 
-async function req(method, path, body) {
+const TIMEOUT_MS = 20000;
+
+async function req(method, path, body, timeoutMs = TIMEOUT_MS) {
   let res;
+  // A request on a dead mobile connection can otherwise hang for minutes with no feedback.
+  const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
   try {
     res = await fetch(`${BASE}/api${path}`, {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl ? ctrl.signal : undefined,
     });
   } catch {
-    throw new ApiError(0, "network", "Sunucuya ulaşılamıyor");
+    throw new ApiError(0, "unreachable", "Sunucuya ulaşılamıyor");
+  } finally {
+    clearTimeout(timer);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -46,7 +54,7 @@ export const api = {
   getRoom: (code) => req("GET", `/rooms/${code}`),
   getMessages: (code) => req("GET", `/rooms/${code}/messages`),
   sendMessage: (code, ident, text, client_id) => req("POST", `/rooms/${code}/messages`, { ...cred(ident), text, client_id }),
-  setVideo: (code, ident, url, extra) => req("PUT", `/rooms/${code}/video`, { ...cred(ident), url, ...(extra || {}) }),
+  setVideo: (code, ident, url, extra) => req("PUT", `/rooms/${code}/video`, { ...cred(ident), url, ...(extra || {}) }, 45000), // the server checks the link first
   setPlayback: (code, ident, cmd) => req("PUT", `/rooms/${code}/playback`, { ...cred(ident), ...cmd }),
   leave: (code, ident) => req("POST", `/rooms/${code}/leave`, cred(ident)),
   close: (code, ident) => req("POST", `/rooms/${code}/close`, cred(ident)),
@@ -56,10 +64,10 @@ export const api = {
   mediaUrl: (id, ident) => req("GET", `/media/${id}/url?${q(ident)}`),
   uploadInit: (body) => req("POST", "/uploads/init", body),
   partUrls: (id, ident, parts) => req("POST", `/uploads/${id}/part-urls`, { ...cred(ident), parts }),
-  uploadComplete: (id, ident) => req("POST", `/uploads/${id}/complete`, cred(ident)),
+  uploadComplete: (id, ident) => req("POST", `/uploads/${id}/complete`, cred(ident), 300000), // joining the parts of a large file takes a while
   uploadAbort: (id, ident) => req("POST", `/uploads/${id}/abort`, cred(ident)),
   config: () => req("GET", "/config"),
-  importDrive: (code, ident, url) => req("POST", "/uploads/import", { code, ...cred(ident), url }),
+  importDrive: (code, ident, url) => req("POST", "/uploads/import", { code, ...cred(ident), url }, 60000),
   importStatus: (id, ident) => req("GET", `/uploads/${id}/import-status?${q(ident)}`),
   report: (code, ident, body) => req("POST", `/rooms/${code}/report`, { ...cred(ident), ...body }),
   kick: (code, ident, target_id) => req("POST", `/rooms/${code}/kick`, { ...cred(ident), target_id }),

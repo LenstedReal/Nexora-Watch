@@ -4,8 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
 import App from "@/App";
 import { inApp } from "@/lib/native";
+import { startUpdateWatch } from "@/lib/update";
 
 if (inApp()) document.documentElement.classList.add("in-app");
+startUpdateWatch();
 
 const queryClient = new QueryClient({
   defaultOptions: {

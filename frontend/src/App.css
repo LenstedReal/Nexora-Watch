@@ -212,7 +212,7 @@ input::placeholder{color:#5f5f76}
 .online-pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#d6d6e0;background:var(--s3);border:1px solid var(--bd);border-radius:99px;padding:4px 9px;flex-shrink:0}
 
 /* Stage */
-.stage-title{position:absolute;top:10px;left:12px;right:60px;z-index:3;font:600 12px var(--font);color:#fff;text-shadow:0 1px 6px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;opacity:.9}
+.stage-title{position:absolute;top:10px;left:12px;right:100px;z-index:3;font:600 12px var(--font);color:#fff;text-shadow:0 1px 6px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;opacity:.9}
 .empty{background:radial-gradient(70% 90% at 50% 40%,#1c1036 0,#050508 100%)}
 .empty svg{color:var(--pu);filter:drop-shadow(0 0 18px #ec489988)}
 
@@ -265,6 +265,29 @@ input::placeholder{color:#5f5f76}
 .modal .cancel{background:none;text-align:center;color:var(--mut);margin-top:4px}
 @media(min-width:960px){.modal-bg{align-items:center}}
 
+/* phones: the top bar keeps room for the room name and code; in the people list the name stays readable */
+.code{position:relative}
+.code::after{content:"";position:absolute;inset:-9px -6px} /* larger tap area, same look */
+@media(max-width:480px){.top{gap:6px;padding-inline:4px 8px}}
+@media(max-width:380px){.code{letter-spacing:1px;padding-inline:7px}.code svg{display:none}} /* the code fits beside "Invite" on 360 px phones */
+@media(max-width:340px){.invite{width:36px;padding:0;justify-content:center}.invite span{display:none}} /* smallest phones: icon only */
+.prow{flex-wrap:wrap;row-gap:8px}
+.prow .nm{flex:1 1 120px}
+.pacts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-left:auto}
+.pact{margin-left:0;min-height:36px;padding:0 12px;font-size:12px;display:inline-flex;align-items:center}
+
+/* yes / no question (replaces the browser's own confirm box) */
+.modal.confirm{gap:10px;padding:18px}
+.modal.confirm b{padding:0;font-size:17px}
+.modal.confirm p{color:#c9c9d8;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.confirm-row{display:flex;gap:8px;margin-top:6px}
+.modal .confirm-row button{flex:1;min-height:46px;display:inline-flex;align-items:center;justify-content:center;text-align:center;font-weight:700}
+.modal .confirm-row .cancel{background:var(--s3);color:var(--tx);margin-top:0}
+.modal .confirm-row .cancel:hover{background:var(--s4)}
+.modal .confirm-row .ok{background:linear-gradient(90deg,#38bdf8,#ec4899);color:#000}
+.modal .confirm-row .ok.danger{background:var(--err);color:#fff}
+.modal .confirm-row .ok:hover{filter:brightness(1.08)}
+
 /* in-app site browser (mobile app only) */
 .browse{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 12px 12px;padding:11px;border-radius:12px;border:1px solid var(--bd2);color:var(--cy);font-size:13px;font-weight:700;width:calc(100% - 24px);transition:background-color .2s}
 .browse:hover{background:var(--s3)}
@@ -276,13 +299,11 @@ input::placeholder{color:#5f5f76}
 /* inside the mobile app: no "download the app" calls to action */
 html.in-app .lp-nav-cta,html.in-app [data-testid="cta-store"],html.in-app [data-testid="cta-web"],html.in-app .lp-soon{display:none!important}
 
-/* app: rotate button + phone landscape = video fills the screen */
-.rotate-fab{position:fixed;z-index:40;right:12px;top:calc(env(safe-area-inset-top) + 66px);width:38px;height:38px;border-radius:12px;background:#000a;border:1px solid #fff3;color:#fff;font-size:18px;display:grid;place-items:center;backdrop-filter:blur(10px)}
+/* phone landscape = video fills the screen (the app's rotate button lives in the stage's tool row) */
 @media (orientation:landscape) and (max-height:520px){
   .room .top,.room .side,.room .banner,.room .hint,.room .desk-only{display:none!important}
   .room .body{display:block;padding:0}
   .room .stage{height:100dvh;max-height:100dvh;aspect-ratio:auto;border-radius:0;border:0}
-  .rotate-fab{top:12px}
 }
 
 /* fullscreen: the picture fills the screen */

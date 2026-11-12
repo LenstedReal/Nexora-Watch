@@ -2,7 +2,7 @@ import asyncio
 import ipaddress
 import re
 import socket
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import httpx
 
@@ -81,7 +81,8 @@ def _classify(url: str, p: dict, provider: str) -> dict | None:
             total = int(cr.rsplit("/", 1)[1])
         return {"kind": "direct", "stream_url": p["final_url"], "mime_type": p["ctype"] or "video/mp4", "provider": provider,
                 "capabilities": {**FULL_CAPS, "seek": ranged}, "range_support": ranged, "size": total,
-                "warning": None if ranged else "Sunucu HTTP Range desteklemiyor; ileri/geri sarma güvenilir olmayabilir"}
+                "warning": None if ranged else "Sunucu HTTP Range desteklemiyor; ileri/geri sarma güvenilir olmayabilir",
+                "warning_code": None if ranged else "no_range"}
     return None
 
 
@@ -141,14 +142,16 @@ async def _resolve(url_in, referer: str | None) -> dict:
         return {"url": url, "kind": "drive_embed", "video_id": fid, "embed_url": f"https://drive.google.com/file/d/{fid}/preview",
                 "stream_url": None, "title": "Google Drive", "mime_type": None, "provider": "drive",
                 "capabilities": {"seek": False, "rate_correction": False, "sync": False},
-                "warning": "Drive bu dosyayı doğrudan akış olarak sunmuyor (izin, boyut veya virüs tarama sayfası). Resmî Drive oynatıcısı açılır; senkron kontrol yok."}
+                "warning": "Drive bu dosyayı doğrudan akış olarak sunmuyor (izin, boyut veya virüs tarama sayfası). Resmî Drive oynatıcısı açılır; senkron kontrol yok.",
+                "warning_code": "drive_embed"}
 
     await _assert_public(parsed.hostname)
     p = await _probe(url, referer)
     _http_errors(p)
     c = _classify(url, p, parsed.hostname)
     if c:
-        return {"url": url, "video_id": None, "embed_url": None, "title": parsed.path.rsplit("/", 1)[-1] or parsed.hostname, "warning": None, **c}
+        name = unquote(parsed.path.rsplit("/", 1)[-1]).strip()[:120]
+        return {"url": url, "video_id": None, "embed_url": None, "title": name or parsed.hostname, "warning": None, **c}
     if HLS_EXT.search(url):
         raise ApiError(422, "manifest_invalid", "Adres .m3u8 ile bitiyor ama geçerli bir HLS manifesti döndürmüyor")
     if p["ctype"].startswith("text/html"):

@@ -64,6 +64,10 @@ class RoomMessage(BaseDocument):
     kind: str = "chat"
     client_id: Optional[str] = None
     created_at: datetime
+    # System messages only: what happened ("created", "joined", "left", "kicked", "host") and to whom, so clients can
+    # show the line in their own language; "text" stays as the Turkish fallback for older clients.
+    event: Optional[str] = None
+    subject: Optional[str] = None
 
 
 class Media(BaseDocument):

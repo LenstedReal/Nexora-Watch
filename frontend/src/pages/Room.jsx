@@ -8,13 +8,15 @@ import { clearIdent, getIdent, lastNickname, saveIdent, saveNickname } from "@/l
 import { useRoomConnection } from "@/hooks/useRoomConnection";
 import { usePlaybackSync } from "@/hooks/usePlaybackSync";
 import { useUpload } from "@/hooks/useUpload";
+import { useDriveImport } from "@/hooks/useDriveImport";
 import { Stage } from "@/components/player/Stage";
 import { TopBar } from "@/components/room/TopBar";
 import { ConnectionBanner } from "@/components/room/ConnectionBanner";
 import { SourcePanel } from "@/components/room/SourcePanel";
 import { PeopleList, PeopleStrip } from "@/components/room/Participants";
 import { Chat } from "@/components/room/Chat";
-import { inApp, setKeepAwake, setOrientation } from "@/lib/native";
+import { ConfirmDialog } from "@/components/room/ConfirmDialog";
+import { setKeepAwake, setOrientation } from "@/lib/native";
 
 const Gate = ({ title, children }) => {
   const nav = useNavigate();
@@ -30,6 +32,7 @@ const Gate = ({ title, children }) => {
 };
 
 const GATE_KEYS = { room_closed: "closed_title", room_expired: "expired_title", room_not_found: "notfound_title", kicked: "kicked_title" };
+const GONE = new Set(["room_closed", "room_expired", "room_not_found"]); // nothing to come back to: drop it from "recent rooms"
 
 export default function RoomPage() {
   const { code: raw } = useParams();
@@ -95,7 +98,11 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
   const [tab, setTab] = useState("chat");
   const [unread, setUnread] = useState(0);
   const [reporting, setReporting] = useState(null);
-  const conn = useRoomConnection(code, ident, initialRoom, (e) => toast.error(errorText(t, e)));
+  const [asking, setAsking] = useState(null); // {title, text, label, danger, run}: a question waiting for yes / no
+  const [askBusy, setAskBusy] = useState(false);
+  const closing = useRef(false); // this person is closing the room: go home, do not show "the host closed the room"
+  const drive = useDriveImport({ code, ident });
+  const conn = useRoomConnection(code, ident, initialRoom, (e) => (e.code === "import_failed" ? drive.onNotice(e) : toast.error(errorText(t, e))));
   const { room } = conn;
   const isHost = room.host_id === ident.participant_id;
   const sync = usePlaybackSync({ room, isHost, conn, playerRef, ident });
@@ -107,6 +114,7 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
   useEffect(() => {
     if (conn.status === "unauthorized") onIdentLost();
   }, [conn.status, onIdentLost]);
+  useEffect(() => { if (GONE.has(conn.status)) clearIdent(code); }, [conn.status, code]);
   useEffect(() => { document.title = `${room.name} · Nexora Watch`; }, [room.name]);
   const wasHost = useRef(isHost);
   useEffect(() => {
@@ -120,7 +128,7 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
   useEffect(() => { if (tabRef.current !== "chat") setUnread((u) => u + 1); }, [msgCount]);
   const switchTab = (k) => { setTab(k); if (k === "chat") setUnread(0); };
 
-  if (GATE_KEYS[conn.status]) return <Gate title={t(GATE_KEYS[conn.status])} />;
+  if (GATE_KEYS[conn.status] && !closing.current) return <Gate title={t(GATE_KEYS[conn.status])} />;
   if (conn.status === "replaced") return <Gate title={t("replaced")} />;
 
   const send = (v) => conn.sendChat(v).catch((e) => toast.error(errorText(t, e)));
@@ -136,31 +144,62 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
       toast.error(errorText(t, e));
     }
   };
-  const kick = async (person) => {
-    if (!window.confirm(`${person.nickname} — ${t("kick_confirm")}`)) return;
+  // Questions are asked with our own dialog: the browser's confirm box is not reliable inside the mobile app.
+  const answerYes = async () => {
+    const q = asking;
+    if (!q || askBusy) return;
+    setAskBusy(true);
     try {
-      conn.setRoom(await api.kick(code, ident, person.id));
-    } catch (e) {
-      toast.error(errorText(t, e));
+      await q.run();
+    } finally {
+      setAskBusy(false);
+      setAsking(null);
     }
   };
-  const makeHost = async (person) => {
-    if (!window.confirm(`${person.nickname} ${t("make_host_confirm")}`)) return;
-    try {
-      conn.setRoom(await api.makeHost(code, ident, person.id));
-    } catch (e) {
-      toast.error(errorText(t, e));
-    }
-  };
-  const leave = async () => {
-    await api.leave(code, ident).catch(() => {});
+  const kick = (person) => setAsking({
+    title: t("kick"), text: `${person.nickname} — ${t("kick_confirm")}`, label: t("kick"), danger: true,
+    run: async () => {
+      try {
+        conn.setRoom(await api.kick(code, ident, person.id));
+      } catch (e) {
+        toast.error(errorText(t, e));
+      }
+    },
+  });
+  const makeHost = (person) => setAsking({
+    title: t("make_host"), text: `${person.nickname} ${t("make_host_confirm")}`, label: t("make_host"),
+    run: async () => {
+      try {
+        conn.setRoom(await api.makeHost(code, ident, person.id));
+      } catch (e) {
+        toast.error(errorText(t, e));
+      }
+    },
+  });
+  // Leaving never waits for the server: on a slow connection the button must still work at once.
+  const leave = () => {
+    api.leave(code, ident).catch(() => {});
     nav("/");
   };
-  const close = async () => {
-    if (!window.confirm(t("close_confirm"))) return;
-    try { await api.close(code, ident); } catch (e) { toast.error(errorText(t, e)); }
-  };
-  const source = isHost ? <SourcePanel code={code} ident={ident} video={room.video} upload={upload} onRoom={conn.setRoom} /> : null;
+  const close = () => setAsking({
+    title: t("close_room"), text: t("close_confirm"), label: t("close_room"), danger: true,
+    run: async () => {
+      closing.current = true;
+      try {
+        await api.close(code, ident);
+      } catch (e) {
+        if (e.status !== 404 && e.status !== 410) { // "already gone" counts as closed
+          closing.current = false;
+          toast.error(errorText(t, e));
+          return;
+        }
+      }
+      clearIdent(code); // a closed room must not stay in "recent rooms"
+      toast.success(t("closed_by_you"));
+      nav("/");
+    },
+  });
+  const source = isHost ? <SourcePanel code={code} ident={ident} video={room.video} upload={upload} drive={drive} onRoom={conn.setRoom} /> : null;
 
   return (
     <div className="room" data-testid="room-page">
@@ -199,8 +238,8 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
           </div>
         </div>
       )}
-      {inApp() && (
-        <button className="rotate-fab" onClick={() => setOrientation(window.innerWidth > window.innerHeight ? "portrait" : "landscape")} aria-label={t("rotate")} data-testid="rotate-btn">⤢</button>
+      {asking && (
+        <ConfirmDialog title={asking.title} text={asking.text} confirmLabel={asking.label} danger={asking.danger} busy={askBusy} onConfirm={answerYes} onCancel={() => !askBusy && setAsking(null)} />
       )}
       {conn.reactions.map((r) => <div key={r.id} className="fly" style={{ left: `${r.left}%` }}>{r.emoji}</div>)}
     </div>

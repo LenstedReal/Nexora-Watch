@@ -5,9 +5,9 @@ import {
   MessageCircle, ShieldCheck, Download, Smartphone, MonitorPlay, ChevronDown, Lock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { errorText, useI18n } from "@/i18n";
+import { defaultRoomName, errorText, useI18n } from "@/i18n";
 import { api } from "@/lib/api";
-import { getIdent, lastNickname, saveIdent, saveNickname } from "@/lib/session";
+import { clearIdent, getIdent, lastNickname, saveIdent, saveNickname } from "@/lib/session";
 import { useAppConfig } from "@/lib/config";
 import { inApp } from "@/lib/native";
 import { SiteFooter } from "@/pages/Legal";
@@ -69,7 +69,7 @@ export default function Home() {
   const [name, setName] = useState("");
   const [code, setCode] = useState((params.get("join") || "").toUpperCase());
   const [busy, setBusy] = useState(false);
-  const [recent] = useState(recentRooms);
+  const [recent, setRecent] = useState(recentRooms);
   const formRef = useRef(null);
   const app = inApp(); // inside the mobile app there is nothing to download and no "web" to switch to
 
@@ -77,6 +77,21 @@ export default function Home() {
     document.title = "Nexora Watch — Better than Rave";
     if (params.get("join")) formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [params]);
+
+  // "Recent rooms" only lists rooms one can still go back to: closed and expired ones are dropped.
+  useEffect(() => {
+    let alive = true;
+    recent.forEach((r) => {
+      api.getRoom(r.code).catch((ex) => {
+        if (ex.status !== 404 && ex.status !== 410) return; // offline or server trouble says nothing about the room
+        clearIdent(r.code);
+        if (alive) setRecent((list) => list.filter((x) => x.code !== r.code));
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = async (e) => {
     e.preventDefault();
@@ -86,7 +101,8 @@ export default function Home() {
     if (mode === "j" && c.length !== 6) return toast.error(t("need_code"));
     setBusy(true);
     try {
-      const res = mode === "c" ? await api.createRoom(n, name.trim()) : await api.joinRoom(c, n, getIdent(c)); // reuse the seat instead of creating a duplicate participant
+      // An empty room name becomes "<nickname>'s room" in the creator's language. Joining reuses the seat instead of creating a duplicate participant.
+      const res = mode === "c" ? await api.createRoom(n, name.trim() || defaultRoomName(t, lang, n)) : await api.joinRoom(c, n, getIdent(c));
       saveNickname(n);
       saveIdent(res.room.code, { participant_id: res.participant.id, token: res.token, nickname: n });
       nav(`/room/${res.room.code}`, { state: { room: res.room } });

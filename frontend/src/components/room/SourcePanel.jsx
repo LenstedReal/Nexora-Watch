@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link2, Upload, Loader2, Film, PlayCircle, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useT } from "@/i18n";
@@ -6,39 +6,16 @@ import { api } from "@/lib/api";
 import { UploadPanel } from "./UploadPanel";
 import { inApp, pickFromNativeBrowser } from "@/lib/native";
 
-export const SourcePanel = ({ code, ident, video, upload, onRoom }) => {
+// A phone shows this panel in the "Video" tab and a wide screen next to the player: two copies can exist at once.
+// Whatever must survive closing the tab (upload, Drive import) therefore comes from the room: `upload` and `drive`.
+export const SourcePanel = ({ code, ident, video, upload, drive, onRoom }) => {
   const t = useT();
   const [tab, setTab] = useState("link");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const [imp, setImp] = useState(null); // {media_id, done, size, filename}
-  const poll = useRef(null);
+  const imp = drive.imp;
   const isDrive = /drive\.google\.com/i.test(url);
-  useEffect(() => () => clearInterval(poll.current), []);
-
-  const startImport = async () => {
-    const res = await api.importDrive(code, ident, url.trim());
-    setImp({ media_id: res.media_id, done: 0, size: res.size, filename: res.filename });
-    setUrl("");
-    clearInterval(poll.current);
-    poll.current = setInterval(async () => {
-      try {
-        const st = await api.importStatus(res.media_id, ident);
-        if (st.status === "completed") {
-          clearInterval(poll.current);
-          setImp(null);
-          toast.success(t("drive_done"));
-        } else if (st.status === "failed") {
-          clearInterval(poll.current);
-          setImp(null);
-          toast.error(st.error || t("drive_failed"));
-        } else setImp((x) => x && { ...x, done: st.bytes_done, size: st.size || x.size });
-      } catch {
-        /* keep polling */
-      }
-    }, 1500);
-  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -46,8 +23,10 @@ export const SourcePanel = ({ code, ident, video, upload, onRoom }) => {
     setBusy(true);
     setErr(null);
     try {
-      if (isDrive) await startImport();
-      else {
+      if (isDrive) {
+        await drive.start(url.trim());
+        setUrl("");
+      } else {
         onRoom(await api.setVideo(code, ident, url.trim()));
         setUrl("");
       }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clapperboard, TriangleAlert, Volume2, VolumeX, Hand, Pause, Plus, Maximize } from "lucide-react";
+import { Clapperboard, TriangleAlert, Volume2, VolumeX, Hand, Pause, Plus, Maximize, Minimize } from "lucide-react";
 import { useT } from "@/i18n";
-import { inApp } from "@/lib/native";
+import { inApp, setOrientation } from "@/lib/native";
 import { HtmlPlayer } from "./HtmlPlayer";
 import { YouTubePlayer } from "./YouTubePlayer";
 
@@ -13,8 +13,16 @@ export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVi
   const sourceKey = `${video?.media_id || "none"}:${retryKey}`;
   const prev = useRef(video?.media_id);
   const stageRef = useRef(null);
+  const app = inApp();
+  const [wide, setWide] = useState(() => window.innerWidth > window.innerHeight);
 
   useEffect(() => { if (prev.current !== video?.media_id) { prev.current = video?.media_id; setFatal(null); } }, [video?.media_id]);
+  useEffect(() => {
+    if (!app) return undefined;
+    const onResize = () => setWide(window.innerWidth > window.innerHeight);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [app]);
 
   const toggleFullscreen = () => {
     const el = stageRef.current;
@@ -44,6 +52,7 @@ export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVi
   const embed = video?.kind === "drive_embed";
   const yt = video?.kind === "youtube";
   const showPaused = video && !isHost && !embed && playback && !playback.playing && !sync.stats.buffering && !fatal;
+  const warning = video?.warning ? (video.warning_code && t(`warn_${video.warning_code}`) !== `warn_${video.warning_code}` ? t(`warn_${video.warning_code}`) : video.warning) : null;
   return (
     <div className="stage" ref={stageRef} data-testid="video-stage">
       {body}
@@ -51,7 +60,7 @@ export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVi
       {video && !isHost && !embed && <div className="lock" data-testid="guest-lock" />}
       {video && sync.stats.buffering && !fatal && <div className="loader" data-testid="buffering-indicator"><span className="ring" /></div>}
       {showPaused && <div className="stage-chip" data-testid="paused-chip"><Pause size={12} /> {t("host_paused")}</div>}
-      {video?.warning && <div className="stage-warn" data-testid="source-warning"><TriangleAlert size={13} /> {video.warning}</div>}
+      {warning && <div className="stage-warn" data-testid="source-warning"><TriangleAlert size={13} /> {warning}</div>}
       {video?.title && !video?.warning && !fatal && <div className="stage-title" data-testid="stage-title">{video.title}</div>}
       {sync.needsGesture && !fatal && !isHost && (
         <button className="gesture" onClick={sync.resolveGesture} data-testid="tap-to-sync-btn"><Hand size={18} /> {t("tap_sync")}</button>
@@ -67,11 +76,13 @@ export const Stage = ({ video, playback, isHost, ident, playerRef, sync, onAddVi
           <button className="btn" onClick={() => { setFatal(null); setRetryKey((k) => k + 1); }} data-testid="player-retry-btn">{t("retry")}</button>
         </div>
       )}
-      {video && !embed && (
+      {video && (!embed || app) && (
         <div className="stage-tools">
-          {!isHost && <button onClick={() => sync.setMuted(!sync.muted)} aria-label="mute" data-testid="guest-mute-btn">{sync.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>}
-          {/* The host's YouTube player has its own fullscreen button; everyone else gets ours (the app rotates instead). */}
-          {!inApp() && !(yt && isHost) && <button onClick={toggleFullscreen} aria-label={t("fullscreen")} title={t("fullscreen")} data-testid="fullscreen-btn"><Maximize size={16} /></button>}
+          {!embed && !isHost && <button onClick={() => sync.setMuted(!sync.muted)} aria-label={t(sync.muted ? "unmute" : "mute")} data-testid="guest-mute-btn">{sync.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>}
+          {/* The host's YouTube player has its own fullscreen button; everyone else gets ours. */}
+          {!embed && !app && !(yt && isHost) && <button onClick={toggleFullscreen} aria-label={t("fullscreen")} title={t("fullscreen")} data-testid="fullscreen-btn"><Maximize size={16} /></button>}
+          {/* The app turns the screen instead. The button sits in this row so it never covers another one. */}
+          {app && <button onClick={() => setOrientation(wide ? "portrait" : "landscape")} aria-label={t(wide ? "portrait" : "rotate")} data-testid="rotate-btn">{wide ? <Minimize size={16} /> : <Maximize size={16} />}</button>}
         </div>
       )}
     </div>

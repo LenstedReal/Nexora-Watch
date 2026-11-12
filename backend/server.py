@@ -137,7 +137,7 @@ async def leave(code: str, request: Request):
     room = await R.get_room(code)
     p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
     await R.set_online(room.code, p.participant_id, False)
-    msg = await R.system_message(room.code, f"{p.nickname} ayrıldı")
+    msg = await R.system_message(room.code, f"{p.nickname} ayrıldı", "left", p.nickname)
     await hub.broadcast(room.code, {"type": "message", "message": msg, "server_time": R.now_ms()})
     return {"ok": True}
 
@@ -209,7 +209,8 @@ async def kick(code: str, request: Request):
         raise ApiError(404, "not_participant", "Kişi odada değil")
     await R.ban(room.code, target)  # kicked people cannot rejoin this room with the same identity
     await hub.kick(room.code, target_id, {"type": "error", "code": "kicked", "detail": "Oda sahibi seni odadan çıkardı"})
-    msg = await R.system_message(room.code, f"{target.get('nickname', 'Biri')} odadan çıkarıldı")
+    who = target.get("nickname") or "Biri"
+    msg = await R.system_message(room.code, f"{who} odadan çıkarıldı", "kicked", who)
     await hub.broadcast(room.code, {"type": "message", "message": msg, "server_time": R.now_ms()})
     view = await R.room_view(room)
     await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})

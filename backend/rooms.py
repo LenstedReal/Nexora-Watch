@@ -44,6 +44,21 @@ def _text(value, field: str, max_len: int) -> str:
     return text
 
 
+_TR_SUFFIX = {**dict.fromkeys("aıâáàãå", "ın"), **dict.fromkeys("eiéèêëîíìïä", "in"),
+              **dict.fromkeys("ouôóòõûúù", "un"), **dict.fromkeys("öü", "ün")}
+
+
+def tr_possessive(name: str) -> str:
+    """Turkish "X's" with vowel harmony: Deniz'in, Ayşe'nin, Umut'un, Gül'ün. Names that do not end in a letter get no suffix."""
+    low = name.strip().replace("I", "ı").replace("İ", "i").lower()
+    if not low or not low[-1].isalpha():
+        return name
+    last = next((c for c in reversed(low) if c in _TR_SUFFIX), None)
+    if last is None:
+        return f"{name}'in"
+    return f"{name}'{'n' if low[-1] in _TR_SUFFIX else ''}{_TR_SUFFIX[last]}"
+
+
 async def get_room(code: str) -> Room:
     code = normalize_code(code)
     room = Room.from_mongo(await db.rooms.find_one({"code": code}))
@@ -122,7 +137,8 @@ async def _add_participant(code: str, nickname: str, role: str) -> tuple[RoomPar
 
 async def create_room(nickname_in, name_in) -> dict:
     nickname = _text(nickname_in, "nickname", 24)
-    name = (name_in.strip() if isinstance(name_in, str) else "") or f"{nickname}'in odası"
+    # Clients send a name in the user's language; this default only serves callers that send none.
+    name = (name_in.strip() if isinstance(name_in, str) else "") or f"{tr_possessive(nickname)} odası"[:48]
     name = _text(name, "name", 48)
     now = utcnow()
     for _ in range(20):
@@ -140,7 +156,7 @@ async def create_room(nickname_in, name_in) -> dict:
         )
         await db.room_participants.insert_one(host.to_mongo())
         await db.room_playback.insert_one(RoomPlayback(room_code=code, updated_at=now_ms()).to_mongo())
-        await system_message(code, f"{nickname} odayı kurdu")
+        await system_message(code, f"{nickname} odayı kurdu", "created", nickname)
         room = await get_room(code)
         return {"room": await room_view(room), "participant": participant_view(host), "token": token}
     raise ApiError(500, "code_generation_failed", "Kod üretilemedi")
@@ -160,7 +176,7 @@ async def join_room(code: str, nickname_in, participant_id: Optional[str], token
         if doc:
             return {"room": await room_view(room), "participant": participant_view(RoomParticipant.from_mongo(doc)), "token": token, "rejoined": True}
     p, new_tok = await _add_participant(room.code, nickname, "guest")
-    msg = await system_message(room.code, f"{nickname} odaya katıldı")
+    msg = await system_message(room.code, f"{nickname} odaya katıldı", "joined", nickname)
     return {"room": await room_view(room), "participant": participant_view(p), "token": new_tok, "rejoined": False, "_message": msg}
 
 
@@ -189,7 +205,8 @@ async def transfer_host(room: Room, new_host_id: str) -> Optional[dict]:
         return None  # someone else changed the host meanwhile
     await db.room_participants.update_one({"room_code": room.code, "participant_id": room.host_id}, {"$set": {"role": "guest"}})
     await db.room_participants.update_one({"room_code": room.code, "participant_id": new_host_id}, {"$set": {"role": "host"}})
-    return await system_message(room.code, f"{target.get('nickname', 'Biri')} artık oda sahibi")
+    who = target.get("nickname") or "Biri"
+    return await system_message(room.code, f"{who} artık oda sahibi", "host", who)
 
 
 async def auth_participant(code: str, participant_id, token) -> RoomParticipant:
@@ -252,8 +269,9 @@ async def apply_playback(code: str, host: RoomParticipant, playing, position, se
     return playback_view(await get_playback(code)), False
 
 
-async def system_message(code: str, text: str) -> dict:
-    msg = RoomMessage(msg_id=str(uuid.uuid4()), room_code=code, nickname="Nexora", text=text, kind="system", created_at=utcnow())
+async def system_message(code: str, text: str, event: Optional[str] = None, subject: Optional[str] = None) -> dict:
+    msg = RoomMessage(msg_id=str(uuid.uuid4()), room_code=code, nickname="Nexora", text=text, kind="system", created_at=utcnow(),
+                      event=event, subject=subject)
     await db.room_messages.insert_one(msg.to_mongo())
     return message_view(msg)
 
@@ -262,6 +280,7 @@ def message_view(m: RoomMessage) -> dict:
     return {
         "id": m.msg_id, "room_code": m.room_code, "participant_id": m.participant_id, "nickname": m.nickname,
         "text": m.text, "kind": m.kind, "client_id": m.client_id, "created_at": iso(m.created_at),
+        "event": m.event, "subject": m.subject,
     }
 
 

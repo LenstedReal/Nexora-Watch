@@ -9,6 +9,7 @@
   - APK sayfası:     sayfanın en altındaki kodda  var APK_SITE = "https://..."  (boşsa kart "Yakında" yazar)
   - Projeler:        id="projects" içindeki .proj kartları: oyunlar, uygulamalar (kopyala-yapıştır ile yenisini ekle)
   - Bağlantılar:     id="links" içindeki a etiketleri
+  - Gizlilik notu:   gizlilik.html (alt bilgideki "Gizlilik" bağlantısı oraya gider)
   Yayına alma: main dalına push yeterli; GitHub Actions siteyi kendisi günceller.
   Kurallar: bu sayfada 18+ uygulama adı ya da görseli yer almaz; Google Play'deki oyunların yanında
   APK ya da kısaltılmış bağlantı olmaz.
@@ -120,10 +121,23 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
 .sys{list-style:none;display:grid;gap:10px 26px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));margin-top:14px;color:var(--mut);font-size:15px}
 .sys li b{color:#e4e4ee;font-weight:700}
 .lv{list-style:none;display:grid;gap:12px;margin-top:14px;max-width:720px}
-.lv li{display:grid;grid-template-columns:minmax(110px,150px) 1fr 58px;align-items:center;gap:12px;font-size:15px}
+.lv li{display:grid;grid-template-columns:minmax(110px,180px) minmax(60px,1fr) 58px;align-items:center;gap:12px;font-size:15px;line-height:1.3}
 .lv li>i{height:8px;border-radius:99px;background:var(--s2);border:1px solid var(--bd);position:relative;overflow:hidden}
 .lv li>i::after{content:"";position:absolute;inset:0;width:var(--w);background:var(--grad);border-radius:99px}
 .lv li>b{font-size:12px;font-weight:700;text-align:center;padding:4px 0;border-radius:99px;background:var(--s2);border:1px solid var(--bd);color:#c9c9d8}
+/* --- telefon menüsü: 560px altında bağlantılar düğmeyle açılır (masaüstü görünümü değişmedi) --- */
+.menu{display:none;width:44px;height:44px;border-radius:13px;border:1px solid #ffffff26;background:#ffffff0a;color:var(--tx);align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.menu svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.menu .m2,nav.open .menu .m1{display:none}
+nav.open .menu .m2{display:inline}
+@media (max-width:560px){
+  nav{position:relative}
+  .menu{display:inline-flex}
+  nav.open .links{display:flex;flex-direction:column;gap:2px;position:absolute;top:58px;right:0;z-index:30;min-width:210px;padding:8px;border-radius:18px;background:#14141ff2;border:1px solid var(--bd);box-shadow:0 26px 60px -18px #000,0 0 0 1px #ffffff08 inset;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  nav.open .links a{padding:13px 14px;border-radius:12px;font-size:15px;font-weight:500;color:var(--tx)}
+  nav.open .links a:active{background:#ffffff14}
+}
+@media (max-width:340px){h1{font-size:38px;letter-spacing:-1.5px}}
 @media (prefers-reduced-motion:reduce){.bg i{animation:none}.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
 </style>
 </head>
@@ -132,7 +146,8 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
 <main>
   <nav>
     <div class="logo">Lensted<span>Real</span></div>
-    <div class="links"><a href="#about">Hakkımda</a><a href="#skills">Yetenekler</a><a href="#projects">Projeler</a><a href="#services">Hizmetler</a><a href="#links">İletişim</a></div>
+    <button class="menu" id="menu-btn" type="button" aria-label="Menü" aria-expanded="false" aria-controls="nav-links"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="m1" d="M4 7h16M4 12h16M4 17h16"/><path class="m2" d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="links" id="nav-links"><a href="#about">Hakkımda</a><a href="#skills">Yetenekler</a><a href="#projects">Projeler</a><a href="#services">Hizmetler</a><a href="#links">İletişim</a></div>
   </nav>
 
   <header class="hero">
@@ -159,11 +174,11 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
     <span class="k">Yetenekler</span>
     <h2>Neler yapıyorum?</h2>
     <div class="grid">
-      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.500z"/></svg></div><h3>HLS &amp; Streaming</h3><p>M3U8 yayın sistemleri, medya akışları, yayın filtreleme, proxy/stream katmanları ve yüksek performanslı yayın altyapıları.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></div><h3>HLS &amp; Streaming</h3><p>M3U8 yayın sistemleri, medya akışları, yayın filtreleme, proxy/stream katmanları ve yüksek performanslı yayın altyapıları.</p></div>
       <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></svg></div><h3>Gerçek zamanlı sistemler</h3><p>WebSocket tabanlı senkron oynatma, saat eşitleme, sohbet ve canlı durum altyapıları.</p></div>
       <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></div><h3>VoIP &amp; Servis Altyapıları</h3><p>VoIP servisleri, bağlantı altyapıları ve özel servis entegrasyonları; kurulum, yapılandırma ve sürdürülebilir işletim.</p></div>
       <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></svg></div><h3>Web, Mobil &amp; Backend</h3><p>Modern web ve mobil uygulamalar, API mimarileri; FastAPI, Next.js, React / React Native.</p></div>
-      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.800a2 2 0 0 0 1.300 1.300L21 12l-5.800 1.900a2 2 0 0 0-1.300 1.300L12 21l-1.900-5.800a2 2 0 0 0-1.300-1.300L3 12l5.800-1.900a2 2 0 0 0 1.300-1.300z"/></svg></div><h3>Cloud &amp; AI</h3><p>Cloudflare R2/Tunnels, Oracle Cloud, Docker, Linux; özel AI modülleri, agent tabanlı sistemler ve otomasyon.</p></div>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg></div><h3>Cloud &amp; AI</h3><p>Cloudflare R2/Tunnels, Oracle Cloud, Docker, Linux; özel AI modülleri, agent tabanlı sistemler ve otomasyon.</p></div>
       <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 14h.01M15 14h.01M2 13v3M22 13v3"/><circle cx="12" cy="3" r="1"/></svg></div><h3>Botlar &amp; Otomasyon</h3><p>Telegram ve Discord botları, zamanlanmış görevler, terminal betikleri; bir işi insan eli değmeden baştan sona yürüten sistemler.</p></div>
       <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="11" rx="5.5"/><path d="M7 11v3M5.5 12.5h3M15.5 11.5h.01M18 13.5h.01"/></svg></div><h3>Mobil oyun</h3><p>Fikirden mağazaya mobil oyun: oynanış, liderlik tablosu, görevler, reklam entegrasyonu, hukuk sayfaları ve Google Play yayın süreci.</p></div>
       <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/></svg></div><h3>Entegrasyonlar</h3><p>Üçüncü taraf API'ler, reklam SDK'ları (AdMob, InMobi), abonelik, depolama ve bildirim servisleri; farklı sistemleri tek akışta birbirine bağlama.</p></div>
@@ -189,9 +204,11 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
     <ul class="lv">
       <li><span>Python</span><i style="--w:92%"></i><b>İleri</b></li>
       <li><span>C++ (Visual Studio)</span><i style="--w:88%"></i><b>İleri</b></li>
-      <li><span>Modelleme</span><i style="--w:86%"></i><b>İleri</b></li>
+      <li><span>Photoshop &amp; Illustrator</span><i style="--w:86%"></i><b>İleri</b></li>
+      <li><span>Tablo ve grafik çizimi</span><i style="--w:84%"></i><b>İleri</b></li>
       <li><span>Excel</span><i style="--w:68%"></i><b>İyi</b></li>
-      <li><span>JavaScript</span><i style="--w:40%"></i><b>Temel</b></li>
+      <li><span>JavaScript</span><i style="--w:58%"></i><b>Orta</b></li>
+      <li><span>React &amp; Next.js</span><i style="--w:56%"></i><b>Orta</b></li>
       <li><span>SQL</span><i style="--w:36%"></i><b>Temel</b></li>
     </ul>
   </section>
@@ -221,6 +238,13 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
         <p>Senkronize birlikte izleme. Oda kur, kodu paylaş; YouTube, video bağlantıları ve kendi videolarınla aynı anda izle. Better than Rave.</p>
         <div class="act"><a class="btn p s" href="https://nexora.lenstedreal.info">Web'de dene →</a><span class="btn g s off">Yakında Google Play'de</span></div>
       </div>
+      <div class="proj">
+        <span class="st">Web'de yayında</span>
+        <img src="lovematrix.svg" alt="Love Matrix" width="52" height="52">
+        <h3>Love Matrix</h3>
+        <p>Terminal temalı romantik web deneyimi. Komutu yaz, erişimi aç; geri sayımın sonunda kalp çekirdeği açılır. “Seni seviyorum”un 100 dildeki karşılığı da içinde.</p>
+        <div class="act"><a class="btn p s" href="https://lovematrix.vercel.app" target="_blank" rel="noopener">Web'de aç →</a></div>
+      </div>
       <div class="proj" id="apk-card">
         <div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg></div>
         <h3>APK indirmeler</h3>
@@ -237,7 +261,7 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
       <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></div><h3>VoIP sanal numara</h3><p>Ülke çapında sanal numara satışı ve kurulumu.</p>
         <ul><li>Kod sistemi: numaraya gelen doğrulama kodlarını alma</li><li>Garantili hizmetler</li><li>Numaranın telefona, santrale ya da uygulamaya yönlendirilmesi</li><li>Kurulum, yapılandırma ve sonrasında destek</li></ul>
         <div class="act"><a class="btn p s" href="mailto:lenstedreal@gmail.com?subject=VoIP%20sanal%20numara">İletişime geç →</a></div></div>
-      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.500z"/></svg></div><h3>HLS yayın kurulumu</h3><p>Sitene çalışan bir yayın oynatıcısı.</p>
+      <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg></div><h3>HLS yayın kurulumu</h3><p>Sitene çalışan bir yayın oynatıcısı.</p>
         <ul><li>HLS.js ile web oynatıcı</li><li>M3U8 yayın akışının kurulması</li><li>Oynatıcının sitene gömülmesi</li></ul>
         <div class="act"><a class="btn p s" href="mailto:lenstedreal@gmail.com?subject=HLS%20yay%C4%B1n%20kurulumu">İletişime geç →</a></div></div>
       <div class="proj"><div class="ph"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9 14h.01M15 14h.01M2 13v3M22 13v3"/><circle cx="12" cy="3" r="1"/></svg></div><h3>Bot ve otomasyon</h3><p>İhtiyacına göre bot ya da otomasyon.</p>
@@ -258,7 +282,7 @@ footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px +
     </div>
   </section>
 
-  <footer><span>© <span id="y"></span> LenstedReal</span><span><a href="https://nexora.lenstedreal.info/gizlilik">Gizlilik</a></span></footer>
+  <footer><span>© <span id="y"></span> LenstedReal</span><span><a href="gizlilik.html">Gizlilik</a></span></footer>
 </main>
 <script>
 /* ---- APK sayfası: adresi buraya yaz; boş kalırsa kart "Yakında" yazar ---- */
@@ -268,6 +292,17 @@ var APK_SITE = "";
   if (!a || !/^https:\/\/[^\s"<>]+$/.test(APK_SITE)) return;
   a.href = APK_SITE; a.target = "_blank"; a.rel = "noopener"; a.textContent = "APK sayfasına git →";
   a.classList.remove("off"); a.removeAttribute("aria-disabled");
+})();
+/* ---- telefon menüsü ---- */
+(function () {
+  var nav = document.querySelector("nav"), btn = document.getElementById("menu-btn");
+  if (!nav || !btn) return;
+  function set(open) { nav.classList.toggle("open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); btn.setAttribute("aria-label", open ? "Menüyü kapat" : "Menü"); }
+  btn.addEventListener("click", function (e) { e.stopPropagation(); set(!nav.classList.contains("open")); });
+  document.addEventListener("click", function (e) { if (nav.classList.contains("open") && !e.target.closest("#nav-links")) set(false); });
+  document.getElementById("nav-links").addEventListener("click", function (e) { if (e.target.closest("a")) set(false); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && nav.classList.contains("open")) { set(false); btn.focus(); } });
+  window.addEventListener("resize", function () { if (window.innerWidth > 560) set(false); });
 })();
 document.getElementById("y").textContent=new Date().getFullYear();
 var io="IntersectionObserver"in window?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{threshold:.12}):null;

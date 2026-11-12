@@ -28,26 +28,27 @@ export const PeopleList = ({ room, me, peerState, isHost, onReport, onKick, onMa
     <>
       <div className="ph">{t("people")} <span data-testid="participants-count">{online} {t("online")}</span></div>
       <div className="plist" data-testid="participants-panel">
-        {room.participants.map((p) => (
-          <div key={p.id} className="prow" data-testid={`participant-${p.id}`}>
-            <Avatar name={p.nickname} online={p.online} host={p.is_host} />
-            <div className="nm">
-              <b>{p.nickname}{p.id === me ? ` (${t("you")})` : ""}</b>
-              <small>{p.online ? t("online") : "—"}</small>
+        {room.participants.map((p) => {
+          const other = p.id !== me;
+          // The buttons form one group: on a narrow screen the whole group moves below the name instead of squeezing it away.
+          const acts = [
+            other && onReport && <button key="report" className="pact" onClick={() => onReport(p)} title={t("report_title")} data-testid={`report-${p.id}`}>{t("report_short")}</button>,
+            isHost && !p.is_host && other && p.online && onMakeHost && <button key="host" className="pact" onClick={() => onMakeHost(p)} data-testid={`make-host-${p.id}`}>{t("make_host")}</button>,
+            isHost && !p.is_host && other && onKick && <button key="kick" className="pact danger" onClick={() => onKick(p)} data-testid={`kick-${p.id}`}>{t("kick")}</button>,
+          ].filter(Boolean);
+          return (
+            <div key={p.id} className="prow" data-testid={`participant-${p.id}`}>
+              <Avatar name={p.nickname} online={p.online} host={p.is_host} />
+              <div className="nm">
+                <b>{p.nickname}{p.id === me ? ` (${t("you")})` : ""}</b>
+                <small>{p.online ? t("online") : "—"}</small>
+              </div>
+              {peerState[p.id]?.buffering && <Loader2 size={14} className="spin" />}
+              {p.is_host && <span className="tag">HOST</span>}
+              {acts.length > 0 && <div className="pacts">{acts}</div>}
             </div>
-            {peerState[p.id]?.buffering && <Loader2 size={14} className="spin" />}
-            {p.is_host && <span className="tag">HOST</span>}
-            {p.id !== me && onReport && (
-              <button className="pact" onClick={() => onReport(p)} title={t("report_title")} data-testid={`report-${p.id}`}>{t("report_short")}</button>
-            )}
-            {isHost && !p.is_host && p.id !== me && p.online && onMakeHost && (
-              <button className="pact" onClick={() => onMakeHost(p)} data-testid={`make-host-${p.id}`}>{t("make_host")}</button>
-            )}
-            {isHost && !p.is_host && p.id !== me && onKick && (
-              <button className="pact danger" onClick={() => onKick(p)} data-testid={`kick-${p.id}`}>{t("kick")}</button>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );

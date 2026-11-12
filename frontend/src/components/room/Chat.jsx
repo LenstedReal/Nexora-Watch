@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SendHorizontal, MessageCircle, Flag } from "lucide-react";
-import { useI18n } from "@/i18n";
+import { systemText, useI18n } from "@/i18n";
 import { EMOJI_LIST as EMOJI } from "@/hooks/useRoomConnection";
 import { Avatar } from "./Participants";
 
@@ -34,7 +34,7 @@ export const Chat = ({ messages, me, onSend, onReport }) => {
           </div>
         )}
         {messages.map((m, i) => {
-          if (m.kind === "system") return <div key={m.id} className="sys">{m.text}</div>;
+          if (m.kind === "system") return <div key={m.id} className="sys" data-testid="chat-system">{systemText(t, m)}</div>;
           const prev = messages[i - 1];
           const cont = prev && prev.kind !== "system" && prev.participant_id === m.participant_id;
           return (
@@ -58,7 +58,7 @@ export const Chat = ({ messages, me, onSend, onReport }) => {
       </div>
       <form className="send" onSubmit={submit}>
         <input value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder={t("msg_ph")} data-testid="chat-input" />
-        <button aria-label="send" data-testid="chat-send-btn"><SendHorizontal size={18} /></button>
+        <button aria-label={t("send")} data-testid="chat-send-btn"><SendHorizontal size={18} /></button>
       </form>
     </div>
   );

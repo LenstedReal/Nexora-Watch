@@ -1,16 +1,26 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { I18nProvider } from "@/i18n";
 import Home from "@/pages/Home";
 import RoomPage from "@/pages/Room";
 import { ConsentGate } from "@/components/ConsentGate";
 import { ChildSafety, Copyright, DeleteData, Kvkk, Privacy, Terms } from "@/pages/Legal";
+import { checkForUpdate } from "@/lib/update";
+
+/** Leaving a room (or any page change) is a good moment to move to a newer release, if there is one. */
+function UpdateWatcher() {
+  const { pathname } = useLocation();
+  useEffect(() => { checkForUpdate(); }, [pathname]);
+  return null;
+}
 
 export default function App() {
   return (
     <I18nProvider>
       <BrowserRouter>
+        <UpdateWatcher />
         <ConsentGate>
         <Routes>
           <Route path="/" element={<Home />} />

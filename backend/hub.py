@@ -51,6 +51,12 @@ class Hub:
         except Exception:
             pass
 
+    async def send_to(self, code: str, pid: str, data: dict):
+        """Sends to one participant of a room, if connected."""
+        ws = self.rooms.get(code, {}).get(pid)
+        if ws is not None:
+            await self.send(ws, data)
+
     async def broadcast(self, code: str, data: dict, exclude: str | None = None):
         payload = json.dumps(data, ensure_ascii=False)
         for pid, ws in list(self.rooms.get(code, {}).items()):

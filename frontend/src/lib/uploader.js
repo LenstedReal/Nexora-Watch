@@ -10,7 +10,7 @@ function putPart(url, blob, onProgress, signal) {
     xhr.open("PUT", url);
     xhr.upload.onprogress = (e) => onProgress(e.loaded);
     xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new ApiError(xhr.status, `http_${xhr.status}`, `HTTP ${xhr.status}`)));
-    xhr.onerror = () => reject(new ApiError(0, "network", "Ağ hatası"));
+    xhr.onerror = () => reject(new ApiError(0, "unreachable", "Ağ hatası"));
     xhr.onabort = () => reject(new ApiError(-1, "aborted", "İptal edildi"));
     signal.addEventListener("abort", () => xhr.abort(), { once: true });
     xhr.send(blob);

@@ -16,7 +16,7 @@ export const TopBar = ({ room, status, attempt, isHost, onBack, onLeave, onClose
   const label = status === "reconnecting" ? t("st_reconnecting", { n: attempt }) : t(`st_${status}`);
   return (
     <header className="top" data-testid="room-topbar">
-      <button className="ib" onClick={onBack} aria-label="back" data-testid="room-back-btn"><ArrowLeft size={20} /></button>
+      <button className="ib" onClick={onBack} aria-label={t("back")} data-testid="room-back-btn"><ArrowLeft size={20} /></button>
       <div className="top-title">
         <b data-testid="room-name">{room.name}</b>
         <button className="code" onClick={() => copy(room.code, t("code_copied"))} data-testid="room-code-copy-btn">{room.code} <Copy size={11} /></button>
@@ -24,7 +24,7 @@ export const TopBar = ({ room, status, attempt, isHost, onBack, onLeave, onClose
       <span className="online-pill" title={t("online")} data-testid="online-count"><Users size={12} /> {room.participants.filter((p) => p.online).length}</span>
       <span className={`dot ${DOT[status] ?? ""}`} title={label} data-testid="connection-status" />
       <span className="status-txt">{label}</span>
-      <button className="invite" onClick={share} data-testid="invite-btn"><Share2 size={15} /> {t("invite")}</button>
+      <button className="invite" onClick={share} aria-label={t("invite")} title={t("invite")} data-testid="invite-btn"><Share2 size={15} /> <span>{t("invite")}</span></button>
       <div className="menu-wrap">
         <button className="ib" onClick={() => setOpen((o) => !o)} aria-label={t("menu")} data-testid="room-menu-btn"><MoreVertical size={20} /></button>
         {open && (

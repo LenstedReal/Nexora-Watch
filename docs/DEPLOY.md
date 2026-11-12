@@ -19,6 +19,18 @@ Mevcut kurulum: Oracle Cloud **zeppelin** (Ubuntu 24.04, 1 GB RAM + 2 GB swap), 
 
 Canlıdaki sürüm: <https://nexora.lenstedreal.info/version.txt> (`<uygulama sürümü> <commit>`).
 
+### Yeni sürüm kullanıcıya nasıl ulaşır?
+- İki sitede de sayfalar tarayıcının önbelleğinden sunucuya sorulmadan açılmaz (`Cache-Control: no-cache`). Yalnızca
+  uygulamanın, adı her derlemede değişen dosyaları (`/static/...`) kalıcı olarak önbelleğe alınır. Kurallar
+  `deploy/Caddyfile` içindedir.
+- Açık kalmış bir sekme ya da arka planda bekleyen mobil uygulama, `/version.txt` dosyasına bakarak yeni sürümü
+  kendisi fark eder ve sayfayı yeniler (`frontend/src/lib/update.js`). Oda içindeyken ya da yazı yazılırken
+  yenilemez; odadan çıkılınca yeniler. Her yeni sürüm için en fazla bir kez dener.
+- Eski bir sayfa, sunucuda artık bulunmayan bir uygulama dosyasını isterse kendini bir kez yeniler; yine
+  olmazsa "yüklenemedi" mesajı ve "Yeniden dene" düğmesi çıkar (`frontend/public/index.html`).
+- `deploy/Caddyfile` imaj derlenirken denetlenir (`deploy/web.Dockerfile`). Hatalıysa derleme durur, sunucuya
+  dokunulmaz ve canlı site eski sürümle çalışmaya devam eder.
+
 **Sunucuda `--build` çalıştırma.** Elle yeniden başlatmak gerekirse (imajlar zaten sunucudadır):
 ```bash
 cd ~/Nexora-Watch
@@ -31,6 +43,7 @@ sudo docker compose ps
 |---|---|
 | Sunucuya SSH ile bağlanılamadı | `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` secret'larını kontrol et; sunucu açık mı? |
 | Sunucudaki kopya ileri sarılamıyor | Sunucuda `cd ~/Nexora-Watch && git status`: değişmiş dosya varsa `git stash` ile kenara al, sonra işi GitHub'dan yeniden çalıştır. `.env` ve `docker-compose.override.yml` izlenmeyen dosyalardır, etkilenmez. |
+| İmajlar derlenemedi, hata `caddy validate` adımında | `deploy/Caddyfile` içinde yazım hatası var; satırı derleme çıktısında yazar. Sunucu eski sürümle çalışmaya devam eder. |
 | İmaj indirilemedi | Disk dolu olabilir: `df -h /` ve `sudo docker system df` |
 | Yeni sürüm cevap vermiyor | Hata satırının üstündeki `docker compose logs` çıktısına bak; `.env` eksik ya da hatalı olabilir |
 | Başka bir güncelleme hâlâ çalışıyor | Bitmesini bekle, sonra işi yeniden çalıştır |

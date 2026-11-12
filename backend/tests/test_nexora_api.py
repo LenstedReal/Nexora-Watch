@@ -317,3 +317,25 @@ def test_drive_import_rejects_non_drive(room):
     r = requests.post(f"{API}/uploads/import", json={"code": room["code"], **cred(room["host"]), "url": "https://example.com/a.mp4"})
     # room may already be closed by the close test depending on order -> 410 is acceptable too
     assert r.status_code in (400, 410), r.text
+
+
+# Chat lines about the room say what happened and to whom, so every client can show them in its own language.
+def test_room_events_are_labelled_for_translation():
+    h = requests.post(f"{API}/rooms", json={"nickname": "TEST_Deniz", "name": "TEST olaylar"}).json()
+    code = h["room"]["code"]
+    g = requests.post(f"{API}/rooms/{code}/join", json={"nickname": "TEST_Elif"}).json()
+    assert requests.post(f"{API}/rooms/{code}/leave", json=cred(g)).status_code == 200
+    msgs = requests.get(f"{API}/rooms/{code}/messages").json()
+    events = [(m.get("event"), m.get("subject")) for m in msgs if m["kind"] == "system"]
+    assert events == [("created", "TEST_Deniz"), ("joined", "TEST_Elif"), ("left", "TEST_Elif")]
+    assert all(m["text"] for m in msgs)  # older clients still get a readable line
+    assert requests.post(f"{API}/rooms/{code}/close", json=cred(h)).status_code == 200
+
+
+# A room created without a name: "<nickname>'s room" with the Turkish suffix that fits the name.
+def test_default_room_name_uses_the_right_turkish_suffix():
+    for nick, want in (("TEST_Deniz", "TEST_Deniz'in odası"), ("TEST_Ayşe", "TEST_Ayşe'nin odası"),
+                       ("TEST_Umut", "TEST_Umut'un odası"), ("TEST_Gül", "TEST_Gül'ün odası")):
+        h = requests.post(f"{API}/rooms", json={"nickname": nick}).json()
+        assert h["room"]["name"] == want
+        requests.post(f"{API}/rooms/{h['room']['code']}/close", json=cred(h))
