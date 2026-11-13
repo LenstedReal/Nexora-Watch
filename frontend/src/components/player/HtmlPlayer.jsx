@@ -104,5 +104,10 @@ export const HtmlPlayer = ({ video, ident, playerRef, events, onFatal, onMedia }
     };
   }, [src, video.kind, playerRef, onFatal, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <video ref={ref} playsInline preload="auto" className="html-video" data-testid="html-video-player" />;
+  const sub = video.subtitle; // feat worker: the room's subtitle file; each viewer turns it on in the subtitles menu
+  return (
+    <video ref={ref} playsInline preload="auto" className="html-video" data-testid="html-video-player">
+      {sub && <track key={sub.id} kind="subtitles" src={absUrl(sub.url)} label={sub.name.replace(/\.(srt|vtt)$/i, "")} srcLang="und" data-room-sub="1" />}
+    </video>
+  );
 };

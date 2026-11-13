@@ -46,3 +46,21 @@ export function openExternal(url) {
 
 export const setOrientation = (mode) => postNative({ type: "orientation", mode }); // "landscape" | "portrait"
 export const setKeepAwake = (on) => postNative({ type: "keep_awake", on: !!on });
+
+/** Asks the app for notification permission and lets it send its push token for this device. Resolves with
+ * {ok, reason?}; outside the app (or an older app version without "push") resolves {ok:false, reason:"no_app"}. */
+export function enableAppPush(device) {
+  return new Promise((resolve) => {
+    if (!appInfo()?.caps?.includes("push")) return resolve({ ok: false, reason: "no_app" });
+    const prev = window.__nexoraPush;
+    window.__nexoraPush = (res) => {
+      window.__nexoraPush = prev;
+      resolve(res || { ok: false });
+    };
+    if (!postNative({ type: "push_enable", device_id: device.id, key: device.key, origin: window.location.origin })) {
+      window.__nexoraPush = prev;
+      resolve({ ok: false, reason: "no_app" });
+    }
+  });
+}
+export const canAppPush = () => !!appInfo()?.caps?.includes("push");

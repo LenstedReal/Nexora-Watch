@@ -133,6 +133,55 @@ sudo docker system df                    # docker kullanımı
 sudo docker compose exec mongo mongodump --db nexora --archive > ~/nexora-$(date +%F).archive   # veritabanı yedeği
 ```
 
+## Yedekleme (her gece, 7 gün saklanır)
+
+`deploy/backup.sh`, `mongo` konteynerinin içinde `mongodump` çalıştırır (compose ağının içinde; dışarıya port
+açılmaz) ve sıkıştırılmış arşivi `/srv/backups/nexora-YYYYMMDD.gz` olarak yazar. 7 günden eski arşivleri siler.
+Döküm başarısız olursa eski yedek bozulmaz (önce `.part` dosyasına yazılır).
+
+Sunucuda bir kez `sudo crontab -e` ile şu satırı ekle (her gece 03:17):
+```
+17 3 * * * NEXORA_DIR=/home/ubuntu/Nexora-Watch /home/ubuntu/Nexora-Watch/deploy/backup.sh >> /var/log/nexora-backup.log 2>&1
+```
+Kontrol: `ls -lh /srv/backups` ve `tail /var/log/nexora-backup.log`. Ayarlar (gerekirse satırın başına):
+`BACKUP_DIR` (varsayılan `/srv/backups`), `KEEP_DAYS` (varsayılan 7).
+
+Geri yükleme (mevcut veriyi yedektekiyle değiştirir):
+```bash
+cd ~/Nexora-Watch
+gunzip -c /srv/backups/nexora-20261113.gz | sudo docker compose exec -T mongo mongorestore --archive --drop
+```
+Not: yedek aynı diskte durur; disk kaybına karşı ara sıra bir kopyayı başka yere (ör. telefona `scp`) al.
+
+## ARM (Ampere A1) sunucuya geçiş
+
+Kodda değişiklik gerekmez: `deploy.yml` iki imajı da `linux/amd64,linux/arm64` için derleyip GHCR'a koyar
+(QEMU + buildx). Taban imajların hepsi ARM destekler: `python:3.12-slim`, `caddy:2`, `mongo:7`
+(web derlemesi `node:20-alpine` GitHub makinesinin kendi mimarisinde çalışır, çıktısı mimariden bağımsızdır).
+Sunucu `docker compose pull` yaptığında kendi mimarisine uyan imajı otomatik alır. Backend paketleri (fastapi,
+uvicorn, motor, pymongo, boto3…) ARM için hazır wheel olarak gelir. Not: `mongo:7` ARM'da ARMv8.2 ister; Ampere A1
+bunu karşılar (Raspberry Pi 4 gibi eski ARM'lar karşılamaz).
+
+Adımlar (eski sunucu, yenisi hazır olana kadar çalışmaya devam eder):
+1. Oracle Cloud → Compute → Instance oluştur: şekil `VM.Standard.A1.Flex` (ücretsiz katman: toplam 4 OCPU / 24 GB),
+   imaj Ubuntu 24.04 **aarch64**. Ağ: aynı VCN; güvenlik listesinde 80 ve 443 açık olsun (bkz. "Oracle güvenlik").
+2. Yeni sunucuya Docker ve compose eklentisini kur (Docker'ın resmî Ubuntu kurulumu ARM'ı da destekler), sonra
+   depoyu `~/Nexora-Watch` olarak klonla.
+3. Eski sunucudan `.env` dosyasını kopyala. `docker-compose.override.yml` içindeki 1 GB ayarları ARM'da gerekmez;
+   istersen `mem_limit` değerlerini yükselt ya da dosyayı hiç koyma.
+4. Veriyi taşı: eski sunucuda `deploy/backup.sh` çalıştır, `/srv/backups/nexora-YYYYMMDD.gz` dosyasını yenisine
+   `scp` ile kopyala; yenisinde önce yalnız mongo'yu başlat (`sudo docker compose up -d --no-build mongo`), sonra
+   "Yedekleme" bölümündeki geri yükleme komutunu çalıştır. Yüklenen videolar (S3/yerel klasör) kullanılıyorsa onları da kopyala.
+5. Yenisinde `sudo docker compose --profile tls up -d --no-build` (imajlar GHCR'dan çekilir, sunucuda derleme yok).
+6. Cloudflare DNS'te `nexora`, `me` ve `apk` kayıtlarını yeni sunucunun genel IP'sine çevir. Caddy sertifikaları
+   kendisi alır (ilk istek birkaç saniye sürebilir).
+7. GitHub → Settings → Secrets: `DEPLOY_HOST` değerini yeni IP ile değiştir; `DEPLOY_SSH_KEY`'in açık anahtarını
+   yeni sunucunun `~/.ssh/authorized_keys` dosyasına ekle. Bir sonraki push yeni sunucuya gider.
+8. Kontrol: `https://nexora.lenstedreal.info/api/health` ve `/version.txt`. Nightly yedek için crontab satırını yeni
+   sunucuya da ekle. Her şey birkaç gün sorunsuz çalışınca eski VM'i kapat.
+
+Bu adımlar burada denenmedi (gerçek bir ARM sunucusu yok); yalnızca imaj ve paket uyumluluğu kontrol edildi.
+
 ## Otomatik deploy: tek seferlik kurulum
 
 Akış yukarıda ("Güncelleme"). GHCR için ayar gerekmez: sunucu, işin kendi geçici anahtarıyla giriş yapar ve

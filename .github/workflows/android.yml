@@ -78,6 +78,19 @@ jobs:
             echo "::warning::ANDROID_KEYSTORE_BASE64 secret missing - building with the DEBUG key (not for Google Play)"
           fi
 
+      # Push notifications (docs/PUSH.md): secret GOOGLE_SERVICES_JSON = base64 of google-services.json.
+      # Without it the app builds the same, only push is off.
+      - name: Restore google-services.json
+        env:
+          GSJ_B64: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GSJ_B64" ]; then
+            echo "$GSJ_B64" | base64 -d > google-services.json
+            echo "Push: google-services.json restored"
+          else
+            echo "::notice::GOOGLE_SERVICES_JSON secret missing - push notifications off"
+          fi
+
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install --clean
 

@@ -1,10 +1,8 @@
 .git
 **/node_modules
 apps/mobile
-archive
 tests/*.webm
 backend/data
 backend/.env
 .env
-.screenshots
 frontend/build

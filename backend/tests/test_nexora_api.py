@@ -126,6 +126,22 @@ def test_playback_seq(room):
     assert r.status_code == 400
 
 
+def test_playback_rate(room):
+    url = f"{API}/rooms/{room['code']}/playback"
+    seq = 2 * 10**13
+    r = requests.put(url, json={**cred(room["host"]), "playing": True, "position": 4, "seq": seq, "media_id": room["media_id"], "rate": 1.5})
+    assert r.status_code == 200 and r.json()["applied"] is True and r.json()["rate"] == 1.5
+    # a command without rate keeps the current speed
+    r = requests.put(url, json={**cred(room["host"]), "playing": False, "position": 5, "seq": seq + 1, "media_id": room["media_id"]})
+    assert r.json()["rate"] == 1.5
+    assert requests.get(f"{API}/rooms/{room['code']}").json()["playback"]["rate"] == 1.5
+    for bad in (0.1, 3, "2", True, 0):
+        r = requests.put(url, json={**cred(room["host"]), "playing": True, "position": 5, "seq": seq + 2, "rate": bad})
+        assert r.status_code == 400, bad
+    r = requests.put(url, json={**cred(room["host"]), "playing": True, "position": 5, "seq": seq + 3, "media_id": room["media_id"], "rate": 1})
+    assert r.json()["rate"] == 1
+
+
 def test_resolve_youtube():
     r = requests.post(f"{API}/resolve", json={"url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ"})
     assert r.status_code == 200 and r.json()["kind"] == "youtube" and r.json()["video_id"] == "aqz-KE-bpKQ"
@@ -230,6 +246,20 @@ def test_drm_and_unsupported_sites_rejected(room):
     assert r.status_code == 403 and r.json()["code"] == "drm_not_allowed"
     r = requests.post(f"{API}/resolve", json={"url": MP4, "referer": "https://some-random-site.example/movie"})
     assert r.status_code == 403 and r.json()["code"] == "site_not_supported"
+
+
+def test_service_link_becomes_app_only_room_video(room):
+    """Beta: a Netflix/Disney+/Prime Video/HBO Max title link is a "service" video watched in the app (services.py)."""
+    if not requests.get(f"{API}/config").json().get("services_enabled"):
+        pytest.skip("SERVICES_ENABLED=0 on this server")
+    h = cred(room["host"])
+    r = requests.put(f"{API}/rooms/{room['code']}/video", json={**h, "url": "https://www.netflix.com/watch/80100172?trackId=9"})
+    assert r.status_code == 200, r.text
+    v = r.json()["video"]
+    assert v["kind"] == "service" and v["service"] == "netflix" and v["url"] == "https://www.netflix.com/watch/80100172"
+    assert v["capabilities"]["sync"] and v["capabilities"]["app_only"] and not v.get("stream_url")
+    r = requests.post(f"{API}/resolve", json={"url": "https://www.primevideo.com/detail/0KRGHGZCHKS920ZQGY5LBRF7MA/"})
+    assert r.status_code == 200 and r.json()["service"] == "prime" and r.json()["title"] == "Prime Video"
 
 
 # Reports + moderation
@@ -381,3 +411,177 @@ def test_resolve_kick_live_and_recorded():
     assert live["capabilities"] == {"seek": False, "rate_correction": False, "sync": False}
     rec = requests.post(f"{API}/resolve", json={"url": "https://kick.com/somestreamer/clips/clip_01HABCDEF"})
     assert rec.status_code == 422 and rec.json()["code"] == "kick_recorded"
+
+
+# Queue ("Sıra"): everyone adds and votes, only the host plays/removes, sorted by votes then time
+def _fresh_room():
+    h = requests.post(f"{API}/rooms", json={"nickname": "TEST_q_host"}).json()
+    code = h["room"]["code"]
+    g = requests.post(f"{API}/rooms/{code}/join", json={"nickname": "TEST_q_guest"}).json()
+    return code, h, g
+
+
+def test_queue_add_vote_sort_and_host_rules():
+    code, h, g = _fresh_room()
+    a = requests.post(f"{API}/rooms/{code}/queue", json={**cred(g), "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"})
+    assert a.status_code == 200, a.text
+    b = requests.post(f"{API}/rooms/{code}/queue", json={**cred(h), "url": "https://youtu.be/jNQXAC9IVRw"})
+    assert b.status_code == 200, b.text
+    q = b.json()["queue"]
+    assert [i["url"] for i in q] == ["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://youtu.be/jNQXAC9IVRw"]
+    dup = requests.post(f"{API}/rooms/{code}/queue", json={**cred(g), "url": "https://youtu.be/jNQXAC9IVRw"})
+    assert dup.status_code == 409 and dup.json()["code"] == "queue_duplicate"
+    second = q[1]["id"]
+    v = requests.post(f"{API}/rooms/{code}/queue/{second}/vote", json=cred(g)).json()["queue"]
+    assert v[0]["id"] == second and v[0]["votes"] == [g["participant"]["id"]]
+    v = requests.post(f"{API}/rooms/{code}/queue/{second}/vote", json=cred(g)).json()["queue"]  # toggle off
+    assert v[0]["id"] != second and v[1]["votes"] == []
+    # guests cannot play or remove
+    assert requests.post(f"{API}/rooms/{code}/queue/next", json=cred(g)).status_code == 403
+    assert requests.delete(f"{API}/rooms/{code}/queue/{second}", json=cred(g)).status_code == 403
+    assert requests.post(f"{API}/rooms/{code}/queue", json={"url": "https://youtu.be/x"}).status_code == 401
+    # host plays the top item; it leaves the queue and becomes the room video
+    n = requests.post(f"{API}/rooms/{code}/queue/next", json=cred(h)).json()
+    assert n["room"]["video"]["video_id"] == "dQw4w9WgXcQ" and len(n["room"]["queue"]) == 1
+    # automatic next only when the given video is still the current one
+    stale = requests.post(f"{API}/rooms/{code}/queue/next", json={**cred(h), "after_media_id": "old"}).json()
+    assert stale["played"] is None and len(stale["room"]["queue"]) == 1
+    cur = n["room"]["video"]["media_id"]
+    auto = requests.post(f"{API}/rooms/{code}/queue/next", json={**cred(h), "after_media_id": cur}).json()
+    assert auto["room"]["video"]["video_id"] == "jNQXAC9IVRw" and auto["room"]["queue"] == []
+    r = requests.post(f"{API}/rooms/{code}/queue", json={**cred(g), "url": "https://youtu.be/dQw4w9WgXcQ"}).json()["queue"]
+    assert requests.delete(f"{API}/rooms/{code}/queue/{r[0]['id']}", json=cred(h)).json()["queue"] == []
+
+
+def test_queue_bad_link_and_ws_broadcast():
+    code, h, g = _fresh_room()
+    bad = requests.post(f"{API}/rooms/{code}/queue", json={**cred(g), "url": "not a link"})
+    assert bad.status_code == 400
+
+    async def run():
+        url = f"{WS}?code={code}&participant_id={h['participant']['id']}&token={h['token']}"
+        async with websockets.connect(url) as ws:
+            await asyncio.wait_for(ws.recv(), 5)  # hello
+            await asyncio.get_running_loop().run_in_executor(None, lambda: requests.post(
+                f"{API}/rooms/{code}/queue", json={**cred(g), "url": "https://youtu.be/dQw4w9WgXcQ"}))
+            for _ in range(10):
+                m = json.loads(await asyncio.wait_for(ws.recv(), 5))
+                if m["type"] == "queue":
+                    assert m["queue"][0]["added_by"] == g["participant"]["id"]
+                    return
+            raise AssertionError("no queue broadcast")
+    asyncio.run(run())
+
+
+# Titles of official players: the real video title from the providers' oEmbed endpoints, the channel name for live
+# channels, never a lone "YouTube"/"KICK" page title. Offline over HTTP (the test server may not reach the internet),
+# and in-process with an injected fake fetcher.
+def test_resolve_titles_over_http_never_a_lone_site_word():
+    k = requests.post(f"{API}/resolve", json={"url": "https://kick.com/SomeStreamer", "title": "KICK"}).json()
+    assert k["title"] == "Kick · SomeStreamer"
+    t = requests.post(f"{API}/resolve", json={"url": "https://www.twitch.tv/SomeChannel", "title": "Twitch"}).json()
+    assert t["title"] == "Twitch · SomeChannel"
+    vod = requests.post(f"{API}/resolve", json={"url": "https://www.twitch.tv/SomeChannel/v/2301234567"}).json()
+    assert vod["title"] == "Twitch · SomeChannel"
+    y = requests.post(f"{API}/resolve", json={"url": "https://www.youtube.com/shorts/aqz-KE-bpKQ", "title": "(2) YouTube"}).json()
+    assert y["title"] and y["title"] != "(2) YouTube"  # offline: the neat label "YouTube"; online: the real title
+    v = requests.post(f"{API}/resolve", json={"url": "https://vimeo.com/76979871", "title": "Paper Trail | Videos & Movies on Vimeo"}).json()
+    assert v["title"] != "Paper Trail | Videos & Movies on Vimeo"
+
+
+def _resolver_module():
+    import sys
+    httpx = pytest.importorskip("httpx")  # noqa: F841 - the backend's own dependency
+    here = os.path.dirname(os.path.abspath(__file__))
+    for d in (os.environ.get("NEXORA_BACKEND_DIR"), os.path.join(here, "..")):
+        if d and os.path.exists(os.path.join(d, "resolver.py")) and d not in sys.path:
+            sys.path.insert(0, d)
+    return pytest.importorskip("resolver")
+
+
+def test_resolver_titles_from_oembed_with_cache_and_fallbacks():
+    resolver = _resolver_module()
+    calls = []
+    answers = {}
+
+    async def fake(url):
+        calls.append(url)
+        a = answers.get(url.split("?", 1)[0])
+        if isinstance(a, Exception):
+            raise a
+        return a
+
+    saved = resolver.oembed_fetch
+    resolver.oembed_fetch = fake
+    resolver._title_cache.clear()
+    try:
+        run = lambda u, title=None: asyncio.run(resolver.resolve(u, None, title))  # noqa: E731
+        answers["https://www.youtube.com/oembed"] = {"title": "Big Buck Bunny 60fps 4K", "author_name": "Blender"}
+        r = run("https://youtu.be/aqz-KE-bpKQ", "YouTube")
+        assert r["title"] == "Big Buck Bunny 60fps 4K"
+        assert calls[0].startswith("https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Daqz-KE-bpKQ")
+        run("https://www.youtube.com/watch?v=aqz-KE-bpKQ")
+        assert len(calls) == 1  # cached
+        # oEmbed down: the cleaned page title, else the neat label
+        answers["https://www.youtube.com/oembed"] = OSError("offline")
+        assert run("https://www.youtube.com/watch?v=bbbbbbbbbbb", "(3) Kedi videosu - YouTube")["title"] == "Kedi videosu"
+        assert run("https://www.youtube.com/watch?v=ccccccccccc", "YouTube")["title"] == "YouTube"
+        assert run("https://www.youtube.com/watch?v=ddddddddddd")["title"] == "YouTube"
+        # Vimeo, unlisted hash goes to oEmbed
+        answers["https://vimeo.com/api/oembed.json"] = {"title": "Paper Trail"}
+        v = run("https://vimeo.com/76979871/8272103f6e", "Paper Trail | Videos & Movies on Vimeo")
+        assert v["title"] == "Paper Trail" and "vimeo.com%2F76979871%2F8272103f6e" in calls[-1]
+        answers["https://vimeo.com/api/oembed.json"] = None  # 404 / private
+        assert run("https://vimeo.com/11111111", "Videos & Movies on Vimeo")["title"] == "Vimeo"
+        assert run("https://vimeo.com/22222222", "Gece Yolu on Vimeo")["title"] == "Gece Yolu"
+        # Twitch / Kick: the channel, whatever the page title said; no network for them
+        n = len(calls)
+        assert run("https://kick.com/xQc", "KICK")["title"] == "Kick · xQc"
+        assert run("https://www.twitch.tv/Gaules", "Twitch")["title"] == "Twitch · Gaules"
+        assert run("https://www.twitch.tv/videos/2301234567", "Gaules - Twitch")["title"] == "Twitch · Gaules"
+        assert run("https://www.twitch.tv/videos/2301234568", "Twitch")["title"] == "Twitch"
+        assert len(calls) == n
+        # a slow provider cannot hold the resolve for long
+        async def slow(url):
+            await asyncio.sleep(30)
+        resolver.oembed_fetch = slow
+        saved_t, resolver.OEMBED_TIMEOUT = resolver.OEMBED_TIMEOUT, 0.2
+        import time as _t
+        t0 = _t.monotonic()
+        assert run("https://www.youtube.com/watch?v=eeeeeeeeeee", "Yavaş - YouTube")["title"] == "Yavaş"
+        assert _t.monotonic() - t0 < 2
+        resolver.OEMBED_TIMEOUT = saved_t
+        assert resolver._page_title("Shorts") is None
+    finally:
+        resolver.oembed_fetch = saved
+        resolver._title_cache.clear()
+
+
+# Public rooms ("Açık odalar")
+def test_public_rooms_opt_in():
+    h = requests.post(f"{API}/rooms", json={"nickname": "TEST_host", "name": "TEST herkese"}).json()
+    code = h["room"]["code"]
+    room = {"host": h, "guest": requests.post(f"{API}/rooms/{code}/join", json={"nickname": "TEST_g"}).json()}
+    listed = lambda: [r["code"] for r in requests.get(f"{API}/rooms/public").json()["rooms"]]
+    assert code not in listed()  # private by default
+    assert requests.get(f"{API}/rooms/{code}").json()["public"] is False
+    r = requests.put(f"{API}/rooms/{code}/public", json={**cred(room["guest"]), "public": True})
+    assert r.status_code == 403, r.text  # host only
+    r = requests.put(f"{API}/rooms/{code}/public", json={**cred(room["host"]), "public": "yes"})
+    assert r.status_code == 400, r.text
+    r = requests.put(f"{API}/rooms/{code}/public", json={**cred(room["host"]), "public": True})
+    assert r.status_code == 200 and r.json()["public"] is True, r.text
+    rows = requests.get(f"{API}/rooms/public").json()["rooms"]
+    row = next(x for x in rows if x["code"] == code)
+    assert set(row) == {"code", "name", "video_title", "people"} and len(rows) <= 20
+    requests.put(f"{API}/rooms/{code}/public", json={**cred(room["host"]), "public": False})
+    assert code not in listed()
+
+
+def test_public_rooms_hide_closed():
+    h = requests.post(f"{API}/rooms", json={"nickname": "TEST_pub", "name": "TEST açık"}).json()
+    code = h["room"]["code"]
+    assert requests.put(f"{API}/rooms/{code}/public", json={**cred(h), "public": True}).status_code == 200
+    assert code in [r["code"] for r in requests.get(f"{API}/rooms/public").json()["rooms"]]
+    assert requests.post(f"{API}/rooms/{code}/close", json=cred(h)).status_code == 200
+    assert code not in [r["code"] for r in requests.get(f"{API}/rooms/public").json()["rooms"]]

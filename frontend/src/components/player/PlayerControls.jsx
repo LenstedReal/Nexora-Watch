@@ -34,6 +34,7 @@ const mem = {
 };
 const levelLabel = (l) => (l.h ? `${l.h}p` : `${Math.max(1, Math.round(l.br / 1000))} kbps`);
 const speedLabel = (r) => `${r}×`;
+const ROOM_SUB = "room"; // the room's own subtitle file (<track data-room-sub>), listed next to the stream's tracks
 
 /**
  * "ok" while a guest is within a quarter second of the room, "syncing" while it is being corrected. Two samples in a
@@ -74,7 +75,10 @@ export const PlayerControls = memo(function PlayerControls({ media, stageRef, is
   const [level, setLevel] = useState(-1); // -1 = automatic
   const [autoIdx, setAutoIdx] = useState(-1);
   const [tracks, setTracks] = useState([]);
-  const [track, setTrack] = useState(-1); // -1 = off
+  const [track, setTrack] = useState(-1); // -1 = off, ROOM_SUB = the room's subtitle file
+  const [roomSub, setRoomSub] = useState(null); // with hls.js: {label} of the room's <track>, when the room has one
+  const trackRef = useRef(-1);
+  trackRef.current = track;
   const [pip, setPip] = useState(false);
   const [fs, setFs] = useState(false);
   const [vol, setVol] = useState(() => {
@@ -233,7 +237,11 @@ export const PlayerControls = memo(function PlayerControls({ media, stageRef, is
     };
     const onSwitched = (_e, d) => setAutoIdx(typeof d?.level === "number" ? d.level : -1);
     const onLevel = (_e, d) => { if (d?.details?.live) setLive(true); };
-    const onSub = (_e, d) => setTrack(typeof d?.id === "number" ? d.id : -1);
+    const onSub = (_e, d) => {
+      const id = typeof d?.id === "number" ? d.id : -1;
+      if (id < 0 && trackRef.current === ROOM_SUB) return; // the stream's tracks went off because the room's file is on
+      setTrack(id);
+    };
     const subs = [[Hls.Events.MANIFEST_PARSED, readLevels], [Hls.Events.LEVEL_SWITCHED, onSwitched], [Hls.Events.LEVEL_LOADED, onLevel],
       [Hls.Events.SUBTITLE_TRACKS_UPDATED, readTracks], [Hls.Events.SUBTITLE_TRACK_SWITCH, onSub]].filter(([name]) => name);
     subs.forEach(([name, fn]) => hls.on(name, fn));
@@ -241,6 +249,25 @@ export const PlayerControls = memo(function PlayerControls({ media, stageRef, is
     readTracks();
     return () => subs.forEach(([name, fn]) => { try { hls.off(name, fn); } catch { /* already destroyed */ } });
   }, [hls]);
+  // With hls.js the room's subtitle file is not one of hls.js's tracks: it gets its own entry.
+  const roomTrackEl = useCallback(() => el.querySelector("track[data-room-sub]"), [el]);
+  useEffect(() => {
+    const list = el.textTracks;
+    if (!hls || !list || typeof list.addEventListener !== "function") return undefined;
+    const read = () => {
+      const tr = roomTrackEl();
+      setRoomSub(tr ? { label: tr.label || "1" } : null);
+      if (tr && trackRef.current !== ROOM_SUB && tr.track && tr.track.mode === "showing") tr.track.mode = "disabled";
+      if (!tr && trackRef.current === ROOM_SUB) setTrack(-1);
+    };
+    list.addEventListener("addtrack", read);
+    list.addEventListener("removetrack", read);
+    read();
+    return () => {
+      list.removeEventListener("addtrack", read);
+      list.removeEventListener("removetrack", read);
+    };
+  }, [el, hls, roomTrackEl]);
   // Without hls.js (plain files, iPhone's built-in HLS) subtitles come from the element's own text tracks, when it has any.
   useEffect(() => {
     const list = el.textTracks;
@@ -269,8 +296,11 @@ export const PlayerControls = memo(function PlayerControls({ media, stageRef, is
   const pickTrack = (i) => {
     try {
       if (hls) {
-        hls.subtitleDisplay = i >= 0;
-        hls.subtitleTrack = i;
+        const own = i === ROOM_SUB;
+        hls.subtitleDisplay = !own && i >= 0;
+        hls.subtitleTrack = own ? -1 : i;
+        const tt = roomTrackEl()?.track;
+        if (tt) tt.mode = own ? "showing" : "disabled";
       } else {
         const list = el.textTracks;
         nativeTracks.current.forEach((ti, n) => { list[ti].mode = n === i ? "showing" : "disabled"; });
@@ -453,7 +483,8 @@ export const PlayerControls = memo(function PlayerControls({ media, stageRef, is
 
   const VolIcon = muted || vol === 0 ? VolumeX : vol < 0.5 ? Volume1 : Volume2;
   const hasQuality = levels.length > 1;
-  const hasSubs = tracks.length > 0;
+  const subList = hls && roomSub ? [...tracks, { i: ROOM_SUB, label: roomSub.label }] : tracks;
+  const hasSubs = subList.length > 0;
   const hasSpeed = isHost && !!onRate && !live;
   const pipInMenu = canPip && narrow;
   const hasMenu = hasQuality || hasSubs || hasSpeed || pipInMenu;
@@ -484,7 +515,7 @@ export const PlayerControls = memo(function PlayerControls({ media, stageRef, is
                 <button role="menuitem" onClick={() => setMenu("quality")} data-testid="menu-quality"><span>{t("pl_quality")}</span><small>{qualityText}</small><ChevronRight size={15} /></button>
               )}
               {hasSubs && (
-                <button role="menuitem" onClick={() => setMenu("subs")} data-testid="menu-subs"><span>{t("pl_subtitles")}</span><small>{track < 0 ? t("pl_off") : tracks.find((s) => s.i === track)?.label}</small><ChevronRight size={15} /></button>
+                <button role="menuitem" onClick={() => setMenu("subs")} data-testid="menu-subs"><span>{t("pl_subtitles")}</span><small>{track === -1 ? t("pl_off") : subList.find((s) => s.i === track)?.label}</small><ChevronRight size={15} /></button>
               )}
               {hasSpeed && (
                 <button role="menuitem" onClick={() => setMenu("speed")} data-testid="menu-speed"><span>{t("pl_speed")}</span><small>{rate === 1 ? t("pl_normal") : speedLabel(rate)}</small><ChevronRight size={15} /></button>
@@ -510,8 +541,8 @@ export const PlayerControls = memo(function PlayerControls({ media, stageRef, is
           {menu === "subs" && (
             <>
               <button className="back" onClick={() => setMenu("main")} data-testid="menu-back"><ChevronLeft size={15} /><span>{t("pl_subtitles")}</span></button>
-              <button role="menuitemradio" aria-checked={track < 0} onClick={() => pickTrack(-1)} data-testid="subs-off">{track < 0 ? <Check size={15} /> : <i />}<span>{t("pl_off")}</span></button>
-              {tracks.map((s) => (
+              <button role="menuitemradio" aria-checked={track === -1} onClick={() => pickTrack(-1)} data-testid="subs-off">{track === -1 ? <Check size={15} /> : <i />}<span>{t("pl_off")}</span></button>
+              {subList.map((s) => (
                 <button key={s.i} role="menuitemradio" aria-checked={track === s.i} onClick={() => pickTrack(s.i)} data-testid={`subs-${s.i}`}>
                   {track === s.i ? <Check size={15} /> : <i />}<span>{s.label}</span>
                 </button>

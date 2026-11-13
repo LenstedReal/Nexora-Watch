@@ -124,6 +124,9 @@ export function useRoomConnection(code, ident, initialRoom, onNotice) {
         case "room":
           mergeRoom(data.room);
           break;
+        case "queue":
+          setRoom((prev) => prev && { ...prev, queue: data.queue });
+          break;
         case "playback":
           applyPlayback(data.playback);
           listenersRef.current.forEach((fn) => fn(data));

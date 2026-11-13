@@ -1,3 +1,4 @@
+import { deviceHeaders, getDevice, markRegistered } from "@/lib/device";
 // Empty = same origin (Caddy serves the web app and proxies /api to the backend).
 const BASE = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
 
@@ -11,7 +12,7 @@ export class ApiError extends Error {
 
 const TIMEOUT_MS = 20000;
 
-async function req(method, path, body, timeoutMs = TIMEOUT_MS) {
+async function req(method, path, body, timeoutMs = TIMEOUT_MS, extraHeaders) {
   let res;
   // A request on a dead mobile connection can otherwise hang for minutes with no feedback.
   const ctrl = typeof AbortController === "function" ? new AbortController() : null;
@@ -19,7 +20,7 @@ async function req(method, path, body, timeoutMs = TIMEOUT_MS) {
   try {
     res = await fetch(`${BASE}/api${path}`, {
       method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
+      headers: body || extraHeaders ? { ...(body ? { "Content-Type": "application/json" } : {}), ...(extraHeaders || {}) } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       signal: ctrl ? ctrl.signal : undefined,
     });
@@ -38,6 +39,23 @@ async function req(method, path, body, timeoutMs = TIMEOUT_MS) {
 const cred = (ident) => ({ participant_id: ident.participant_id, token: ident.token });
 const q = (ident) => `participant_id=${encodeURIComponent(ident.participant_id)}&token=${encodeURIComponent(ident.token)}`;
 
+// Registers the anonymous device once; failures are ignored (the room still works without it).
+let devReg = null;
+export function ensureDevice() {
+  const d = getDevice();
+  if (d.reg) return Promise.resolve(true);
+  if (!devReg) {
+    devReg = req("POST", "/devices", { device_id: d.id, secret: d.key }, 8000)
+      .then(() => { markRegistered(); return true; })
+      .catch(() => { devReg = null; return false; });
+  }
+  return devReg;
+}
+const withDev = async (method, path, body, timeoutMs) => {
+  const ok = await ensureDevice();
+  return req(method, path, body, timeoutMs, ok ? deviceHeaders() : undefined);
+};
+
 export const absUrl = (u) => (/^https?:\/\//.test(u) ? u : `${BASE}${u}`);
 
 const wsBase = () => {
@@ -49,8 +67,15 @@ const wsBase = () => {
 export const wsUrl = (code, ident) => `${wsBase()}/api/ws?code=${encodeURIComponent(code)}&${q(ident)}`;
 
 export const api = {
-  createRoom: (nickname, name) => req("POST", "/rooms", { nickname, name }),
-  joinRoom: (code, nickname, ident) => req("POST", `/rooms/${code}/join`, { nickname, ...(ident ? cred(ident) : {}) }),
+  createRoom: (nickname, name) => withDev("POST", "/rooms", { nickname, name }),
+  joinRoom: (code, nickname, ident) => withDev("POST", `/rooms/${code}/join`, { nickname, ...(ident ? cred(ident) : {}) }),
+  people: () => withDev("GET", "/devices/me/people"),
+  testPush: () => withDev("POST", "/devices/me/test-push", {}),
+  forgetPerson: (id) => withDev("DELETE", `/devices/me/people/${encodeURIComponent(id)}`),
+  forgetAll: () => withDev("DELETE", "/devices/me/people"),
+  invitePerson: (code, ident, to) => withDev("POST", `/rooms/${code}/invite`, { ...cred(ident), to }),
+  publicRooms: () => req("GET", "/rooms/public"),
+  setPublic: (code, ident, value) => req("PUT", `/rooms/${code}/public`, { ...cred(ident), public: !!value }),
   getRoom: (code) => req("GET", `/rooms/${code}`),
   getMessages: (code) => req("GET", `/rooms/${code}/messages`),
   sendMessage: (code, ident, text, client_id) => req("POST", `/rooms/${code}/messages`, { ...cred(ident), text, client_id }),
@@ -72,4 +97,9 @@ export const api = {
   report: (code, ident, body) => req("POST", `/rooms/${code}/report`, { ...cred(ident), ...body }),
   kick: (code, ident, target_id) => req("POST", `/rooms/${code}/kick`, { ...cred(ident), target_id }),
   makeHost: (code, ident, target_id) => req("POST", `/rooms/${code}/host`, { ...cred(ident), target_id }),
+  queueAdd: (code, ident, url) => req("POST", `/rooms/${code}/queue`, { ...cred(ident), url }, 45000),
+  queueVote: (code, ident, id) => req("POST", `/rooms/${code}/queue/${id}/vote`, cred(ident)),
+  queueRemove: (code, ident, id) => req("DELETE", `/rooms/${code}/queue/${id}`, cred(ident)),
+  setSubtitle: (code, ident, body) => req("PUT", `/rooms/${code}/subtitle`, { ...cred(ident), ...body }, 45000),
+  queueNext: (code, ident, body) => req("POST", `/rooms/${code}/queue/next`, { ...cred(ident), ...body }, 45000),
 };

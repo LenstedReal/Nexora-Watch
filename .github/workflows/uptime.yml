@@ -1,0 +1,32 @@
+# Uptime check: every 30 minutes GitHub calls the live API health probe. If it does not answer 200 three times in a
+# row (about 1 minute), the run fails and GitHub emails the repository owner ("Run failed" notification).
+# Only curl is used; no third-party service. Note: GitHub pauses scheduled workflows after 60 days without a commit.
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: GET https://nexora.lenstedreal.info/api/health
+        run: |
+          url="https://nexora.lenstedreal.info/api/health"
+          for i in 1 2 3; do
+            code="$(curl -sS -o /tmp/body -w '%{http_code}' -m 15 "$url" || echo 000)"
+            if [ "$code" = "200" ]; then echo "up: $(cat /tmp/body)"; exit 0; fi
+            echo "attempt $i: HTTP $code"
+            sleep 20
+          done
+          echo "::error title=Nexora down::$url did not answer 200 (last: HTTP $code)"
+          exit 1

@@ -45,7 +45,19 @@ services:
       BLOCKED_HOSTS: ${BLOCKED_HOSTS:-}
       # Apps whose download taps are counted for the download page (empty = the default in backend/server.py).
       TRACK_APPS: ${TRACK_APPS:-}
+      # Admin read of the web app's crash reports: GET /api/client-errors?token=ADMIN_TOKEN (unset = disabled).
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      # Invite notifications (Firebase): base64 of the service-account JSON, one line in .env. Unset = invites without push.
+      FCM_SERVICE_ACCOUNT_B64: ${FCM_SERVICE_ACCOUNT_B64:-}
     volumes: [media-data:/data/media]
+    # "healthy" only when the API answers and MongoDB is reachable (docker compose ps shows the state).
+    # The image has no curl; Python is there.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 20s
     ports: ["8001:8001"]
 
   caddy:
@@ -62,6 +74,13 @@ services:
       PERSONAL_DOMAIN: ${PERSONAL_DOMAIN:-me.lenstedreal.info}
       APK_DOMAIN: ${APK_DOMAIN:-apk.lenstedreal.info}
     ports: ["80:80", "443:443"]
+    # Caddy's local admin API answers only while Caddy runs with a loaded config (busybox wget is in the image).
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     volumes:
       - caddy-data:/data
       - caddy-config:/config

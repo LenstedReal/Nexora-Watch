@@ -10,11 +10,14 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { Ionicons } from "@expo/vector-icons";
 import { C } from "./src/theme";
 import { WEB_URL } from "./src/core/api";
+import { enablePush, onNotificationTap } from "./src/core/push"; // push worker
 import { loadLang, t, useT } from "./src/i18n";
 import { IntroSplash } from "./src/components/Brand";
 import { BrowserModal, type DetectedMedia } from "./src/screens/BrowserModal";
 import { ROUTE_REPORTER, adsEnabled, initialAdState, onBackground, onResume, onRoute, routeOf, type AdEffects, type AdIds } from "./src/core/ads";
 import { NexoraAds } from "./modules/nexora-ads/src";
+import { ServicePlayer, type ServiceSession } from "./src/screens/ServicePlayer"; // rave: in-app services (beta)
+import { parseServiceCommand, serviceUrlOk, type ServiceCommand, type ServiceReport } from "./src/core/serviceController";
 
 /**
  * Nexora Watch app = the Nexora Watch web app (same screens, same code, always the same version as the website)
@@ -32,7 +35,15 @@ export function webUrlFrom(link: string | null): string | null {
 }
 
 // "caps" tells the web app what this version of the app can do, so the web side never has to compare version numbers.
-const BOOT = `window.__NEXORA_APP__ = { platform: ${JSON.stringify(Platform.OS)}, version: ${JSON.stringify(VERSION)}, caps: ["open_external"] }; ${ROUTE_REPORTER} true;`;
+/** The page fills the whole screen (behind the status and navigation bars); it gets the real insets as CSS variables
+ *  (--sa-top/right/bottom/left, used by the web CSS before env(safe-area-inset-*), which Android WebViews report
+ *  unreliably). So every inset is applied exactly once, by the page, and the bars show the page's own dark colours. */
+export function insetJs(i: { top: number; right: number; bottom: number; left: number }): string {
+  const v = (n: number) => `${Math.max(0, Math.round(n))}px`;
+  return `(function(){var s=document.documentElement.style;s.setProperty("--sa-top","${v(i.top)}");s.setProperty("--sa-right","${v(i.right)}");s.setProperty("--sa-bottom","${v(i.bottom)}");s.setProperty("--sa-left","${v(i.left)}");})(); true;`;
+}
+
+const BOOT = `window.__NEXORA_APP__ = { platform: ${JSON.stringify(Platform.OS)}, version: ${JSON.stringify(VERSION)}, caps: ["open_external", "service_player", "push"] }; ${ROUTE_REPORTER} true;`;
 
 // InMobi IDs: filled at build time from EXPO_PUBLIC_INMOBI_* (app.config.js `extra.inmobi`). Empty = no ads at all.
 const AD_IDS: Partial<AdIds> = (Constants.expoConfig?.extra as any)?.inmobi ?? {};
@@ -57,7 +68,11 @@ function Shell() {
   const landscape = width > height;
   const web = useRef<WebView>(null);
   const canBack = useRef(false);
+  const [svc, setSvc] = useState<ServiceSession | null>(null); // rave: the open service page (ServicePlayer)
+  const svcCmd = useRef<((c: ServiceCommand) => void) | null>(null);
+  const svcOpen = useRef<(() => void) | null>(null);
   const [start, setStart] = useState<string | null>(null);
+  const tapped = useRef<string | null>(null); // push worker: room of a notification tapped before the WebView exists
   const [loaded, setLoaded] = useState(false);
   const [intro, setIntro] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -113,12 +128,18 @@ function Shell() {
     } catch {}
   }, [showBanner, navInset]);
   const adPad = showBanner ? bannerH : 0;
+  // Under a banner the page ends above it (banner + navigation bar are native), so its bottom inset is 0 then.
+  const pageInsets = { top: insets.top, right: insets.right, bottom: showBanner ? 0 : insets.bottom, left: insets.left };
+  const insetScript = insetJs(pageInsets);
+  useEffect(() => {
+    web.current?.injectJavaScript(insetScript);
+  }, [insetScript]);
 
   useEffect(() => {
     (async () => {
       await loadLang();
       const initial = await ExpoLinking.getInitialURL().catch(() => null);
-      setStart(webUrlFrom(initial) ?? WEB_URL);
+      setStart(tapped.current ?? webUrlFrom(initial) ?? WEB_URL);
     })();
     const sub = ExpoLinking.addEventListener("url", ({ url }) => {
       const target = webUrlFrom(url);
@@ -127,9 +148,28 @@ function Shell() {
     return () => sub.remove();
   }, []);
 
+  // push worker: a tapped invite notification opens its room.
+  useEffect(
+    () =>
+      onNotificationTap((link) => {
+        const target = webUrlFrom(link);
+        if (!target) return;
+        if (web.current) web.current.injectJavaScript(`location.href = ${JSON.stringify(target)}; true;`);
+        else {
+          tapped.current = target;
+          setStart((cur) => (cur ? target : cur));
+        }
+      }),
+    [],
+  );
+
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (browser) return false; // the modal handles it
+      if (svcOpen.current) { // rave: back closes the service page first
+        svcOpen.current();
+        return true;
+      }
       if (canBack.current) {
         web.current?.goBack();
         return true;
@@ -175,8 +215,30 @@ function Shell() {
     } else if (m.type === "open_external") {
       // "Watch on the web": the website opens in the phone's browser.
       if (isOwnWebUrl(m.url)) Linking.openURL(m.url).catch(() => {});
+    } else if (m.type === "service_open") {
+      // rave: the room's ServiceCard opens the service page; only that service's own https pages are accepted.
+      if (serviceUrlOk(m.service, m.url)) setSvc({ service: m.service, url: m.url, role: m.role === "host" ? "host" : "guest", key: Date.now() });
+    } else if (m.type === "service_cmd") {
+      const c = parseServiceCommand(m);
+      if (c) svcCmd.current?.(c);
+    } else if (m.type === "service_close") {
+      setSvc(null);
+    } else if (m.type === "push_enable") {
+      // push worker: "Bildirimlere izin ver" in the web app; the token is sent to our own server (WEB_URL) only.
+      enablePush(m.device_id, m.key).then((r) =>
+        web.current?.injectJavaScript(`window.__nexoraPush && window.__nexoraPush(${JSON.stringify(r)}); true;`),
+      );
     }
   }, [routeChanged]);
+
+  // rave: the service page's reports go to the room's ServiceCard.
+  const toRoom = (r: ServiceReport | { type: "closed" }) =>
+    web.current?.injectJavaScript(`window.__nexoraService && window.__nexoraService(${JSON.stringify(r)}); true;`);
+  const closeService = () => {
+    setSvc(null);
+    toRoom({ type: "closed" });
+  };
+  svcOpen.current = svc ? closeService : null;
 
   const onPick = async (m: DetectedMedia) => {
     picked.current = true;
@@ -210,13 +272,13 @@ function Shell() {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: landscape ? 0 : insets.top, paddingBottom: (landscape ? 0 : insets.bottom) + adPad }]}>
-      <StatusBar style="light" hidden={landscape} />
+    <View style={[styles.root, { paddingBottom: showBanner ? adPad + navInset : 0 }]}>
+      <StatusBar style="light" hidden={landscape} translucent backgroundColor="transparent" />
       {start && (
         <WebView
           ref={web}
           source={{ uri: start }}
-          injectedJavaScriptBeforeContentLoaded={BOOT}
+          injectedJavaScriptBeforeContentLoaded={BOOT + insetScript}
           applicationNameForUserAgent={`NexoraWatchApp/${VERSION}`}
           onMessage={onMessage}
           onShouldStartLoadWithRequest={onShouldStart}
@@ -224,7 +286,10 @@ function Shell() {
             canBack.current = s.canGoBack;
             if (s.url) routeChanged(s.url);
           }}
-          onLoadEnd={() => setLoaded(true)}
+          onLoadEnd={() => {
+            setLoaded(true);
+            web.current?.injectJavaScript(insetScript);
+          }}
           onError={() => setFailed(true)}
           onHttpError={(e) => {
             if (e.nativeEvent.statusCode >= 500 && e.nativeEvent.url.replace(/\/$/, "") === WEB_URL) setFailed(true);
@@ -260,6 +325,7 @@ function Shell() {
           <ActivityIndicator color={C.cyan} size="large" />
         </View>
       )}
+      <ServicePlayer session={svc} commandRef={svcCmd} onReport={toRoom} onClose={closeService} />
       <BrowserModal visible={browser} onClose={onCloseBrowser} onPick={onPick} />
       {intro && <IntroSplash slogan={t("slogan")} onDone={() => setIntro(false)} />}
     </View>

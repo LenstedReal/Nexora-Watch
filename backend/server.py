@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.middleware.cors import CORSMiddleware
 
 import rooms as R
+import room_queue as Q
 from config import CORS_ORIGINS, HOST_HANDOVER_S, ROOM_PURGE_GRACE_S
 from db import db, ensure_indexes
 from hub import hub
@@ -17,6 +18,8 @@ from policy import check_source, public_config
 from resolver import resolve
 from security import ApiError, RateLimiter, api_error_response
 from storage import cleanup_once, router as storage_router
+from client_errors import ensure_client_error_indexes, router as client_errors_router
+import devices as D
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("nexora")
@@ -24,6 +27,7 @@ log = logging.getLogger("nexora")
 app = FastAPI(title="Nexora Watch API")
 app.add_middleware(CORSMiddleware, allow_credentials=False, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 write_limiter = RateLimiter(120, 60)
+read_limiter = RateLimiter(60, 60)  # per IP, for public listings
 metrics_limiter = RateLimiter(12, 60)  # per participant; telemetry must not use up the shared per-IP budget
 
 
@@ -59,6 +63,16 @@ async def health():
     return {"ok": True, "service": "nexora-watch", "server_time": R.now_ms()}
 
 
+@app.get("/api/health")
+async def health_check():
+    """Uptime/healthcheck probe: 200 only when MongoDB answers."""
+    try:
+        await db.rooms.find_one({"code": "__health__"})
+    except Exception:
+        return JSONResponse({"ok": False}, status_code=503)
+    return {"ok": True}
+
+
 @app.get("/api/time")
 async def server_time():
     return {"server_time": R.now_ms()}
@@ -67,7 +81,27 @@ async def server_time():
 @app.post("/api/rooms")
 async def create_room(request: Request):
     b = await body(request)
-    return await R.create_room(b.get("nickname"), b.get("name"))
+    res = await R.create_room(b.get("nickname"), b.get("name"))
+    await D.attach_device(res["room"]["code"], res["participant"]["id"], await D.device_from_headers(request, required=False))
+    return res
+
+
+@app.get("/api/rooms/public")
+async def public_rooms(request: Request):
+    ip = request.client.host if request.client else "?"
+    if not read_limiter.allow(ip):
+        raise ApiError(429, "rate_limited", "Çok fazla istek, biraz bekleyin")
+    return {"rooms": await R.list_public(20)}
+
+
+@app.put("/api/rooms/{code}/public")
+async def put_public(code: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    view = await R.set_public(room, p, b.get("public"))
+    await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})
+    return view
 
 
 @app.get("/api/rooms/{code}")
@@ -81,6 +115,7 @@ async def join_room(code: str, request: Request):
     b = await body(request)
     res = await R.join_room(code, b.get("nickname"), b.get("participant_id"), b.get("token"))
     msg = res.pop("_message", None)
+    await D.attach_device(res["room"]["code"], res["participant"]["id"], await D.device_from_headers(request, required=False))
     if not res["rejoined"]:
         if msg:  # "X joined" must show up in everyone's chat right away, not only after a reload
             await hub.broadcast(res["room"]["code"], {"type": "message", "message": msg, "server_time": R.now_ms()})
@@ -126,7 +161,7 @@ async def put_playback(code: str, request: Request):
     b = await body(request)
     room = await R.get_room(code)
     p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
-    pb, applied = await R.apply_playback(room.code, p, b.get("playing"), b.get("position"), b.get("seq"), b.get("media_id"))
+    pb, applied = await R.apply_playback(room.code, p, b.get("playing"), b.get("position"), b.get("seq"), b.get("media_id"), b.get("rate"))
     if applied:
         await hub.broadcast(room.code, {"type": "playback", "playback": pb, "server_time": R.now_ms()})
     return {**pb, "applied": applied}
@@ -151,6 +186,115 @@ async def close(code: str, request: Request):
     await R.close_room(room, p)
     await hub.close_room(room.code, {"type": "room_closed", "code": "room_closed", "detail": "Oda sahibi odayı kapattı"})
     return {"ok": True}
+
+
+async def _queue_broadcast(code: str, queue: list):
+    await hub.broadcast(code, {"type": "queue", "queue": queue, "server_time": R.now_ms()})
+
+
+@app.post("/api/rooms/{code}/queue")
+async def queue_add(code: str, request: Request):
+    """Anyone in the room adds a link to the queue; it is checked like a video link, so a bad link fails here, not later."""
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    url = b.get("url").strip() if isinstance(b.get("url"), str) else ""
+    if not url or len(url) > 2048:
+        raise ApiError(400, "invalid_url", "Geçersiz bağlantı")
+    check_source(url, b.get("referer"))
+    video = await resolve(url, b.get("referer"), b.get("title"))
+    queue = await Q.add(room, p, url, video)
+    await _queue_broadcast(room.code, queue)
+    return {"queue": queue}
+
+
+@app.post("/api/rooms/{code}/queue/next")
+async def queue_next(code: str, request: Request):
+    """Host only: plays the given item now, or the top item. after_media_id = automatic next when that video ended."""
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    R.require_host(p)
+    item = await Q.take(room, p, b.get("item_id"), b.get("after_media_id"))
+    if not item:
+        return {"played": None, "room": await R.room_view(await R.get_room(room.code))}
+    try:
+        video = await resolve(item["url"], None, item.get("title"))
+    except ApiError:
+        await _queue_broadcast(room.code, Q.queue_view(await Q.load(room.code)))
+        raise
+    view = await R.set_video(room, p, video)
+    await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})
+    return {"played": item["id"], "room": view}
+
+
+@app.post("/api/rooms/{code}/queue/{item_id}/vote")
+async def queue_vote(code: str, item_id: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    queue = await Q.vote(room, p, item_id)
+    await _queue_broadcast(room.code, queue)
+    return {"queue": queue}
+
+
+@app.delete("/api/rooms/{code}/queue/{item_id}")
+async def queue_remove(code: str, item_id: str, request: Request):
+    b = await body(request)
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token"))
+    queue = await Q.remove(room, p, item_id)
+    await _queue_broadcast(room.code, queue)
+    return {"queue": queue}
+
+
+SUBTITLE_MAX = 1024 * 1024  # bytes of WebVTT text
+OWN_PLAYER_KINDS = {"direct", "hls", "upload"}
+
+
+@app.put("/api/rooms/{code}/subtitle")
+async def put_subtitle(code: str, request: Request):
+    """Host only: a WebVTT subtitle (the browser converts .srt) for our own player, kept with the current video."""
+    raw = await _small_body(request, SUBTITLE_MAX + 4096)
+    if raw is None:
+        raise ApiError(413, "subtitle_too_large", "Altyazı dosyası en çok 1 MB olabilir")
+    try:
+        b = json.loads(raw.decode("utf-8") or "{}")
+        b = b if isinstance(b, dict) else {}
+    except Exception:
+        b = {}
+    room = await R.get_room(code)
+    p = await R.auth_participant(room.code, b.get("participant_id"), b.get("token") or request.headers.get("x-participant-token"))
+    R.require_host(p)
+    video = dict(room.video or {})
+    if not video or video.get("kind") not in OWN_PLAYER_KINDS:
+        raise ApiError(409, "subtitle_not_supported", "Altyazı yalnızca kendi oynatıcımızdaki videolara eklenebilir")
+    if b.get("clear"):
+        video.pop("subtitle", None)
+        await db.subtitles.delete_many({"room_code": room.code})
+    else:
+        vtt = b.get("vtt") if isinstance(b.get("vtt"), str) else ""
+        vtt = vtt.lstrip("\ufeff")
+        if not vtt.startswith("WEBVTT") or len(vtt.encode("utf-8")) > SUBTITLE_MAX:
+            raise ApiError(400, "invalid_subtitle", "Geçersiz altyazı dosyası")
+        name = (b.get("name") if isinstance(b.get("name"), str) else "").strip()[:80] or "subtitle.vtt"
+        sid = R.uuid.uuid4().hex
+        await db.subtitles.delete_many({"room_code": room.code})
+        await db.subtitles.insert_one({"room_code": room.code, "sid": sid, "vtt": vtt, "created_at": R.utcnow()})
+        video["subtitle"] = {"id": sid, "name": name, "url": f"/api/rooms/{room.code}/subtitle/{sid}.vtt"}
+    await db.rooms.update_one({"code": room.code}, {"$set": {"video": video}, "$inc": {"version": 1}})
+    view = await R.room_view(await R.get_room(room.code))
+    await hub.broadcast(room.code, {"type": "room", "room": view, "server_time": R.now_ms()})
+    return view
+
+
+@app.get("/api/rooms/{code}/subtitle/{sid}.vtt")
+async def get_subtitle(code: str, sid: str):
+    room = await R.get_room(code)
+    doc = await db.subtitles.find_one({"room_code": room.code, "sid": sid})
+    if not doc:
+        raise ApiError(404, "subtitle_not_found", "Altyazı bulunamadı")
+    return Response(doc["vtt"], media_type="text/vtt; charset=utf-8", headers={"Cache-Control": "private, max-age=3600"})
 
 
 @app.post("/api/resolve")
@@ -415,6 +559,8 @@ async def metrics_summary(code: str, participant_id: str = "", token: str = ""):
 
 
 app.include_router(storage_router)
+app.include_router(client_errors_router)
+app.include_router(D.router)
 
 
 async def _ws_handle(ws: WebSocket, code: str, p: R.RoomParticipant, data: dict, chat_limiter: RateLimiter, seen: dict):
@@ -425,7 +571,7 @@ async def _ws_handle(ws: WebSocket, code: str, p: R.RoomParticipant, data: dict,
             seen["at"] = time.monotonic()
             await R.set_online(code, p.participant_id, True)
     elif t == "playback":
-        pb, applied = await R.apply_playback(code, p, data.get("playing"), data.get("position"), data.get("seq"), data.get("media_id"))
+        pb, applied = await R.apply_playback(code, p, data.get("playing"), data.get("position"), data.get("seq"), data.get("media_id"), data.get("rate"))
         msg = {"type": "playback", "playback": pb, "server_time": R.now_ms(), "cmd_sent_at": data.get("sent_at"), "seq": data.get("seq")}
         if applied:
             await hub.broadcast(code, msg)
@@ -533,6 +679,7 @@ async def maintenance_once(now: datetime | None = None):
         await db.room_messages.delete_many({"room_code": c})
         await db.sync_metrics.delete_many({"room_code": c})
         await db.room_participants.delete_many({"room_code": c})
+        await db.subtitles.delete_many({"room_code": c})  # feat worker
         await db.room_playback.delete_many({"room_code": c})
         await db.room_bans.delete_many({"room_code": c})
         await db.media.delete_many({"room_code": c})  # only finished/deleted records are left at this point (file names)
@@ -540,6 +687,19 @@ async def maintenance_once(now: datetime | None = None):
     # Retention promised in the privacy policy: reports 180 days, audit/security logs 90 days.
     await db.reports.delete_many({"created_at": {"$lt": now - timedelta(days=180)}})
     await db.audit_log.delete_many({"at": {"$lt": now - timedelta(days=90)}})
+    await D.cleanup(now)
+
+
+async def pairs_loop():
+    while True:
+        await asyncio.sleep(60)
+        try:
+            async for d in db.rooms.find({"status": "active"}, {"code": 1}):
+                ids = hub.online_ids(d["code"])
+                if len(ids) > 1:
+                    await D.record_room_pairs(d["code"], ids)
+        except Exception:
+            log.exception("pairs failed")
 
 
 async def maintenance_loop():
@@ -554,5 +714,7 @@ async def maintenance_loop():
 @app.on_event("startup")
 async def startup():
     await ensure_indexes()
+    await ensure_client_error_indexes()
     await db.clicks.create_index([("day", 1), ("app", 1), ("event", 1)], unique=True)
     asyncio.create_task(maintenance_loop())
+    asyncio.create_task(pairs_loop())

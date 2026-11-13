@@ -6,10 +6,13 @@ const RATE_BAND_S = 0.25;
 const HOST_TOLERANCE_S = 0.75;
 const KEEPALIVE_MS = 20000;
 
+// The host's chosen speed (0.25–2, 1 when the room has none): the room's clock runs at this speed.
+export const rateOf = (pb) => (typeof pb?.rate === "number" && pb.rate >= 0.25 && pb.rate <= 2 ? pb.rate : 1);
+
 export function expectedPosition(pb, offset) {
   if (!pb) return 0;
   if (!pb.playing) return pb.position;
-  return Math.max(0, pb.position + (Date.now() + offset - pb.updated_at) / 1000);
+  return Math.max(0, pb.position + ((Date.now() + offset - pb.updated_at) / 1000) * rateOf(pb));
 }
 
 export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
@@ -35,6 +38,8 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
   const [pausedBy, setPausedBy] = useState(null);
   const lastPb = useRef(null);
   const noticeTimer = useRef(0);
+  const [rate, setRateState] = useState(() => rateOf(room?.playback));
+  const rateRef = useRef(rate);
 
   const setMuted = useCallback((m) => {
     mutedRef.current = m;
@@ -76,8 +81,8 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     const seq = Math.max(seqRef.current + 1, Date.now(), (r.playback?.seq || 0) + 1);
     seqRef.current = seq;
     const position = Math.max(0, p.getTime());
-    lastPubRef.current = { at: Date.now(), playing, position };
-    conn.publishPlayback({ playing, position, seq, media_id: r.playback.media_id });
+    lastPubRef.current = { at: Date.now(), playing, position, rate: rateRef.current };
+    conn.publishPlayback({ playing, position, seq, media_id: r.playback.media_id, rate: rateRef.current });
   }, [isHost, conn, playerRef]);
 
   const onReady = useCallback(() => {
@@ -88,7 +93,8 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     const target = expectedPosition(pb, conn.clockRef.current.offset);
     if (isHost) {
       suppressUntil.current = Date.now() + 1500;
-      lastPubRef.current = { at: Date.now(), playing: pb.playing, position: target };
+      lastPubRef.current = { at: Date.now(), playing: pb.playing, position: target, rate: rateOf(pb) };
+      p.setRate(rateRef.current);
       if (target > 0.5) p.seek(target);
       if (pb.playing) p.play().catch(() => setNeedsGesture(true));
     } else {
@@ -144,11 +150,12 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
         if (now < suppressUntil.current || p.isBuffering()) return;
         const playing = !p.isPaused();
         const ref = lastPubRef.current || { at: now, playing: r.playback.playing, position: expectedPosition(r.playback, offset) };
-        const exp = ref.position + (ref.playing ? (now - ref.at) / 1000 : 0);
+        const exp = ref.position + (ref.playing ? ((now - ref.at) / 1000) * (ref.rate || 1) : 0);
         if (playing !== ref.playing || Math.abs(p.getTime() - exp) > HOST_TOLERANCE_S || (playing && now - ref.at > KEEPALIVE_MS)) publish(playing);
         return;
       }
       const pb = r.playback;
+      const base = rateOf(pb);
       const target = expectedPosition(pb, offset);
       const t = p.getTime();
       if (!pb.playing) {
@@ -157,7 +164,7 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
           p.seek(target);
           cooldown.current = now + 1500;
         }
-        p.setRate(1);
+        p.setRate(base);
         setStats((s) => ({ ...s, drift: t - target }));
         return;
       }
@@ -172,15 +179,15 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
       if (p.isBuffering()) return;
       const drift = t - target;
       if (Math.abs(drift) > DRIFT_SEEK_S && now > cooldown.current) {
-        p.setRate(1);
-        p.seek(target + 0.15);
+        p.setRate(base);
+        p.seek(target + 0.15 * base);
         cooldown.current = now + 3000;
         corrections.current += 1;
         push({ event: "correction", drift });
       } else if (p.supportsRate && Math.abs(drift) > RATE_BAND_S && Math.abs(drift) <= DRIFT_SEEK_S) {
-        p.setRate(Math.min(1.05, Math.max(0.95, 1 - drift * 0.1)));
+        p.setRate(base * Math.min(1.05, Math.max(0.95, 1 - drift * 0.1)));
       } else {
-        p.setRate(1);
+        p.setRate(base);
       }
       setStats((s) => ({ ...s, drift, corrections: corrections.current }));
     }, isHost ? 1000 : 500);
@@ -212,7 +219,7 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
       const atEnd = !pb.playing && Number.isFinite(dur) && dur > 0 && pb.position >= dur - 1; // the video ended by itself
       if (!atEnd) kind = pb.playing ? "resumed" : "paused";
     } else {
-      const expected = prev.playing ? prev.position + (pb.updated_at - prev.updated_at) / 1000 : prev.position;
+      const expected = prev.playing ? prev.position + ((pb.updated_at - prev.updated_at) / 1000) * rateOf(prev) : prev.position;
       if (Math.abs(pb.position - expected) > 2.5) kind = "seeked";
     }
     if (!kind) return;
@@ -248,6 +255,24 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     };
   }, [conn.clockRef, playerRef, push, ident, room?.code, caps.sync]);
 
+  // The room's speed: follows the stored playback (another host device, a new video resets it to 1).
+  const pbRate = rateOf(pb);
+  useEffect(() => {
+    rateRef.current = pbRate;
+    setRateState(pbRate);
+    if (isHost) playerRef.current?.setRate?.(pbRate);
+  }, [pbRate, mediaId, isHost, playerRef]);
+  // Host only: pick a speed for everyone. The element changes at once; the room hears it as a playback command.
+  const setRate = useCallback((r) => {
+    const p = playerRef.current;
+    if (!isHost || !p?.ready || !(r >= 0.25 && r <= 2)) return;
+    rateRef.current = r;
+    setRateState(r);
+    p.setRate(r);
+    suppressUntil.current = 0;
+    publish(!p.isPaused());
+  }, [isHost, playerRef, publish]);
+
   const resolveGesture = useCallback(() => {
     const p = playerRef.current;
     if (!p) return;
@@ -257,5 +282,5 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     p.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
   }, [playerRef, conn.clockRef, setMuted]);
 
-  return { events, needsGesture, resolveGesture, stats, muted, setMuted, autoMuted, notice, pausedBy };
+  return { events, needsGesture, resolveGesture, stats, muted, setMuted, autoMuted, notice, pausedBy, rate, setRate };
 }

@@ -31,6 +31,8 @@ class Room(BaseDocument):
     expires_at: datetime
     version: int = 0
     video: Optional[dict[str, Any]] = None
+    queue: Optional[list[dict[str, Any]]] = None  # room_queue.py
+    public: bool = False  # listed under "Açık odalar" on the home page (host opt-in)
 
 
 class RoomPlayback(BaseDocument):
@@ -38,6 +40,7 @@ class RoomPlayback(BaseDocument):
     media_id: Optional[str] = None
     position: float = 0.0
     is_playing: bool = False
+    rate: float = 1.0  # playback speed chosen by the host; guests follow it
     updated_at: int
     updated_by: Optional[str] = None
     revision: int = 0

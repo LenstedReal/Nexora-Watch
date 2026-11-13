@@ -55,10 +55,13 @@ MIN_AGE = int(os.environ.get("MIN_AGE", "16"))
 OWNER_NAME = os.environ.get("OWNER_NAME", "").strip()
 OWNER_ADDRESS = os.environ.get("OWNER_ADDRESS", "").strip()
 
-# Only sources that work by design: YouTube, Vimeo and Twitch (their official players), Internet Archive (direct files)
-# and Drive (link import). Other platforms return when they get an official-player adapter.
+# Sites offered in the app (official players only): YouTube, TikTok, Instagram, X, Facebook, Twitch, Kick and Drive.
+# Vimeo and Internet Archive links still play when pasted; they are just not offered (little used in Turkey).
 # Override with ALLOWED_SITES in .env ("domain|Name,...").
-_DEFAULT_SITES = "youtube.com|YouTube,vimeo.com|Vimeo,twitch.tv|Twitch,kick.com|Kick,archive.org|Internet Archive,drive.google.com|Google Drive"
+_DEFAULT_SITES = ("youtube.com|YouTube,tiktok.com|TikTok,instagram.com|Instagram,x.com|X (Twitter),facebook.com|Facebook,"
+                  "twitch.tv|Twitch,kick.com|Kick,drive.google.com|Google Drive")
+# Accepted as source pages too, but not listed: twitter.com (old X addresses) and the sites dropped from the list.
+QUIET_SITES = [h.strip().lower().lstrip(".") for h in (os.environ.get("QUIET_SITES") or "twitter.com,vimeo.com,archive.org").split(",") if h.strip()]
 ALLOWED_SITES: list[dict] = []
 for _item in (os.environ.get("ALLOWED_SITES") or _DEFAULT_SITES).split(","):
     _dom, _, _name = _item.strip().partition("|")
@@ -68,4 +71,7 @@ for _item in (os.environ.get("ALLOWED_SITES") or _DEFAULT_SITES).split(","):
 
 _DEFAULT_BLOCKED = ("netflix.com,disneyplus.com,primevideo.com,amazon.com,max.com,hbomax.com,blutv.com,exxen.com,"
                     "gain.com.tr,tabii.com,puhutv.com,mubi.com,tv.apple.com,spotify.com")
+# Rave-style subscription services watched inside the mobile app with each person's own account (services.py, beta).
+# SERVICES_ENABLED=0 turns them off: their links are then blocked like the hosts above.
+SERVICES_ENABLED = os.environ.get("SERVICES_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 BLOCKED_HOSTS = [h.strip().lower().lstrip(".") for h in (os.environ.get("BLOCKED_HOSTS") or _DEFAULT_BLOCKED).split(",") if h.strip()]

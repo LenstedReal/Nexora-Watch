@@ -7,8 +7,17 @@ import "@/embeds.css";
 // Twitch plays in Twitch's own interactive embed (https://dev.twitch.tv/docs/embed/video-and-clips/).
 // Twitch's embed rules (https://dev.twitch.tv/docs/embed/): the player must be at least 400x300 and must not be
 // covered by other page elements. So the room draws nothing on top of it (Stage.jsx: no lock, chips or buttons over
-// it; the buttons sit in a side rail), and a player area below the minimum shows a "turn the phone" note instead.
+// it; the buttons sit in the bar under the picture). A smaller picture area (a portrait phone) still gets a player of
+// at least 400x300 CSS pixels, shown smaller with a CSS scale; only a very narrow area (<200 px) shows a note instead.
 export const TWITCH_MIN = { w: 400, h: 300 };
+export const TWITCH_TINY = 200;
+
+/** CSS size of the embed (never below Twitch's minimum) and the scale that fits it into a w x h area. */
+export function twitchFit(w, h) {
+  const s = Math.min(1, w / TWITCH_MIN.w, h / TWITCH_MIN.h);
+  // No rounding up: the drawn size (CSS size x s) must stay inside the area; max() guards against float error.
+  return { s, w: Math.max(TWITCH_MIN.w, w / s), h: Math.max(TWITCH_MIN.h, h / s) };
+}
 
 let sdk;
 function loadTwitch() {
@@ -37,16 +46,29 @@ export const TwitchPlayer = ({ video, playerRef, events, onFatal }) => {
   const hostRef = useRef(null);
   const evRef = useRef(events);
   evRef.current = events;
-  const [big, setBig] = useState(null); // null = not measured yet
+  const [big, setBig] = useState(null); // null = not measured yet; false = area narrower than TWITCH_TINY
+  const mountRef = useRef(null);
   const live = !!video.live;
   const vod = video.video_id;
   const channel = video.channel;
 
+  // Sizes the embed to the picture area: at least 400x300 CSS pixels, scaled down to fit when the area is smaller.
+  const fit = () => {
+    const el = hostRef.current, m = mountRef.current;
+    if (!el || !m) return;
+    const f = twitchFit(el.clientWidth, el.clientHeight);
+    m.style.width = `${f.w}px`;
+    m.style.height = `${f.h}px`;
+    m.style.transform = f.s < 1 ? `scale(${f.s})` : "";
+  };
+  const fitRef = useRef(fit);
+  fitRef.current = fit;
+
   useEffect(() => {
     const el = hostRef.current;
     const measure = () => {
-      const r = el.getBoundingClientRect();
-      setBig(r.width >= TWITCH_MIN.w && r.height >= TWITCH_MIN.h);
+      setBig(el.clientWidth >= TWITCH_TINY && el.clientHeight > 0);
+      fitRef.current();
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -62,6 +84,8 @@ export const TwitchPlayer = ({ video, playerRef, events, onFatal }) => {
     mount.id = `nx-twitch-${(seq += 1)}`;
     mount.className = "tw-mount";
     hostRef.current.appendChild(mount);
+    mountRef.current = mount;
+    fitRef.current();
     const st = { buffering: false, pending: null };
     const setBuffering = (on) => {
       if (st.buffering === on) return;
@@ -134,6 +158,7 @@ export const TwitchPlayer = ({ video, playerRef, events, onFatal }) => {
       settle(false);
       setBuffering(false);
       playerRef.current = null;
+      if (mountRef.current === mount) mountRef.current = null;
       mount.remove(); // the embed has no documented destroy(); removing its element stops it
     };
   }, [big, live, vod, channel, playerRef, onFatal]);

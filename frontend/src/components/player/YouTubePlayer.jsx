@@ -48,6 +48,7 @@ export const YouTubePlayer = ({ videoId, isHost, playerRef, events, onFatal }) =
                 ready: true, supportsRate: false, kind: "youtube",
                 getTime: () => player.getCurrentTime?.() || 0,
                 isPaused: () => ![1, 3].includes(state()),
+                isEnded: () => state() === 0, // feat worker: queue auto-next
                 isBuffering: () => state() === 3,
                 play: () => {
                   player.playVideo();

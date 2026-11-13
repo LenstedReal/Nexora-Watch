@@ -580,7 +580,7 @@ async def _expire_media(m: Media, reason: str):
     room = await db.rooms.find_one({"code": m.room_code})
     if room and (room.get("video") or {}).get("media_id") == m.media_id:
         await db.rooms.update_one({"code": m.room_code}, {"$set": {"video": None}, "$inc": {"version": 1}})
-        await db.room_playback.update_one({"room_code": m.room_code}, {"$set": {"media_id": None, "position": 0.0, "is_playing": False,
+        await db.room_playback.update_one({"room_code": m.room_code}, {"$set": {"media_id": None, "position": 0.0, "is_playing": False, "rate": 1.0,
                                                                                  "updated_at": R.now_ms()}, "$inc": {"revision": 1}})
         if room.get("status") == "active":
             try:

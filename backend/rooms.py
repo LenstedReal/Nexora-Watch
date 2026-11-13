@@ -88,6 +88,7 @@ def playback_view(pb: RoomPlayback) -> dict:
     return {
         "playing": pb.is_playing,
         "position": pb.position,
+        "rate": pb.rate,
         "updated_at": pb.updated_at,
         "revision": pb.revision,
         "media_id": pb.media_id,
@@ -108,6 +109,7 @@ async def room_view(room: Room) -> dict:
     parts = [RoomParticipant.from_mongo(d) async for d in db.room_participants.find({"room_code": room.code}).sort("joined_at", 1)]
     for p in parts:
         p.online = p.participant_id in live
+    from room_queue import queue_view
     return {
         "id": room.id,
         "code": room.code,
@@ -119,6 +121,8 @@ async def room_view(room: Room) -> dict:
         "expires_at": iso(room.expires_at),
         "participants": [participant_view(p) for p in parts],
         "video": room.video,
+        "public": bool(room.public),
+        "queue": queue_view(room.queue),
         "playback": playback_view(await get_playback(room.code)),
         "server_time": now_ms(),
     }
@@ -238,13 +242,16 @@ async def set_video(room: Room, host: RoomParticipant, video: Optional[dict]) ->
     await db.rooms.update_one({"code": room.code}, {"$set": {"video": video}, "$inc": {"version": 1}})
     await db.room_playback.update_one(
         {"room_code": room.code},
-        {"$set": {"media_id": source_id if video else None, "position": 0.0, "is_playing": False,
+        {"$set": {"media_id": source_id if video else None, "position": 0.0, "is_playing": False, "rate": 1.0,
                   "updated_at": now_ms(), "updated_by": host.participant_id}, "$inc": {"revision": 1}},
     )
     return await room_view(await get_room(room.code))
 
 
-async def apply_playback(code: str, host: RoomParticipant, playing, position, seq, media_id) -> tuple[dict, bool]:
+RATE_MIN, RATE_MAX = 0.25, 2.0
+
+
+async def apply_playback(code: str, host: RoomParticipant, playing, position, seq, media_id, rate=None) -> tuple[dict, bool]:
     require_host(host)
     if not isinstance(playing, bool):
         raise ApiError(400, "invalid_playing", "playing boolean olmalı")
@@ -254,14 +261,20 @@ async def apply_playback(code: str, host: RoomParticipant, playing, position, se
         raise ApiError(400, "invalid_position", "Geçersiz oynatma konumu")
     if position < 0 or position != position or position > 7 * 24 * 3600:
         raise ApiError(400, "invalid_position", "Geçersiz oynatma konumu")
+    if rate is not None:
+        if isinstance(rate, bool) or not isinstance(rate, (int, float)) or rate != rate or not RATE_MIN <= rate <= RATE_MAX:
+            raise ApiError(400, "invalid_rate", "Geçersiz oynatma hızı")
     seq = int(seq) if isinstance(seq, (int, float)) and seq > 0 else now_ms()
     filt = {"room_code": code, "last_seq": {"$lt": seq}}
     if media_id:
         filt["media_id"] = media_id
+    fields = {"is_playing": playing, "position": round(position, 3), "updated_at": now_ms(),
+              "updated_by": host.participant_id, "last_seq": seq}
+    if rate is not None:
+        fields["rate"] = round(float(rate), 3)
     doc = await db.room_playback.find_one_and_update(
         filt,
-        {"$set": {"is_playing": playing, "position": round(position, 3), "updated_at": now_ms(),
-                  "updated_by": host.participant_id, "last_seq": seq}, "$inc": {"revision": 1}},
+        {"$set": fields, "$inc": {"revision": 1}},
         return_document=ReturnDocument.AFTER,
     )
     if doc:
@@ -305,3 +318,25 @@ async def send_message(code: str, p: RoomParticipant, text_in, client_id=None) -
 async def close_room(room: Room, host: RoomParticipant):
     require_host(host)
     await db.rooms.update_one({"code": room.code}, {"$set": {"status": "closed", "closed_at": utcnow()}, "$inc": {"version": 1}})
+
+
+async def set_public(room: Room, host: RoomParticipant, public) -> dict:
+    require_host(host)
+    if not isinstance(public, bool):
+        raise ApiError(400, "invalid_public", "Geçersiz değer")
+    await db.rooms.update_one({"code": room.code}, {"$set": {"public": public}, "$inc": {"version": 1}})
+    return await room_view(await get_room(room.code))
+
+
+async def list_public(limit: int = 20) -> list[dict]:
+    """Open, public rooms for the home page. Only what a stranger may see: no participant ids, no tokens."""
+    from hub import hub
+    out = []
+    cur = db.rooms.find({"public": True, "status": "active", "expires_at": {"$gt": utcnow()}}).sort("created_at", -1).limit(100)
+    async for d in cur:
+        room = Room.from_mongo(d)
+        people = len(set(hub.online_ids(room.code)))
+        video = room.video or {}
+        out.append({"code": room.code, "name": room.name, "video_title": video.get("title") or None, "people": people})
+    out.sort(key=lambda r: -r["people"])
+    return out[:limit]

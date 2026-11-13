@@ -3,11 +3,14 @@ import ipaddress
 import re
 import socket
 import json
+import time
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse, urlunparse
 
 import httpx
 
 from security import ApiError
+import config
+import services
 
 YT_RE = re.compile(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|live/)|youtu\.be/|youtube-nocookie\.com/embed/)([\w-]{11})")
 DRIVE_RE = re.compile(r"drive\.google\.com/(?:file/d/|open\?id=|uc\?(?:.*&)?id=)([\w-]{20,})")
@@ -15,9 +18,11 @@ DIRECT_EXT = re.compile(r"\.(mp4|webm|mov|m4v)(?:$|[?#])", re.I)
 HLS_EXT = re.compile(r"\.m3u8(?:$|[?#])", re.I)
 
 FULL_CAPS = {"seek": True, "rate_correction": True, "sync": True}
-# Official embedded players (YouTube, Vimeo, Twitch, TikTok): position sync by seeking, no playback-rate nudging.
+# Official embedded players (YouTube, Vimeo, Twitch, TikTok, Facebook): position sync by seeking, no playback-rate nudging.
 EMBED_CAPS = {"seek": True, "rate_correction": False, "sync": True}
 LIVE_CAPS = {"seek": False, "rate_correction": False, "sync": False}
+# Embeds without a JavaScript API (Instagram, X): everyone sees the same post, nobody can be kept in sync.
+NOSYNC_CAPS = LIVE_CAPS
 
 # --- Vimeo: official Player SDK (https://github.com/vimeo/player.js). Only URL shapes that carry the numeric id. -------
 VIMEO_HOSTS = {"vimeo.com", "www.vimeo.com", "player.vimeo.com"}
@@ -27,7 +32,7 @@ VIMEO_HASH = re.compile(r"^[0-9a-f]{6,16}$", re.I)
 
 # --- Twitch: official interactive embed (https://dev.twitch.tv/docs/embed/video-and-clips/). ----------------------------
 TWITCH_HOSTS = {"twitch.tv", "www.twitch.tv", "m.twitch.tv", "go.twitch.tv"}
-TWITCH_VOD = re.compile(r"^/(?:videos|[A-Za-z0-9_]{3,25}/(?:v|video))/(\d{6,12})/?$")
+TWITCH_VOD = re.compile(r"^/(?:videos|([A-Za-z0-9_]{3,25})/(?:v|video))/(\d{6,12})/?$")
 TWITCH_CHANNEL = re.compile(r"^/([A-Za-z0-9][A-Za-z0-9_]{2,24})/?$")
 TWITCH_CLIP = re.compile(r"^/[A-Za-z0-9_]{3,25}/clip/[\w-]+/?$")
 # First path segments that are pages of the site, not channels.
@@ -61,6 +66,34 @@ IA_MAX_METADATA = 4 * 1024 * 1024
 # --- Dropbox: a share link becomes a direct file with raw=1 (https://help.dropbox.com/share/force-download). -----------
 DROPBOX_HOSTS = {"dropbox.com", "www.dropbox.com"}
 DROPBOX_PATH = re.compile(r"^/(?:s|scl/fi)/[^/]+/[^/]+", re.I)
+
+# --- TikTok: official Embed Player, an iframe of www.tiktok.com/player/v1/<id> driven by postMessage (play / pause /
+# seekTo, onCurrentTime / onStateChange events: https://developers.tiktok.com/doc/embed-player). Short share links
+# (vm./vt.tiktok.com, tiktok.com/t/...) are looked up with the official oEmbed API (https://developers.tiktok.com/doc/embed-videos).
+TIKTOK_HOSTS = {"tiktok.com", "www.tiktok.com", "m.tiktok.com"}
+TIKTOK_SHORT_HOSTS = {"vm.tiktok.com", "vt.tiktok.com"}
+TIKTOK_PATH = re.compile(r"^/(?:@[\w.-]{1,40}/(?:video|photo)/|embed/(?:v2/)?|player/v1/|v/)(\d{15,21})(?:\.html)?/?$")
+TIKTOK_SHORT_PATH = re.compile(r"^/(?:t/)?[A-Za-z0-9]{5,20}/?$")
+TIKTOK_OEMBED = "https://www.tiktok.com/oembed?url="
+TIKTOK_ID = re.compile(r"^\d{15,21}$")
+
+# --- Instagram: official post / reel embed (www.instagram.com/p/<code>/embed). No JavaScript control: no sync. ---------
+IG_HOSTS = {"instagram.com", "www.instagram.com", "m.instagram.com"}
+IG_PATH = re.compile(r"^/(?:[A-Za-z0-9_.]{1,30}/)?(p|reels?|tv)/([A-Za-z0-9_-]{5,40})(?:/embed(?:/captioned)?)?/?$")
+
+# --- X / Twitter: official embedded post (platform.twitter.com/embed/Tweet.html?id=<id>). No sync. ---------------------
+X_HOSTS = {"x.com", "www.x.com", "mobile.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com", "m.twitter.com"}
+X_PATH = re.compile(r"^/(?:[A-Za-z0-9_]{1,15}|i(?:/web)?)/status(?:es)?/(\d{5,20})(?:/(?:video|photo)/\d)?/?$")
+
+# --- Facebook: official Embedded Video Player (https://developers.facebook.com/docs/plugins/embedded-video-player/api):
+# the JS SDK's fb-video with play / pause / seek / getCurrentPosition and events. fb.watch and /share/ short links can
+# only be opened by following Facebook's redirect, which is not an official API: the full link is asked for instead.
+FB_HOSTS = {"facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com", "mbasic.facebook.com"}
+FB_SHORT_HOSTS = {"fb.watch", "www.fb.watch"}
+FB_WATCH_PATHS = {"/watch", "/watch/", "/video.php", "/video/video.php", "/watch/live", "/watch/live/"}
+FB_VIDEOS = re.compile(r"^/([A-Za-z0-9.\-]{1,80})/videos/(?:[^/]{1,200}/)?(\d{6,20})/?$")
+FB_REEL = re.compile(r"^/reel/(\d{6,20})/?$")
+FB_SHARE = re.compile(r"^/share/(?:v|r)/[A-Za-z0-9]{4,30}/?$")
 
 
 async def _assert_public(host: str):
@@ -156,33 +189,35 @@ def _twitch(url: str, parsed) -> dict | None:
     if host == "clips.twitch.tv" or (host in TWITCH_HOSTS and TWITCH_CLIP.match(path)):
         # Clips have no interactive embed (no position API), so they cannot be kept in sync.
         raise ApiError(422, "twitch_clip", "Twitch klipleri eşitlenemiyor; yayının ya da kayıtlı videonun bağlantısını kullan")
-    vid = channel = None
+    vid = channel = owner = None  # owner = the channel name as written in the address, for the title
     if host == "player.twitch.tv":
         q = dict(parse_qsl(parsed.query))
         v = q.get("video", "")
         if re.fullmatch(r"v?\d{6,12}", v):
             vid = v.lstrip("v")
         elif re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_]{2,24}", q.get("channel", "")):
-            channel = q["channel"].lower()
+            owner = q["channel"]
+            channel = owner.lower()
         else:
             return None
     elif host in TWITCH_HOSTS:
         m = TWITCH_VOD.match(path)
         if m:
-            vid = m.group(1)
+            owner, vid = m.group(1), m.group(2)
         else:
             c = TWITCH_CHANNEL.match(path)
             if not c or c.group(1).lower() in TWITCH_RESERVED:
                 return None
-            channel = c.group(1).lower()
+            owner = c.group(1)
+            channel = owner.lower()
     else:
         return None
     base = {"url": url, "kind": "twitch", "stream_url": None, "mime_type": None, "provider": "twitch", "warning": None}
     if vid:
         return {**base, "video_id": vid, "channel": None, "live": False, "embed_url": f"https://player.twitch.tv/?video=v{vid}",
-                "title": "Twitch", "capabilities": EMBED_CAPS}
+                "title": f"Twitch · {owner}" if owner else "Twitch", "capabilities": EMBED_CAPS}
     return {**base, "video_id": None, "channel": channel, "live": True, "embed_url": f"https://player.twitch.tv/?channel={channel}",
-            "title": f"Twitch · {channel}", "capabilities": LIVE_CAPS}
+            "title": f"Twitch · {owner}", "capabilities": LIVE_CAPS}
 
 
 def _kick(url: str, parsed) -> dict | None:
@@ -199,8 +234,125 @@ def _kick(url: str, parsed) -> dict | None:
     channel = m.group(1).lower()
     return {"url": url, "kind": "kick", "video_id": None, "channel": channel, "live": True,
             "embed_url": f"https://player.kick.com/{channel}", "stream_url": None, "mime_type": None, "provider": "kick",
-            "title": f"Kick · {channel}", "capabilities": LIVE_CAPS, "warning": None}
+            "title": f"Kick · {m.group(1)}", "capabilities": LIVE_CAPS, "warning": None}
 
+
+
+def _embed_base(url: str, kind: str) -> dict:
+    return {"url": url, "kind": kind, "stream_url": None, "mime_type": None, "provider": kind, "warning": None}
+
+
+async def _tiktok_oembed(url: str) -> str | None:
+    """The numeric id of a TikTok short link, through the official oEmbed API. None when it cannot be found out."""
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=8, max_redirects=3, event_hooks={"request": [_guard]}) as c:
+            r = await c.get(TIKTOK_OEMBED + quote(url, safe=""), headers={"User-Agent": "NexoraWatch/1.0", "Accept": "application/json"})
+            if r.status_code >= 400 or len(r.content) > 256 * 1024:
+                return None
+            data = r.json()
+    except (ApiError, httpx.HTTPError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    vid = str(data.get("embed_product_id") or "")
+    if not TIKTOK_ID.match(vid):
+        m = re.search(r'data-video-id="(\d{15,21})"', str(data.get("html") or ""))
+        vid = m.group(1) if m else ""
+    return vid or None
+
+
+async def _tiktok(url: str, parsed) -> dict | None:
+    """A TikTok video (or a short share link to one) -> the official Embed Player (synced)."""
+    host = (parsed.hostname or "").lower()
+    path = parsed.path or ""
+    vid = None
+    if host in TIKTOK_HOSTS:
+        m = TIKTOK_PATH.match(path)
+        if m:
+            vid = m.group(1)
+        elif path.startswith("/t/") and TIKTOK_SHORT_PATH.match(path):
+            vid = await _tiktok_oembed(url)
+            if not vid:
+                raise ApiError(422, "tiktok_short", "TikTok kısa bağlantısı açılamadı; videoyu TikTok'ta açıp tam bağlantısını kopyala")
+        elif path.startswith("/@"):
+            raise ApiError(422, "social_link", "Bu bağlantıda tek bir video yok; videonun kendi bağlantısını kopyala")
+        else:
+            return None
+    elif host in TIKTOK_SHORT_HOSTS:
+        if not TIKTOK_SHORT_PATH.match(path):
+            return None
+        vid = await _tiktok_oembed(url)
+        if not vid:
+            raise ApiError(422, "tiktok_short", "TikTok kısa bağlantısı açılamadı; videoyu TikTok'ta açıp tam bağlantısını kopyala")
+    else:
+        return None
+    return {**_embed_base(url, "tiktok"), "video_id": vid, "embed_url": f"https://www.tiktok.com/player/v1/{vid}",
+            "title": "TikTok", "capabilities": EMBED_CAPS}
+
+
+def _instagram(url: str, parsed) -> dict | None:
+    """An Instagram post or reel -> Instagram's own embed (no JavaScript control, no sync)."""
+    if (parsed.hostname or "").lower() not in IG_HOSTS:
+        return None
+    m = IG_PATH.match(parsed.path or "")
+    if not m:
+        if (parsed.path or "/") not in ("", "/"):
+            raise ApiError(422, "social_link", "Bu bağlantıda tek bir video yok; gönderinin ya da Reels videosunun bağlantısını kopyala")
+        return None
+    kind, code = m.group(1), m.group(2)
+    seg = "reel" if kind.startswith("reel") else "p"
+    return {**_embed_base(url, "instagram"), "video_id": code, "embed_url": f"https://www.instagram.com/{seg}/{code}/embed/",
+            "title": "Instagram", "capabilities": NOSYNC_CAPS}
+
+
+def _x(url: str, parsed) -> dict | None:
+    """An X (Twitter) post -> the official embedded post (no sync)."""
+    host = (parsed.hostname or "").lower()
+    vid = None
+    if host == "platform.twitter.com" and (parsed.path or "").rstrip("/") in ("/embed/Tweet.html", "/embed/index.html"):
+        v = dict(parse_qsl(parsed.query)).get("id", "")
+        vid = v if re.fullmatch(r"\d{5,20}", v) else None
+        if not vid:
+            return None
+    elif host in X_HOSTS:
+        m = X_PATH.match(parsed.path or "")
+        if not m:
+            if (parsed.path or "/") not in ("", "/"):
+                raise ApiError(422, "social_link", "Bu bağlantıda tek bir gönderi yok; gönderinin kendi bağlantısını kopyala")
+            return None
+        vid = m.group(1)
+    else:
+        return None
+    return {**_embed_base(url, "x"), "video_id": vid, "embed_url": f"https://platform.twitter.com/embed/Tweet.html?id={vid}",
+            "title": "X", "capabilities": NOSYNC_CAPS}
+
+
+def _facebook(url: str, parsed) -> dict | None:
+    """A Facebook video / reel -> the official Embedded Video Player (synced through its JS API)."""
+    host = (parsed.hostname or "").lower()
+    path = parsed.path or ""
+    if host in FB_SHORT_HOSTS or (host in FB_HOSTS and FB_SHARE.match(path)):
+        raise ApiError(422, "fb_short", "Facebook kısa bağlantıları açılamıyor; videoyu Facebook'ta açıp tam bağlantısını kopyala")
+    if host not in FB_HOSTS:
+        return None
+    vid = href = None
+    if path in FB_WATCH_PATHS:
+        v = dict(parse_qsl(parsed.query)).get("v", "")
+        if re.fullmatch(r"\d{6,20}", v):
+            vid, href = v, f"https://www.facebook.com/watch/?v={v}"
+    elif FB_VIDEOS.match(path):
+        m = FB_VIDEOS.match(path)
+        vid, href = m.group(2), f"https://www.facebook.com/{m.group(1)}/videos/{m.group(2)}/"
+    elif FB_REEL.match(path):
+        vid = FB_REEL.match(path).group(1)
+        href = f"https://www.facebook.com/reel/{vid}"
+    if not vid:
+        if path not in ("", "/"):
+            raise ApiError(422, "social_link", "Bu bağlantıda tek bir video yok; videonun kendi bağlantısını kopyala")
+        return None
+    return {**_embed_base(url, "facebook"), "video_id": vid, "href": href,
+            "embed_url": "https://www.facebook.com/plugins/video.php?" + urlencode({"href": href, "show_text": "false"}),
+            "title": "Facebook", "capabilities": EMBED_CAPS}
 
 async def _ia_metadata(identifier: str) -> dict:
     """The item's public metadata (MD Read API). Size-capped; an unknown item comes back empty."""
@@ -294,11 +446,96 @@ def _clean_title(title_in) -> str | None:
     return t[:120] or None
 
 
+# --- Titles of official players -------------------------------------------------------------------------------------
+# The client sends the page title it saw (document.title), which on these sites is often just "YouTube" or "KICK", or
+# carries a site suffix. The real video title comes from the providers' official oEmbed endpoints
+# (https://oembed.com, https://www.youtube.com/oembed, https://developer.vimeo.com/api/oembed/videos); live channels
+# are named after the channel. A failed lookup never fails the resolve: it falls back to a neat provider label.
+PROVIDER_LABELS = {"youtube": "YouTube", "vimeo": "Vimeo", "twitch": "Twitch", "kick": "Kick"}
+GENERIC_TITLES = {"youtube", "youtube music", "youtube shorts", "shorts", "vimeo", "twitch", "kick", "google drive", "drive",
+                  "video", "videos", "watch", "live", "home", "videos & movies", "videos & movies on vimeo"}
+TITLE_PREFIX = re.compile(r"^\(\d+\+?\)\s*")  # "(3) Video - YouTube": unread-notification counter
+TITLE_SUFFIX = re.compile(r"\s*(?:[-–—|·:]\s*(?:youtube(?: music)?|vimeo|twitch|kick)|\bon vimeo|[-–—|·]\s*videos?\s*&\s*movies)\s*$", re.I)
+OEMBED_TIMEOUT = 2.5
+OEMBED_MAX = 64 * 1024
+_title_cache: dict = {}  # key -> (expires at, title or None); failures are remembered briefly so they are not retried at once
+TITLE_CACHE_MAX = 2000
+
+
+def _page_title(t: str | None) -> str | None:
+    """A page title without counters and site suffixes, or None when nothing but the site's name is left."""
+    if not t:
+        return None
+    t = TITLE_PREFIX.sub("", t)
+    for _ in range(3):
+        t2 = TITLE_SUFFIX.sub("", t).strip()
+        if t2 == t:
+            break
+        t = t2
+    return None if t.strip().lower() in GENERIC_TITLES else (t.strip()[:120] or None)
+
+
+async def _fetch_oembed(url: str):
+    """GET an oEmbed document (fixed provider hosts, no redirects, size-capped). Tests replace `oembed_fetch`."""
+    async with httpx.AsyncClient(timeout=OEMBED_TIMEOUT, follow_redirects=False) as c:
+        async with c.stream("GET", url, headers={"User-Agent": "NexoraWatch/1.0", "Accept": "application/json"}) as r:
+            if r.status_code != 200:
+                return None
+            body = b""
+            async for chunk in r.aiter_bytes():
+                body += chunk
+                if len(body) > OEMBED_MAX:
+                    return None
+    return json.loads(body)
+
+
+oembed_fetch = _fetch_oembed
+
+
+async def _oembed_title(key: str, url: str) -> str | None:
+    now = time.monotonic()
+    hit = _title_cache.get(key)
+    if hit and hit[0] > now:
+        return hit[1]
+    try:
+        data = await asyncio.wait_for(oembed_fetch(url), OEMBED_TIMEOUT + 0.5)
+    except Exception:  # network, timeout, bad JSON: the title is a nicety, never a reason to fail
+        data = None
+    raw = data.get("title") if isinstance(data, dict) else None
+    t = " ".join(raw.split())[:120] if isinstance(raw, str) else ""
+    t = t if t and t.lower() not in GENERIC_TITLES else None
+    _title_cache.pop(key, None)
+    _title_cache[key] = (now + (86400 if t else 300), t)
+    while len(_title_cache) > TITLE_CACHE_MAX:
+        _title_cache.pop(next(iter(_title_cache)))
+    return t
+
+
+async def _provider_title(res: dict, page_title: str | None) -> str:
+    kind = res["kind"]
+    label = PROVIDER_LABELS[kind]
+    if kind == "youtube":
+        watch = f"https://www.youtube.com/watch?v={res['video_id']}"
+        t = await _oembed_title(f"yt:{res['video_id']}", f"https://www.youtube.com/oembed?url={quote(watch, safe='')}&format=json")
+        return t or _page_title(page_title) or label
+    if kind == "vimeo":
+        page = f"https://vimeo.com/{res['video_id']}" + (f"/{res['video_hash']}" if res.get("video_hash") else "")
+        t = await _oembed_title(f"vimeo:{res['video_id']}:{res.get('video_hash') or ''}",
+                                f"https://vimeo.com/api/oembed.json?url={quote(page, safe='')}")
+        return t or _page_title(page_title) or label
+    if res.get("title") and res["title"] != label:  # Twitch / Kick: "Twitch · <channel>"
+        return res["title"]
+    p = _page_title(page_title)
+    return f"{label} · {p}" if p else label
+
+
 async def resolve(url_in, referer=None, title=None) -> dict:
     ref = _clean_referer(referer)
     custom_title = _clean_title(title)
     res = await _resolve(url_in, ref)
-    if custom_title:
+    if res.get("kind") in PROVIDER_LABELS:
+        res["title"] = await _provider_title(res, custom_title)
+    elif custom_title:
         res["title"] = custom_title
     if ref and res.get("kind") in ("direct", "hls"):
         res["headers"] = {"Referer": ref}
@@ -313,6 +550,12 @@ async def _resolve(url_in, referer: str | None) -> dict:
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
         raise ApiError(400, "invalid_url", "Adres http(s) ile başlamalı")
 
+    svc = services.resolve_service(url)  # rave worker: in-app subscription services (beta)
+    if svc:
+        if not config.SERVICES_ENABLED:
+            raise ApiError(403, "drm_not_allowed", "Telif korumalı/abonelikli platformlardan içerik paylaşılamaz")
+        return svc
+
     yt = YT_RE.search(url)
     if yt:
         vid = yt.group(1)
@@ -320,7 +563,8 @@ async def _resolve(url_in, referer: str | None) -> dict:
                 "stream_url": None, "title": "YouTube", "mime_type": None, "provider": "youtube",
                 "capabilities": {"seek": True, "rate_correction": False, "sync": True}, "warning": None}
 
-    official = _vimeo(url, parsed) or _twitch(url, parsed) or _kick(url, parsed)
+    official = (_vimeo(url, parsed) or _twitch(url, parsed) or _kick(url, parsed) or _instagram(url, parsed) or _x(url, parsed)
+                or _facebook(url, parsed) or await _tiktok(url, parsed))
     if official:
         return official
 

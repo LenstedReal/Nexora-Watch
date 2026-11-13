@@ -5,9 +5,12 @@ import "@/index.css";
 import App from "@/App";
 import { inApp } from "@/lib/native";
 import { startUpdateWatch } from "@/lib/update";
+import { startErrorReporting } from "@/lib/errors";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 if (inApp()) document.documentElement.classList.add("in-app");
 startUpdateWatch();
+startErrorReporting();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,8 +24,10 @@ const queryClient = new QueryClient({
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

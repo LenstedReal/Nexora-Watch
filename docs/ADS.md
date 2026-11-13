@@ -26,7 +26,7 @@ Akış: `vars.*` → `.github/workflows/android.yml` (`EXPO_PUBLIC_INMOBI_*`) �
 
 ## app-ads.txt
 
-Adres: `https://nexora.lenstedreal.info/app-ads.txt` (sitenin kökünde, düz metin). Play Console'daki
+Adres: `https://me.lenstedreal.info/app-ads.txt` (dosya `site/personal/app-ads.txt`, düz metin). Play Console'daki
 geliştirici web sitesi bu alan adı olmalıdır. Satır biçimi (IAB):
 
 ```

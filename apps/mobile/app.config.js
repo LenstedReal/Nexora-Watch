@@ -18,11 +18,16 @@ module.exports = ({ config }) => {
   const blockedPermissions = [...(config.android.blockedPermissions || [])];
   if (adsOn) permissions.push("com.google.android.gms.permission.AD_ID");
   else blockedPermissions.push("com.google.android.gms.permission.AD_ID");
+  // Push (docs/PUSH.md): google-services.json is provided later by the owner (CI secret GOOGLE_SERVICES_JSON).
+  // Only referenced when the file exists, so the build works without it (push simply off).
+  const gsj = require("path").join(__dirname, "google-services.json");
+  const googleServicesFile = require("fs").existsSync(gsj) ? "./google-services.json" : undefined;
+  const pushPlugin = ["expo-notifications", { color: "#7c3aed", defaultChannel: "invites" }];
   return {
     ...config,
-    android: { ...config.android, versionCode, permissions, blockedPermissions },
+    android: { ...config.android, versionCode, permissions, blockedPermissions, ...(googleServicesFile ? { googleServicesFile } : {}) },
     ios: { ...config.ios, buildNumber: String(versionCode) },
     extra: { ...(config.extra || {}), inmobi },
-    plugins: [...(config.plugins || []), "./plugins/withReleaseSigning"],
+    plugins: [...(config.plugins || []), pushPlugin, "./plugins/withReleaseSigning"],
   };
 };

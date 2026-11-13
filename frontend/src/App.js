@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { I18nProvider } from "@/i18n";
 import Home from "@/pages/Home";
 import RoomPage from "@/pages/Room";
+import Settings from "@/pages/Settings";
 import { ConsentGate } from "@/components/ConsentGate";
 import { ChildSafety, Copyright, DeleteData, Kvkk, Privacy, Terms } from "@/pages/Legal";
 import { checkForUpdate } from "@/lib/update";
@@ -25,6 +26,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/room/:code" element={<RoomPage />} />
+          <Route path="/ayarlar" element={<Settings />} />
           <Route path="/gizlilik" element={<Privacy />} />
           <Route path="/kosullar" element={<Terms />} />
           <Route path="/kvkk" element={<Kvkk />} />

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Loader2, MessageCircle, Users, Film } from "lucide-react";
+import { Loader2, MessageCircle, Users, Film, ListVideo } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useT } from "@/i18n";
 import { api } from "@/lib/api";
@@ -13,6 +13,10 @@ import { Stage } from "@/components/player/Stage";
 import { TopBar } from "@/components/room/TopBar";
 import { ConnectionBanner } from "@/components/room/ConnectionBanner";
 import { SourcePanel } from "@/components/room/SourcePanel";
+import { QueuePanel } from "@/components/room/QueuePanel"; // feat worker
+import { SubtitlePanel } from "@/components/room/SubtitlePanel"; // feat worker
+import { useQueueAutoNext } from "@/hooks/useQueueAutoNext"; // feat worker
+import { useBackgroundNotify } from "@/hooks/useBackgroundNotify"; // rooms worker
 import { PeopleList, PeopleStrip } from "@/components/room/Participants";
 import { Chat } from "@/components/room/Chat";
 import { ConfirmDialog } from "@/components/room/ConfirmDialog";
@@ -100,13 +104,16 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
   const [reporting, setReporting] = useState(null);
   const [asking, setAsking] = useState(null); // {title, text, label, danger, run}: a question waiting for yes / no
   const [askBusy, setAskBusy] = useState(false);
+  const [plainEmbed, setPlainEmbed] = useState(false); // src2: the player fell back to an embed without sync (Facebook)
   const closing = useRef(false); // this person is closing the room: go home, do not show "the host closed the room"
   const drive = useDriveImport({ code, ident });
   const conn = useRoomConnection(code, ident, initialRoom, (e) => (e.code === "import_failed" ? drive.onNotice(e) : toast.error(errorText(t, e))));
   const { room } = conn;
   const isHost = room.host_id === ident.participant_id;
   const sync = usePlaybackSync({ room, isHost, conn, playerRef, ident });
+  useQueueAutoNext({ code, ident, isHost, room, playerRef, onRoom: conn.setRoom }); // feat worker
   const upload = useUpload({ code, ident });
+  useBackgroundNotify({ t, room, messages: conn.messages, me: ident.participant_id }); // rooms worker
   const msgCount = conn.messages.length;
   const tabRef = useRef(tab);
   tabRef.current = tab;
@@ -199,28 +206,33 @@ function RoomView({ code, ident, initialRoom, onIdentLost }) {
       nav("/");
     },
   });
-  const source = isHost ? <SourcePanel code={code} ident={ident} video={room.video} upload={upload} drive={drive} onRoom={conn.setRoom} /> : null;
+  const queue = <QueuePanel code={code} ident={ident} queue={room.queue} isHost={isHost} onRoom={conn.setRoom} />; // feat worker
+  const source = isHost ? <><SourcePanel code={code} ident={ident} video={room.video} upload={upload} drive={drive} onRoom={conn.setRoom} /><SubtitlePanel code={code} ident={ident} video={room.video} onRoom={conn.setRoom} /></> : null;
 
   return (
     <div className="room" data-testid="room-page">
-      <TopBar room={room} status={conn.status} attempt={conn.attempt} isHost={isHost} onBack={() => nav("/")} onLeave={leave} onClose={close} />
+      <TopBar room={room} ident={ident} status={conn.status} attempt={conn.attempt} isHost={isHost} onBack={() => nav("/")} onLeave={leave} onClose={close}
+        onTogglePublic={(v) => api.setPublic(code, ident, v).then((r) => toast.success(t(r.public ? "public_now_on" : "public_now_off"))).catch((e) => toast.error(errorText(t, e)))} />
       <ConnectionBanner status={conn.status} attempt={conn.attempt} onRetry={conn.retryNow} />
       <div className="body">
         <section className="main">
-          <Stage video={room.video} playback={room.playback} isHost={isHost} ident={ident} playerRef={playerRef} sync={sync} onAddVideo={() => switchTab("video")} />
-          {room.video && room.video.capabilities?.sync === false && <div className="hint">{t("no_sync")}</div>}
+          <Stage video={room.video} playback={room.playback} isHost={isHost} ident={ident} playerRef={playerRef} sync={sync} onAddVideo={() => switchTab("video")} onPlainEmbed={setPlainEmbed} />
+          {room.video && (room.video.capabilities?.sync === false || plainEmbed) && <div className="hint">{t("no_sync")}</div>}
           {source && <div className="desk-only">{source}</div>}
+          <div className="desk-only">{queue}</div>
         </section>
         <aside className="side">
           <nav className="tabs-bar mob-only" data-testid="room-tabs">
             <button className={tab === "chat" ? "on" : ""} onClick={() => switchTab("chat")} data-testid="tab-chat"><MessageCircle size={16} /> {t("chat")}{unread > 0 && tab !== "chat" && <span className="badge" data-testid="chat-unread">{unread}</span>}</button>
             <button className={tab === "people" ? "on" : ""} onClick={() => switchTab("people")} data-testid="tab-people"><Users size={16} /> {t("people")}</button>
             {isHost && <button className={tab === "video" ? "on" : ""} onClick={() => switchTab("video")} data-testid="tab-video"><Film size={16} /> {t("video")}</button>}
+            {!isHost && <button className={tab === "queue" ? "on" : ""} onClick={() => switchTab("queue")} data-testid="tab-queue"><ListVideo size={16} /> {t("q_title")}</button>}
           </nav>
           <div className="desk-only"><PeopleStrip room={room} me={ident.participant_id} /></div>
           <div className="pane">
             {tab === "people" && <div className="pane-sec mob-only"><PeopleList room={room} me={ident.participant_id} peerState={conn.peerState} isHost={isHost} onReport={report} onKick={kick} onMakeHost={makeHost} /></div>}
-            {tab === "video" && isHost && <div className="pane-sec mob-only video-mob">{source}</div>}
+            {tab === "video" && isHost && <div className="pane-sec mob-only video-mob">{source}{queue}</div>}
+            {tab === "queue" && !isHost && <div className="pane-sec mob-only video-mob">{queue}</div>}
             <div className={`pane-sec chat-sec ${tab === "chat" ? "" : "hidden"}`}>
               <Chat messages={conn.messages} me={ident.participant_id} onSend={send} onReport={(m) => report({ id: m.participant_id, nickname: m.nickname }, m.id)} />
             </div>

@@ -1,0 +1,29 @@
+/* Provider players (YouTube, Vimeo, Twitch, Kick, Drive, any iframe): nothing of ours is drawn over the picture.
+   .stage.prov = the picture (.stage-pic, 16:9) + our bar under it (.stage-side: warning row + title / notes / buttons).
+   On a sideways phone the bar becomes a narrow rail beside the picture, so the picture keeps the full height. */
+.stage.prov{display:flex;flex-direction:column;aspect-ratio:auto;background:var(--s1)}
+.stage.prov .stage-pic{position:relative;flex:1 1 auto;min-height:0;aspect-ratio:16/9;background:#000;overflow:hidden}
+.stage.prov .stage-side{flex:none;display:flex;flex-direction:column;min-width:0;background:var(--s1);border-top:1px solid var(--bd)}
+.stage.prov .stage-warn{position:static;background:none;padding:7px 12px 0}
+.stage.prov .stage-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;min-height:44px;padding:4px 6px 4px 12px}
+.stage.prov .stage-title{position:static;flex:1 1 90px;min-width:0;font:600 13px var(--font);color:var(--tx);text-shadow:none;opacity:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage.prov .stage-bar .ring{flex:none;width:18px;height:18px;border-width:2px}
+.stage.prov .stage-chip{position:static;flex:none;padding:5px 10px;font-size:12px;background:var(--s3);border-color:var(--bd2);backdrop-filter:none}
+.stage.prov .gesture{position:static;flex:none;transform:none;padding:8px 14px;font-size:13px;box-shadow:none}
+.stage.prov .sound{position:static;flex:none;transform:none;padding:7px 12px;font-size:12px;background:var(--s3);backdrop-filter:none}
+.stage.prov .stage-tools{position:static;flex:none;margin-left:auto;display:flex;gap:6px;opacity:1}
+.stage.prov .stage-tools button{width:36px;height:36px;background:var(--s3);border-color:var(--bd2);backdrop-filter:none}
+.stage.prov .stage-tools button:hover{background:var(--s4)}
+.stage.prov:fullscreen .stage-pic{aspect-ratio:auto}
+
+/* sideways phone: the bar is a rail on the right; long texts give way to icons */
+@media (orientation:landscape) and (max-height:520px){
+  .stage.prov{flex-direction:row}
+  .stage.prov .stage-pic{aspect-ratio:auto;min-width:0}
+  .stage.prov .stage-side{width:56px;border-top:0;border-left:1px solid var(--bd)}
+  .stage.prov .stage-side .stage-warn,.stage.prov .stage-title,.stage.prov .stage-bar .lbl{display:none}
+  .stage.prov .stage-bar{flex:1;flex-direction:column;flex-wrap:nowrap;justify-content:flex-start;padding:10px 0;gap:8px}
+  .stage.prov .stage-tools{flex-direction:column;margin:0;order:-1}
+  .stage.prov .gesture,.stage.prov .sound{padding:0;width:40px;height:40px;justify-content:center;border-radius:12px}
+  .stage.prov .stage-chip{padding:0;width:36px;height:36px;justify-content:center}
+}

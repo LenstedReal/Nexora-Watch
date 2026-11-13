@@ -1,0 +1,8 @@
+/* In-app subscription services (beta): the card shown in the stage instead of a player. */
+.svc-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px;text-align:center;color:var(--mut);font-size:13px;background:radial-gradient(70% 90% at 50% 40%,#1c1036 0,#050508 100%)}
+.svc-logo{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;font:800 28px var(--head);box-shadow:0 10px 28px -10px #000}
+.svc-name{color:#fff;font:700 17px var(--head);margin-top:6px;display:inline-flex;align-items:center;gap:8px}
+.svc-beta{font:700 10px var(--head);letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:999px;color:#000;background:#facc15}
+.svc-text{max-width:340px;line-height:1.4}
+.svc-hint{max-width:340px;font-size:12px;opacity:.85}
+.svc-card .go{width:auto;margin-top:10px;padding:12px 22px;font-size:14px}

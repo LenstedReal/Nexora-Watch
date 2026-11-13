@@ -5,9 +5,8 @@ backend/              FastAPI + MongoDB — oda, playback, WS, yükleme, ölçü
 apps/mobile/          Expo (React Native, TypeScript) — Android + iOS tek kod tabanı; APK GitHub Actions'ta üretilir
 frontend/             React web istemcisi (aynı API)
 packages/localization/locales.json   12 dil, ortak anahtarlar
-archive/              Eski Kotlin (android-legacy), SwiftUI (ios-legacy), Next.js (web-next-legacy) — kullanılmıyor
 deploy/Caddyfile      İsteğe bağlı HTTPS ters vekil
-docs/                 AUDIT, PLAYBACK-SYNC, STORAGE, SECURITY, TESTING
+docs/                 PLAYBACK-SYNC, STORAGE, SECURITY, TESTING
 ```
 
 - Tek backend süreci; WS fan-out süreç içi (`hub.py`). Yatay ölçek için Redis pub/sub veya Mongo change streams gerekir.

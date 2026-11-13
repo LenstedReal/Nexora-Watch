@@ -160,7 +160,7 @@ const tr = {
   k_hls: "Canlı / HLS akış",
   k_upload: "Yüklenen video",
   k_drive_embed: "Google Drive (senkronsuz)",
-  link_ph: "YouTube, MP4, M3U8 veya Drive bağlantısı",
+  link_ph: "YouTube, TikTok, Instagram, X… bağlantısı",
   paste: "Yapıştır",
   play: "Oynat",
   drive_hint: "Drive dosyasının paylaşımı \"Bağlantıya sahip olan herkes\" olmalı. Video sunucumuza aktarılır ve tam senkron oynar.",
@@ -188,6 +188,10 @@ const tr = {
   b_searching: "Video aranıyor…",
   b_pick_site: "Site seç",
   yt_video: "YouTube videosu",
+  sp_beta: "Beta",
+  sp_back_room: "Odaya dön",
+  sp_expand: "Servisi büyüt",
+  sp_guest: "Oda sahibi yönetiyor",
 };
 
 type Dict = typeof tr;
@@ -345,7 +349,7 @@ const en: Dict = {
   k_hls: "Live / HLS stream",
   k_upload: "Uploaded video",
   k_drive_embed: "Google Drive (no sync)",
-  link_ph: "YouTube, MP4, M3U8 or Drive link",
+  link_ph: "YouTube, TikTok, Instagram, X… link",
   paste: "Paste",
   play: "Play",
   drive_hint: "The Drive file must be shared as \"Anyone with the link\". It is copied to our server and plays in full sync.",
@@ -373,6 +377,10 @@ const en: Dict = {
   b_searching: "Looking for videos…",
   b_pick_site: "Pick a site",
   yt_video: "YouTube video",
+  sp_beta: "Beta",
+  sp_back_room: "Back to room",
+  sp_expand: "Enlarge the service",
+  sp_guest: "The host is in control",
 };
 
 const de: Dict = {
@@ -527,7 +535,7 @@ const de: Dict = {
   k_hls: "Live / HLS-Stream",
   k_upload: "Hochgeladenes Video",
   k_drive_embed: "Google Drive (ohne Sync)",
-  link_ph: "YouTube-, MP4-, M3U8- oder Drive-Link",
+  link_ph: "YouTube-, TikTok-, Instagram-, X-… Link",
   paste: "Einfügen",
   play: "Abspielen",
   drive_hint: "Die Drive-Datei muss für \"Jeder mit dem Link\" freigegeben sein. Sie wird auf unseren Server kopiert und läuft voll synchron.",
@@ -555,6 +563,10 @@ const de: Dict = {
   b_searching: "Suche nach Videos…",
   b_pick_site: "Seite wählen",
   yt_video: "YouTube-Video",
+  sp_beta: "Beta",
+  sp_back_room: "Zurück zum Raum",
+  sp_expand: "Dienst vergrößern",
+  sp_guest: "Der Host steuert",
 };
 
 const DICTS: Record<Lang, Dict> = { tr, en, de };

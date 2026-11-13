@@ -3,7 +3,7 @@
     "name": "Nexora Watch",
     "slug": "nexora-watch",
     "scheme": "nexora",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "orientation": "default",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#09090D",
@@ -77,6 +77,15 @@
         }
       ]
     ],
-    "description": "Nexora Watch \u2014 synchronized watch parties. Better than Rave."
+    "description": "Nexora Watch \u2014 synchronized watch parties. Better than Rave.",
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#00000000",
+      "translucent": true
+    },
+    "androidNavigationBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#09090D"
+    }
   }
 }

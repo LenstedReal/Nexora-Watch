@@ -4,10 +4,12 @@ import { api } from "@/lib/api";
 export const DEFAULT_CONFIG = {
   allowed_sites: [
     { domain: "youtube.com", name: "YouTube" },
-    { domain: "vimeo.com", name: "Vimeo" },
+    { domain: "tiktok.com", name: "TikTok" },
+    { domain: "instagram.com", name: "Instagram" },
+    { domain: "x.com", name: "X (Twitter)" },
+    { domain: "facebook.com", name: "Facebook" },
     { domain: "twitch.tv", name: "Twitch" },
     { domain: "kick.com", name: "Kick" },
-    { domain: "archive.org", name: "Internet Archive" },
     { domain: "drive.google.com", name: "Google Drive" },
   ],
   web_url: "https://nexora.lenstedreal.info",

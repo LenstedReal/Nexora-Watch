@@ -23,7 +23,7 @@ import { useT } from "../i18n";
 
 export type DetectedMedia = {
   url: string;
-  kind: "hls" | "mp4" | "webm" | "video" | "youtube" | "vimeo" | "twitch" | "kick" | "archive" | "blocked";
+  kind: "hls" | "mp4" | "webm" | "video" | "youtube" | "vimeo" | "twitch" | "kick" | "archive" | "tiktok" | "instagram" | "x" | "facebook" | "blocked";
   page: string;
   title: string;
   how: string;
@@ -90,9 +90,14 @@ const KICK_PAGES = new Set(["browse", "categories", "category", "following", "da
   "api", "popout", "transactions", "subscriptions", "messages", "creator-program", "leaderboards", "emotes", "store", "download", "apps",
   "mobile", "contact", "partners", "security"]);
 const ARCHIVE_RE = /^https?:\/\/(?:www\.)?archive\.org\/details\/([A-Za-z0-9][A-Za-z0-9._-]{0,99})(?:[/?#]|$)/i;
+// src2: TikTok / Instagram / X / Facebook posts: the page address is offered; the room plays it in the official embed.
+const TIKTOK_RE = /^https?:\/\/(?:www\.|m\.)?tiktok\.com\/@[\w.-]+\/video\/(\d{15,21})/i;
+const IG_RE = /^https?:\/\/(?:www\.|m\.)?instagram\.com\/(?:[\w.]+\/)?(p|reels?|tv)\/([\w-]{5,40})/i;
+const X_RE = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/[\w]{1,20}\/status(?:es)?\/(\d{5,20})/i;
+const FB_RE = /^https?:\/\/(?:www\.|m\.|web\.)?facebook\.com\/(?:watch\/?\?(?:.*&)?v=(\d{6,20})|[\w.-]+\/videos\/(?:[\w.-]+\/)?(\d{6,20})|reel\/(\d{6,20}))/i;
 // Their players stream through MediaSource or their own CDNs: what the page loads is never offered for these sites.
-const NO_SNIFF = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|vimeocdn\.com|twitch\.tv|ttvnw\.net|kick\.com/i;
-const PAGE_KINDS = new Set<DetectedMedia["kind"]>(["youtube", "vimeo", "twitch", "kick", "archive"]);
+const NO_SNIFF = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|vimeocdn\.com|twitch\.tv|ttvnw\.net|kick\.com|tiktok\.com|tiktokcdn|instagram\.com|cdninstagram|fbcdn\.net|facebook\.com|x\.com|twitter\.com|twimg\.com/i;
+const PAGE_KINDS = new Set<DetectedMedia["kind"]>(["youtube", "vimeo", "twitch", "kick", "archive", "tiktok", "instagram", "x", "facebook"]);
 
 /** The page being viewed, when it is a video of a site with an official player (or an Internet Archive item). */
 export function pageOffer(url: string, title: string, fallbackTitle: string): DetectedMedia | null {
@@ -110,6 +115,14 @@ export function pageOffer(url: string, title: string, fallbackTitle: string): De
   if (kl && !KICK_PAGES.has(kl[1].toLowerCase()) && !/[?&]clip=/.test(url)) {
     return { url: `https://kick.com/${kl[1].toLowerCase()}`, kind: "kick", page: url, title: title || `Kick · ${kl[1]}`, how: "page" };
   }
+  const tt = url.match(TIKTOK_RE);
+  if (tt) return { url: url.split(/[?#]/)[0], kind: "tiktok", page: url, title: title || "TikTok", how: "page" };
+  const ig = url.match(IG_RE);
+  if (ig) return { url: `https://www.instagram.com/${ig[1].startsWith("reel") ? "reel" : "p"}/${ig[2]}/`, kind: "instagram", page: url, title: title || "Instagram", how: "page" };
+  const xm = url.match(X_RE);
+  if (xm) return { url: `https://x.com/i/status/${xm[1]}`, kind: "x", page: url, title: title || "X", how: "page" };
+  const fb = url.match(FB_RE);
+  if (fb) return { url: fb[1] ? `https://www.facebook.com/watch/?v=${fb[1]}` : url.split(/[?#]/)[0], kind: "facebook", page: url, title: title || "Facebook", how: "page" };
   const ia = url.match(ARCHIVE_RE);
   if (ia) return { url: `https://archive.org/details/${ia[1]}`, kind: "archive", page: url, title: title || "Internet Archive", how: "page" };
   return null;

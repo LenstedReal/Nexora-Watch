@@ -3,7 +3,7 @@ import data, { FALLBACK, LANGS, RTL } from "./locales";
 
 const Ctx = createContext(null);
 
-function detect() {
+export function detect() {
   let saved = null;
   try {
     saved = localStorage.getItem("nx:lang");

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Zap, Youtube, Film, Upload, Sparkles, ArrowRight, Loader2, Globe, History, ChevronRight, RefreshCw, ScanSearch,
-  MessageCircle, ShieldCheck, Download, Smartphone, MonitorPlay, ChevronDown, Lock,
+  MessageCircle, ShieldCheck, Download, Smartphone, MonitorPlay, ChevronDown, Lock, Settings as SettingsIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { defaultRoomName, errorText, useI18n } from "@/i18n";
@@ -11,6 +11,8 @@ import { clearIdent, getIdent, lastNickname, saveIdent, saveNickname } from "@/l
 import { useAppConfig } from "@/lib/config";
 import { inApp, openExternal } from "@/lib/native";
 import { SiteFooter } from "@/pages/Legal";
+import { PublicRooms } from "@/components/PublicRooms";
+import { PeopleList } from "@/components/PeopleList";
 import "@/landing.css";
 
 const recentRooms = () => {
@@ -146,6 +148,7 @@ export default function Home() {
               {langs.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </label>
+          <Link className="lp-nav-set" to="/ayarlar" aria-label={t("settings")} title={t("settings")} data-testid="nav-settings"><SettingsIcon size={16} /></Link>
           {!app && cfg.play_url && <a className="lp-nav-cta" href={cfg.play_url} target="_blank" rel="noreferrer" aria-label={t("lp_download")} title={t("lp_download")} data-testid="nav-download"><Download size={15} /> <span>{t("lp_download")}</span></a>}
         </div>
       </header>
@@ -221,6 +224,8 @@ export default function Home() {
               ))}
             </section>
           )}
+          <PublicRooms />
+          <PeopleList />
         </div>
       </section>
 

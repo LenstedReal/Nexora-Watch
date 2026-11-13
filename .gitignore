@@ -76,7 +76,6 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 
-memory/test_credentials.md
 
 # Mobile development
 android-sdk/
@@ -98,3 +97,4 @@ tests/sample.mp4
 credentials.json
 *.key
 .credentials
+apps/mobile/google-services.json
