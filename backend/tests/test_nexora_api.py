@@ -339,3 +339,17 @@ def test_default_room_name_uses_the_right_turkish_suffix():
         h = requests.post(f"{API}/rooms", json={"nickname": nick}).json()
         assert h["room"]["name"] == want
         requests.post(f"{API}/rooms/{h['room']['code']}/close", json=cred(h))
+
+
+# Tap counter of the download site: whatever is sent, the answer is an empty 204 (the page never waits for it and
+# nothing about the sender is revealed). What gets counted is checked next to the database, in the local test stack.
+def test_tap_counter_always_answers_204():
+    url = f"{API}/track"
+    plain = {"Content-Type": "text/plain;charset=UTF-8"}  # what navigator.sendBeacon sends
+    for payload in ('{"app":"velvet","event":"open"}', '{"app":"zeppelin","event":"download"}',
+                    '{"app":"unknown","event":"open"}', '{"app":"velvet","event":"nope"}', "not json", "[]", "",
+                    '{"app":"velvet","event":"open","pad":"' + "x" * 400 + '"}'):
+        r = requests.post(url, data=payload.encode(), headers=plain)
+        assert r.status_code == 204 and r.content == b"", (payload[:40], r.status_code, r.text)
+    assert requests.post(url, json={"app": "velvet", "event": "task_done"}).status_code == 204
+    assert requests.get(url).status_code == 405

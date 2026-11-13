@@ -69,7 +69,7 @@ web sitesindeki "Android APK indir" butonu bunu gösterir.
   - Amaç: Uygulama işlevselliği, güvenlik/kötüye kullanımın önlenmesi. Paylaşım: yok (hizmet sağlayıcılar paylaşım sayılmaz).
   - Aktarım şifreli: Evet (HTTPS). Silme talebi: Evet (veri silme sayfası). Otomatik silme var.
 - [ ] **Kullanıcı içeriği (UGC)**: koşullar kabulü (ilk açılış), içerik bildirme (mesaja uzun bas / kişi menüsü), kullanıcı engelleme, oda sahibinin çıkarma yetkisi, moderasyon süreci (docs/DEPLOY.md).
-- [ ] **Reklam**: içermez. **Uygulama erişimi**: giriş gerektirmez.
+- [ ] **Reklam**: bu sürümde yok, "Hayır" işaretlenir. InMobi reklamı eklenen sürümde "Evet" yapılır; aynı sürümle Veri güvenliği formu ve gizlilik politikası güncellenir. **Uygulama erişimi**: giriş gerektirmez.
 - [ ] Mağaza listesi: kısa açıklama, uzun açıklama, 512×512 ikon, 1024×500 öne çıkan görsel, en az 2 telefon ekran görüntüsü.
   - Not: "Better than Rave" ifadesini **mağaza metninde kullanma** (başka uygulama adını anmak Play meta veri politikasına takılabilir); uygulama içinde ve web sitende kalabilir.
 - [ ] Önce **Dahili test** kanalına yükle, sonra kapalı test → üretim. Yeni kişisel geliştirici hesaplarında üretime çıkmadan önce kapalı testte belirli sayıda test kullanıcısı ve süre şartı olabilir; Play Console'daki güncel şartı kontrol et.

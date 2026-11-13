@@ -29,7 +29,18 @@ export function webUrlFrom(link: string | null): string | null {
   return m ? `${WEB_URL}/room/${m[1].toUpperCase()}` : null;
 }
 
-const BOOT = `window.__NEXORA_APP__ = { platform: ${JSON.stringify(Platform.OS)}, version: ${JSON.stringify(VERSION)} }; true;`;
+// "caps" tells the web app what this version of the app can do, so the web side never has to compare version numbers.
+const BOOT = `window.__NEXORA_APP__ = { platform: ${JSON.stringify(Platform.OS)}, version: ${JSON.stringify(VERSION)}, caps: ["open_external"] }; true;`;
+
+/** Only our own site may be sent to the phone's browser: pages shown inside the room (video players) can post messages too. */
+export function isOwnWebUrl(url: unknown): url is string {
+  if (typeof url !== "string" || !/^https:\/\//i.test(url)) return false;
+  try {
+    return new URL(url).host === WEB_HOST;
+  } catch {
+    return false;
+  }
+}
 
 function Shell() {
   useT();
@@ -100,6 +111,9 @@ function Shell() {
     } else if (m.type === "keep_awake") {
       if (m.on) activateKeepAwakeAsync("room").catch(() => {});
       else deactivateKeepAwake("room");
+    } else if (m.type === "open_external") {
+      // "Watch on the web": the website opens in the phone's browser.
+      if (isOwnWebUrl(m.url)) Linking.openURL(m.url).catch(() => {});
     }
   }, []);
 

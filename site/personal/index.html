@@ -8,7 +8,7 @@
   - Hizmetler:       id="services" içindeki .proj kartları
   - APK sayfası:     sayfanın en altındaki kodda  var APK_SITE = "https://..."  (boşsa kart "Yakında" yazar)
   - Projeler:        id="projects" içindeki .proj kartları: oyunlar, uygulamalar (kopyala-yapıştır ile yenisini ekle)
-  - Bağlantılar:     id="links" içindeki a etiketleri
+  - Bağlantılar:     id="links" içindeki a etiketleri (neon görseller: class="nl-b", resimler links/ klasöründe; adres değişirse yalnızca href'i değiştir)
   - Gizlilik notu:   gizlilik.html (alt bilgideki "Gizlilik" bağlantısı oraya gider)
   Yayına alma: main dalına push yeterli; GitHub Actions siteyi kendisi günceller.
   Kurallar: bu sayfada 18+ uygulama adı ya da görseli yer almaz; Google Play'deki oyunların yanında
@@ -138,7 +138,15 @@ nav.open .menu .m2{display:inline}
   nav.open .links a:active{background:#ffffff14}
 }
 @media (max-width:340px){h1{font-size:38px;letter-spacing:-1.5px}}
-@media (prefers-reduced-motion:reduce){.bg i{animation:none}.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+/* --- bağlantı düğmeleri: neon görseller links/ klasöründe (iki sayfada aynı) --- */
+.nl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 18px;max-width:760px;margin-top:20px}
+.nl-b{display:block;border-radius:999px;transition:filter .2s,transform .15s;-webkit-tap-highlight-color:transparent}
+.nl-b img{display:block;width:100%;height:auto;aspect-ratio:796/204}
+.nl-b:hover{filter:brightness(1.15)}
+.nl-b:active{transform:scale(.985)}
+.nl-b:focus-visible{outline:2px solid #fff;outline-offset:2px}
+@media (max-width:640px){.nl{grid-template-columns:1fr;max-width:440px}}
+@media (prefers-reduced-motion:reduce){.bg i{animation:none}.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}.nl-b{transition:none}}
 </style>
 </head>
 <body>
@@ -275,10 +283,15 @@ nav.open .menu .m2{display:inline}
     <h2>Birlikte bir şey yapalım.</h2>
     <div class="row">
       <a class="btn p" href="mailto:lenstedreal@gmail.com">lenstedreal@gmail.com</a>
-      <a class="btn g" href="https://github.com/LenstedReal" target="_blank" rel="noopener">GitHub</a>
-      <a class="btn g" href="https://www.instagram.com/lenstedreal/" target="_blank" rel="noopener">Instagram @lenstedreal</a>
-      <a class="btn g" href="https://www.tiktok.com/@lenstedreal" target="_blank" rel="noopener">TikTok</a>
       <a class="btn g" href="https://nexora.lenstedreal.info">Nexora Watch</a>
+    </div>
+    <div class="nl">
+      <a class="nl-b" href="https://github.com/LenstedReal" target="_blank" rel="noopener" title="GitHub"><img src="links/github.webp" alt="GitHub @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://www.youtube.com/@lenstedreal" target="_blank" rel="noopener" title="YouTube"><img src="links/youtube.webp" alt="YouTube @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://www.instagram.com/lenstedreal/" target="_blank" rel="noopener" title="Instagram"><img src="links/instagram.webp" alt="Instagram @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://www.tiktok.com/@lenstedreal" target="_blank" rel="noopener" title="TikTok"><img src="links/tiktok.webp" alt="TikTok @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://open.spotify.com/user/lenstedreal" target="_blank" rel="noopener" title="Spotify"><img src="links/spotify.webp" alt="Spotify @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://x.com/lenstedreal" target="_blank" rel="noopener" title="X"><img src="links/x.webp" alt="X @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
     </div>
   </section>
 
@@ -286,7 +299,7 @@ nav.open .menu .m2{display:inline}
 </main>
 <script>
 /* ---- APK sayfası: adresi buraya yaz; boş kalırsa kart "Yakında" yazar ---- */
-var APK_SITE = "";
+var APK_SITE = "https://apk.lenstedreal.info";
 (function () {
   var a = document.getElementById("apk-link");
   if (!a || !/^https:\/\/[^\s"<>]+$/.test(APK_SITE)) return;

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { errorText, useT } from "@/i18n";
 import { api } from "@/lib/api";
 import { UploadPanel } from "./UploadPanel";
+import { BrowseSheet } from "./BrowseSheet";
 import { inApp, pickFromNativeBrowser } from "@/lib/native";
 
 // A phone shows this panel in the "Video" tab and a wide screen next to the player: two copies can exist at once.
@@ -14,8 +15,15 @@ export const SourcePanel = ({ code, ident, video, upload, drive, onRoom }) => {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [sheet, setSheet] = useState(false); // the web's "browse sites" screen
   const imp = drive.imp;
   const isDrive = /drive\.google\.com/i.test(url);
+
+  // Every pasted link enters the room the same way: a Drive file is imported by the server, anything else is checked and set.
+  const bring = async (link) => {
+    if (/drive\.google\.com/i.test(link)) await drive.start(link);
+    else onRoom(await api.setVideo(code, ident, link));
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -23,13 +31,8 @@ export const SourcePanel = ({ code, ident, video, upload, drive, onRoom }) => {
     setBusy(true);
     setErr(null);
     try {
-      if (isDrive) {
-        await drive.start(url.trim());
-        setUrl("");
-      } else {
-        onRoom(await api.setVideo(code, ident, url.trim()));
-        setUrl("");
-      }
+      await bring(url.trim());
+      setUrl("");
     } catch (ex) {
       setErr(ex);
       toast.error(errorText(t, ex));
@@ -39,6 +42,12 @@ export const SourcePanel = ({ code, ident, video, upload, drive, onRoom }) => {
   };
 
   const browse = async () => {
+    // The app has its own site browser that finds the video. A web page cannot read another site: the sheet opens
+    // the site in a new tab and takes the link back.
+    if (!inApp()) {
+      setSheet(true);
+      return;
+    }
     const res = await pickFromNativeBrowser();
     if (!res) return;
     setBusy(true);
@@ -72,7 +81,7 @@ export const SourcePanel = ({ code, ident, video, upload, drive, onRoom }) => {
       ) : (
         <UploadPanel upload={upload} />
       )}
-      {tab === "link" && inApp() && (
+      {tab === "link" && (
         <button className="browse" onClick={browse} disabled={busy} data-testid="source-browse-btn"><Globe size={15} /> {t("browse_sites")}</button>
       )}
       {tab === "link" && isDrive && <div className="hint" data-testid="drive-hint">{t("drive_hint")}</div>}
@@ -83,6 +92,7 @@ export const SourcePanel = ({ code, ident, video, upload, drive, onRoom }) => {
         </div>
       )}
       {err && tab === "link" && <div className="inline-err" data-testid="source-error">{errorText(t, err)}</div>}
+      {sheet && <BrowseSheet onClose={() => setSheet(false)} onBring={bring} />}
     </section>
   );
 };

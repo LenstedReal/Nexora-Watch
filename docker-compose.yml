@@ -1,10 +1,10 @@
-# Nexora Watch: MongoDB + FastAPI backend (+ Caddy: HTTPS, web app, personal site).
+# Nexora Watch: MongoDB + FastAPI backend (+ Caddy: HTTPS, web app, personal site, download page).
 #
 # Server: updated by GitHub Actions (.github/workflows/deploy.yml). The images are built on GitHub and only
 #         pulled here; do NOT run "--build" on the server. Manual restart with the images already present:
 #           sudo docker compose --profile tls up -d --no-build
 # Local:  docker compose up -d --build                 -> API only on http://localhost:8001
-#         docker compose --profile tls up -d --build   -> HTTPS on DOMAIN (web + /api) and PERSONAL_DOMAIN
+#         docker compose --profile tls up -d --build   -> HTTPS on DOMAIN (web + /api), PERSONAL_DOMAIN and APK_DOMAIN
 services:
   mongo:
     image: mongo:7
@@ -43,6 +43,8 @@ services:
       # so a list written here can never silently override the one in the code again.
       ALLOWED_SITES: ${ALLOWED_SITES:-}
       BLOCKED_HOSTS: ${BLOCKED_HOSTS:-}
+      # Apps whose download taps are counted for the download page (empty = the default in backend/server.py).
+      TRACK_APPS: ${TRACK_APPS:-}
     volumes: [media-data:/data/media]
     ports: ["8001:8001"]
 
@@ -58,6 +60,7 @@ services:
     environment:
       DOMAIN: ${DOMAIN:-localhost}
       PERSONAL_DOMAIN: ${PERSONAL_DOMAIN:-me.lenstedreal.info}
+      APK_DOMAIN: ${APK_DOMAIN:-apk.lenstedreal.info}
     ports: ["80:80", "443:443"]
     volumes:
       - caddy-data:/data

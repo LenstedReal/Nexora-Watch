@@ -1,11 +1,12 @@
 import asyncio
 import json
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.cors import CORSMiddleware
 
 import rooms as R
@@ -34,7 +35,7 @@ async def _api_error(_req, exc: ApiError):
 @app.middleware("http")
 async def rate_limit(request: Request, call_next):
     path = request.url.path
-    if request.method in ("POST", "PUT", "DELETE") and "/parts/" not in path and not path.endswith("/metrics"):
+    if request.method in ("POST", "PUT", "DELETE") and "/parts/" not in path and not path.endswith("/metrics") and path != "/api/track":
         # Client IP comes from uvicorn (--proxy-headers rewrites it only for trusted proxies); X-Forwarded-For is not trusted directly.
         ip = request.client.host if request.client else "?"
         if not write_limiter.allow(ip):
@@ -162,6 +163,65 @@ async def resolve_url(request: Request):
 @app.get("/api/config")
 async def app_config():
     return public_config()
+
+
+# --- tap counter for the download site (apk.lenstedreal.info) -----------------------------------------------
+# The page reports taps on its download buttons with navigator.sendBeacon. Only a number per day, app and step is
+# kept: no IP address, no user agent, nothing about the visitor. Whatever is sent, the answer is an empty 204.
+TRACK_APPS = {a.strip().lower() for a in (os.environ.get("TRACK_APPS") or "velvet,zeppelin").split(",") if a.strip()}
+TRACK_EVENTS = {"open", "age_ok", "task_done", "download"}
+TRACK_MAX_BYTES = 300
+track_limiter = RateLimiter(60, 3600)  # per IP: one visitor cannot inflate the numbers
+
+
+async def _small_body(request: Request, limit: int) -> bytes | None:
+    """The request body, or None when it is larger than `limit` bytes (the rest is not read)."""
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > limit:
+        return None
+    buf = b""
+    async for chunk in request.stream():
+        buf += chunk
+        if len(buf) > limit:
+            return None
+    return buf
+
+
+async def count_tap(raw: bytes | None, ip: str, now: datetime | None = None) -> bool:
+    """Counts one tap; False when the input is not a known app/step or the sender is over the limit."""
+    if not raw:
+        return False
+    try:
+        data = json.loads(raw)
+    except (ValueError, UnicodeDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    app_id, event = data.get("app"), data.get("event")
+    if not isinstance(app_id, str) or not isinstance(event, str) or app_id not in TRACK_APPS or event not in TRACK_EVENTS:
+        return False
+    if not track_limiter.allow(ip):
+        return False
+    day = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    key = {"day": day, "app": app_id, "event": event}
+    for attempt in (1, 2):  # two first taps of a day can race for the same new record: the second try finds it
+        try:
+            await db.clicks.update_one(key, {"$inc": {"n": 1}}, upsert=True)
+            return True
+        except Exception:
+            if attempt == 2:
+                raise
+    return False
+
+
+@app.post("/api/track")
+async def track(request: Request):
+    try:
+        ip = request.client.host if request.client else "?"
+        await count_tap(await _small_body(request, TRACK_MAX_BYTES), ip)
+    except Exception:
+        log.exception("tap counter failed")
+    return Response(status_code=204)
 
 
 REPORT_REASONS = {"spam", "abuse", "sexual", "violence", "copyright", "other"}
@@ -494,4 +554,5 @@ async def maintenance_loop():
 @app.on_event("startup")
 async def startup():
     await ensure_indexes()
+    await db.clicks.create_index([("day", 1), ("app", 1), ("event", 1)], unique=True)
     asyncio.create_task(maintenance_loop())

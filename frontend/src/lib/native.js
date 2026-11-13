@@ -30,5 +30,19 @@ export function pickFromNativeBrowser() {
   });
 }
 
+/**
+ * Opens an address outside the app, in the phone's browser; in a normal browser it opens a new tab. Returns false when
+ * this app version cannot do it (older versions keep our own address inside the app): the caller then offers the address
+ * another way.
+ */
+export function openExternal(url) {
+  if (!inApp()) {
+    window.open(url, "_blank", "noopener");
+    return true;
+  }
+  if (!appInfo()?.caps?.includes("open_external")) return false;
+  return postNative({ type: "open_external", url });
+}
+
 export const setOrientation = (mode) => postNative({ type: "orientation", mode }); // "landscape" | "portrait"
 export const setKeepAwake = (on) => postNative({ type: "keep_awake", on: !!on });

@@ -1,0 +1,71 @@
+/* "Browse sites & find a video" sheet (web). Uses the app's own colours and type from App.css. */
+.bs-bg{position:fixed;inset:0;z-index:70;display:flex;justify-content:center;background:#000c;animation:fade .15s ease both}
+.bs{width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);outline:0}
+.bs-top{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 8px max(10px,env(safe-area-inset-left));background:var(--s2);border-bottom:1px solid var(--bd)}
+.bs-top .ib{width:42px;height:42px;background:var(--s3)}
+.bs-top .ib:hover{background:var(--s4)}
+.bs-search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:42px;padding:0 14px;border-radius:99px;background:var(--s3);color:var(--mut);transition:box-shadow .2s}
+.bs-search:focus-within{box-shadow:0 0 0 2px var(--pu)}
+.bs-search svg{flex-shrink:0}
+.bs-search input,.bs-search input:focus,.bs-search input:focus-visible{flex:1;min-width:0;height:100%;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;font-size:15px;color:var(--tx);text-overflow:ellipsis}
+.bs-search input::placeholder{color:#5f5f76;text-overflow:ellipsis}
+
+.bs-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:14px;padding:16px max(16px,env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+/* the list scrolls; its parts are never squeezed to fit */
+.bs-body>*{flex-shrink:0}
+.bs h2{font:800 22px/1.2 var(--head);letter-spacing:-.2px;overflow-wrap:anywhere}
+.bs-sub{color:var(--mut);font-size:13px;line-height:1.5}
+.bs-note{color:var(--mut);font-size:12px;line-height:1.5}
+
+.bs-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.bs-site{position:relative;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;border-radius:14px;text-align:start;background:var(--s2);border:1px solid var(--bd);transition:border-color .2s,background-color .2s,transform .15s}
+.bs-site:hover{border-color:var(--bd2);background:var(--s3)}
+.bs-site:active{transform:scale(.98)}
+.bs-tile{width:40px;height:40px;margin-bottom:6px;display:grid;place-items:center;border-radius:12px;background:#3a0a2c;border:1px solid #ec489977;font:800 18px var(--head);color:var(--tx)}
+.bs-site b{max-width:100%;font:700 15px var(--head);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bs-site small{max-width:100%;color:var(--mut);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bs-ext{position:absolute;top:14px;right:14px;color:var(--mut)}
+.bs-legal{display:flex;gap:8px;padding:12px;border-radius:14px;background:var(--s2);border:1px solid var(--bd);color:var(--mut);font-size:12px;line-height:1.45}
+.bs-legal svg{flex-shrink:0;margin-top:1px}
+
+.bs-back{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 12px 0 8px;margin:-4px 0 -4px -8px;border-radius:12px;color:var(--cy);font-size:13px;font-weight:700;transition:background-color .2s}
+.bs-back:hover{background:var(--s3)}
+.bs-steps{counter-reset:bs;display:flex;flex-direction:column;gap:10px;padding:0;margin:0;list-style:none}
+.bs-steps li{counter-increment:bs;display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.35}
+.bs-steps li::before{content:counter(bs);flex-shrink:0;width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:var(--s3);border:1px solid var(--bd2);color:var(--cy);font:700 13px var(--head)}
+.bs-paste{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:0 18px;border-radius:16px;font:700 16px var(--head);color:#000;background:var(--grad);transition:filter .2s,transform .15s}
+.bs-paste:hover{filter:brightness(1.08)}
+.bs-paste:active{transform:scale(.98)}
+.bs-paste:disabled{opacity:.7}
+.bs-link{display:flex;flex-wrap:wrap;gap:8px}
+.bs-link input{flex:1 1 220px;min-width:0;padding:13px 14px;border-radius:12px;background:var(--s2);border-color:var(--bd);font-size:16px}
+.bs-link .set{flex:0 0 auto;min-height:48px;padding:0 18px;white-space:nowrap}
+.bs-link .set:disabled,.bs-found .set:disabled{opacity:.55}
+.bs-hint{color:var(--warn);font-size:13px;line-height:1.45}
+.bs-err{color:#ff8aa3;font-size:13px;line-height:1.45}
+.bs-reopen{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:40px;color:var(--cy);font-size:13px;font-weight:700}
+.bs-reopen:hover{text-decoration:underline}
+
+.bs-found{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:var(--s3);border:1px solid #38bdf866;animation:pop .2s ease both}
+.bs-found-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.bs-found-t small{color:var(--cy);font-size:11px;font-weight:700;letter-spacing:.3px}
+.bs-found-t b{font:700 14px var(--head);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bs-found-t span{color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bs-found .set{flex-shrink:0;min-height:42px;padding:0 14px;white-space:nowrap}
+.bs-x{flex-shrink:0;width:40px;height:40px;display:grid;place-items:center;border-radius:10px;color:var(--mut);transition:background-color .2s}
+.bs-x:hover{background:var(--s4);color:var(--tx)}
+
+/* narrow phones: the action goes under the field / under the link instead of squeezing it */
+@media(max-width:420px){
+  .bs-link .set{flex:1 1 100%}
+  .bs-found{flex-wrap:wrap}
+  .bs-found-t{flex:1 1 calc(100% - 50px)}
+  .bs-found .set{order:3;flex:1 1 100%}
+}
+/* wide screens: a centred panel instead of the whole screen */
+@media(min-width:720px){
+  .bs-bg{align-items:center;padding:24px}
+  .bs{max-width:560px;height:auto;max-height:min(760px,calc(100dvh - 48px));border:1px solid var(--bd2);border-radius:22px;overflow:hidden;box-shadow:0 30px 80px -20px #000;animation:pop .2s ease both}
+  .bs-top{padding:10px 12px}
+  .bs-body{padding:20px 22px 22px}
+}

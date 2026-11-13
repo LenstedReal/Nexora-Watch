@@ -12,7 +12,7 @@ export const OWNER = {
   controller: "LenstedReal (Nexora Watch geliştiricisi)",
   address: "", // e.g. "İl/İlçe, Türkiye" — optional, shown only when filled
 };
-const UPDATED = "7 Kasım 2026";
+const UPDATED = "13 Kasım 2026";
 
 export const LEGAL_PAGES = [
   { path: "/gizlilik", label: "Gizlilik Politikası" },
@@ -59,9 +59,12 @@ function LegalLayout({ title, children }) {
               Nexora<b>Watch</b>
             </span>
           </Link>
-          <a className="lp-nav-cta" href={cfg.play_url || cfg.apk_url} target="_blank" rel="noreferrer">
-            <Download size={15} /> <span>İndir</span>
-          </a>
+          {/* No download button before the app is on Google Play. */}
+          {cfg.play_url && (
+            <a className="lp-nav-cta" href={cfg.play_url} target="_blank" rel="noreferrer">
+              <Download size={15} /> <span>İndir</span>
+            </a>
+          )}
         </header>
       </div>
       <article className="legal-doc">
@@ -148,7 +151,7 @@ export function Privacy() {
     <LegalLayout title="Gizlilik Politikası">
       <div className="legal-box">
         <p>
-          <b>Kısaca:</b> Hesap yok, reklam yok, takip/analiz SDK'sı yok. Odayı kullanman için gereken en az veriyi işliyoruz ve kısa
+          <b>Kısaca:</b> Hesap yok; bugün reklam ve takip/analiz SDK'sı da yok. Odayı kullanman için gereken en az veriyi işliyoruz ve kısa
           sürede otomatik olarak siliyoruz. Verilerini satmıyoruz.
         </p>
       </div>
@@ -212,6 +215,11 @@ export function Privacy() {
         <li>Yetkili kamu kurumları: yalnızca yasal bir zorunluluk olduğunda.</li>
       </ul>
       <p>Verilerini reklam veya pazarlama amacıyla üçüncü kişilere satmıyor, kiralamıyor veya aktarmıyoruz.</p>
+      <p>
+        <b>Reklamlar:</b> Bugün uygulamada ve sitede reklam göstermiyoruz. İleride mobil uygulamada, oda dışındaki ekranlarda reklam
+        göstermeyi planlıyoruz; izleme sırasında reklam gösterilmeyecek. Reklam eklendiği sürümle birlikte reklam ortağının kim olduğunu ve
+        hangi verileri işlediğini bu sayfada ve Google Play'deki veri güvenliği bölümünde açıklayacağız.
+      </p>
       <h2>6. Güvenlik</h2>
       <p>
         Tüm bağlantılar HTTPS/WSS ile şifrelenir. Oda anahtarları sunucuda yalnızca özet (hash) olarak saklanır. Video adresleri süreli ve

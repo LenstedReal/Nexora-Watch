@@ -9,7 +9,7 @@ import { defaultRoomName, errorText, useI18n } from "@/i18n";
 import { api } from "@/lib/api";
 import { clearIdent, getIdent, lastNickname, saveIdent, saveNickname } from "@/lib/session";
 import { useAppConfig } from "@/lib/config";
-import { inApp } from "@/lib/native";
+import { inApp, openExternal } from "@/lib/native";
 import { SiteFooter } from "@/pages/Legal";
 import "@/landing.css";
 
@@ -113,7 +113,18 @@ export default function Home() {
   };
 
   const toForm = () => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  const storeUrl = cfg.play_url || cfg.apk_url;
+  // In the app this button sends people to the website in the phone's browser. App versions that cannot open our own
+  // address outside the app get the address on the clipboard instead.
+  const openWeb = async () => {
+    const url = cfg.web_url || window.location.origin;
+    if (openExternal(url)) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t("web_copied"));
+    } catch {
+      toast(t("web_open_hint", { host: url.replace(/^https?:\/\//, "") }));
+    }
+  };
 
   return (
     <div className="lp" data-testid="home-page">
@@ -135,7 +146,7 @@ export default function Home() {
               {langs.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </label>
-          {!app && <a className="lp-nav-cta" href={storeUrl} target="_blank" rel="noreferrer" aria-label={t("lp_download")} title={t("lp_download")} data-testid="nav-download"><Download size={15} /> <span>{t("lp_download")}</span></a>}
+          {!app && cfg.play_url && <a className="lp-nav-cta" href={cfg.play_url} target="_blank" rel="noreferrer" aria-label={t("lp_download")} title={t("lp_download")} data-testid="nav-download"><Download size={15} /> <span>{t("lp_download")}</span></a>}
         </div>
       </header>
 
@@ -148,17 +159,14 @@ export default function Home() {
           <p className="lp-pitch">{t("lp_pitch")}</p>
           {!app && (
             <div className="lp-ctas">
-              {cfg.play_url ? (
+              {/* No download button before the app is on Google Play. */}
+              {cfg.play_url && (
                 <a className="lp-btn primary" href={cfg.play_url} target="_blank" rel="noreferrer" data-testid="cta-store">
                   <Smartphone size={18} /> {t("lp_play")}
                 </a>
-              ) : (
-                <a className="lp-btn primary" href={cfg.apk_url} target="_blank" rel="noreferrer" data-testid="cta-store">
-                  <Download size={18} /> {t("lp_apk")}
-                </a>
               )}
-              <button className="lp-btn ghost" onClick={toForm} data-testid="cta-web">
-                <MonitorPlay size={18} /> {t("lp_web")}
+              <button className={`lp-btn ${cfg.play_url ? "ghost" : "primary"}`} onClick={toForm} data-testid="cta-start">
+                <Sparkles size={18} /> {t("lp_start")}
               </button>
             </div>
           )}
@@ -270,13 +278,17 @@ export default function Home() {
         <h2>{t("lp_final")}</h2>
         <div className="lp-ctas center">
           {app ? (
-            <button className="lp-btn primary" onClick={toForm} data-testid="cta-start"><Sparkles size={18} /> {t("lp_start")}</button>
+            <button className="lp-btn primary" onClick={openWeb} data-testid="cta-web"><MonitorPlay size={18} /> {t("lp_web")}</button>
           ) : (
             <>
-              <a className="lp-btn primary" href={storeUrl} target="_blank" rel="noreferrer">
-                <Download size={18} /> {cfg.play_url ? t("lp_play") : t("lp_apk")}
-              </a>
-              <button className="lp-btn ghost" onClick={toForm}><MonitorPlay size={18} /> {t("lp_web")}</button>
+              {cfg.play_url && (
+                <a className="lp-btn primary" href={cfg.play_url} target="_blank" rel="noreferrer" data-testid="cta-store-final">
+                  <Smartphone size={18} /> {t("lp_play")}
+                </a>
+              )}
+              <button className={`lp-btn ${cfg.play_url ? "ghost" : "primary"}`} onClick={toForm} data-testid="cta-start-final">
+                <Sparkles size={18} /> {t("lp_start")}
+              </button>
             </>
           )}
         </div>

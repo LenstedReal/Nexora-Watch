@@ -297,7 +297,7 @@ input::placeholder{color:#5f5f76}
 .consent .chk input{width:20px;height:20px;padding:0;flex-shrink:0;accent-color:#ec4899;margin-top:1px}
 .consent .note a{color:var(--cy)}
 /* inside the mobile app: no "download the app" calls to action */
-html.in-app .lp-nav-cta,html.in-app [data-testid="cta-store"],html.in-app [data-testid="cta-web"],html.in-app .lp-soon{display:none!important}
+html.in-app .lp-nav-cta,html.in-app [data-testid="cta-store"],html.in-app .lp-soon{display:none!important}
 
 /* phone landscape = video fills the screen (the app's rotate button lives in the stage's tool row) */
 @media (orientation:landscape) and (max-height:520px){

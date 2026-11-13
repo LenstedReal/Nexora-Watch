@@ -6,13 +6,14 @@ Mevcut kurulum: Oracle Cloud **zeppelin** (Ubuntu 24.04, 1 GB RAM + 2 GB swap), 
 |---|---|
 | `https://nexora.lenstedreal.info` | Web uygulaması (tanıtım + web'de izleme + yasal sayfalar) ve `/api` (backend + WebSocket) |
 | `https://me.lenstedreal.info` | Kişisel site (`site/personal/index.html`) |
+| `https://apk.lenstedreal.info` | İndirme sayfası (`site/apk/index.html`) ve dokunma sayacı (`/api/track`) |
 
 ## Güncelleme (her yeni sürümde)
 
 `main` dalına push yeterli. Sunucuda komut çalıştırmak gerekmez:
 
 1. GitHub Actions (`.github/workflows/deploy.yml`) iki imajı derler ve GHCR'a yükler:
-   API (`nexora-watch-backend`) ve web + Caddy + kişisel site (`nexora-watch-web`).
+   API (`nexora-watch-backend`) ve web + Caddy + kişisel site + indirme sayfası (`nexora-watch-web`).
 2. Sunucu yalnızca bu imajları indirir ve servisleri yeniden başlatır (`deploy/server-update.sh`).
    1 GB'lık makinede artık derleme yapılmaz.
 3. Yeni sürüm cevap vermezse iş kırmızıya döner ve sebebi GitHub'daki çalışma sayfasında yazar.
@@ -20,7 +21,7 @@ Mevcut kurulum: Oracle Cloud **zeppelin** (Ubuntu 24.04, 1 GB RAM + 2 GB swap), 
 Canlıdaki sürüm: <https://nexora.lenstedreal.info/version.txt> (`<uygulama sürümü> <commit>`).
 
 ### Yeni sürüm kullanıcıya nasıl ulaşır?
-- İki sitede de sayfalar tarayıcının önbelleğinden sunucuya sorulmadan açılmaz (`Cache-Control: no-cache`). Yalnızca
+- Üç sitede de sayfalar tarayıcının önbelleğinden sunucuya sorulmadan açılmaz (`Cache-Control: no-cache`). Yalnızca
   uygulamanın, adı her derlemede değişen dosyaları (`/static/...`) kalıcı olarak önbelleğe alınır. Kurallar
   `deploy/Caddyfile` içindedir.
 - Açık kalmış bir sekme ya da arka planda bekleyen mobil uygulama, `/version.txt` dosyasına bakarak yeni sürümü
@@ -57,6 +58,9 @@ PERSONAL_DOMAIN=me.lenstedreal.info
 ```
 Diğer ayarlar için kök dizindeki `.env.example` dosyasına bak.
 
+`APK_DOMAIN` yazılmazsa `apk.lenstedreal.info` kullanılır; `.env` dosyasına eklemek gerekmez. İndirme sayfasında
+sayılacak uygulamalar için `TRACK_APPS` (varsayılan `velvet,zeppelin`) yalnızca yeni bir uygulama eklenince yazılır.
+
 ## 1 GB RAM ayarı (`docker-compose.override.yml`, sadece sunucuda)
 ```yaml
 services:
@@ -73,12 +77,39 @@ services:
 |---|---|---|---|
 | A | `nexora` | 158.101.173.231 | **DNS only (gri)** |
 | A | `me` | 158.101.173.231 | **DNS only (gri)** |
+| A | `apk` | 158.101.173.231 | **DNS only (gri)** |
 
 `api`, `app`, `stream`, `backend` kayıtları başka projeye ait — dokunma.
 
 ## Oracle güvenlik
 - Security List: TCP 80 ve 443 açık (WireGuard 51820/UDP ve 51821/TCP kuralları korunuyor).
 - Sunucu içi iptables: 80/443 kuralları `netfilter-persistent save` ile kalıcı.
+
+## İndirme sayfası (apk.lenstedreal.info)
+
+Tek dosya: `site/apk/index.html`. Uygulamalar, görev hesapları ve bekleme süresi dosyanın en altındaki kodun
+başında, **AYARLAR** bölümündedir (`APPS`, `TASKS`, `MIN_SECONDS`). Yeni sürümde yalnızca ilgili uygulamanın
+`link` ve `version` değeri değişir; `link` boş bırakılırsa kart "İndirme geçici olarak kapalı" yazar.
+Kişisel sitedeki "APK indirmeler" kartı bu adrese `site/personal/index.html` içindeki `APK_SITE` ile bağlanır.
+
+Sertifika: Caddy, DNS kaydı sunucuyu gösterdiği anda sertifikayı kendisi alır. Kayıt yoksa ya da henüz
+yayılmadıysa yalnızca bu adres açılmaz; diğer iki site etkilenmez ve Caddy aralıklarla yeniden dener.
+
+### Dokunma sayacı
+Sayfa, indirme düğmelerine her dokunuşta `/api/track` adresine küçük bir bildirim gönderir. Sunucu yalnızca
+gün + uygulama + adım başına bir sayı tutar (`clicks` koleksiyonu); IP adresi, tarayıcı bilgisi ya da ziyaretçiyle
+ilgili başka hiçbir şey kaydedilmez. Günler UTC'ye göredir. Aynı adresten saatte en fazla 60 dokunuş sayılır.
+
+Adımlar: `open` (karttaki İndir), `age_ok` (18+ onayı), `task_done` (bir hesap ziyareti tamamlandı), `download`
+(son İndir düğmesi).
+
+```bash
+cd ~/Nexora-Watch
+# Toplamlar (uygulama ve adım başına):
+sudo docker compose exec mongo mongosh nexora --quiet --eval 'db.clicks.aggregate([{$group:{_id:{app:"$app",event:"$event"},n:{$sum:"$n"}}},{$sort:{"_id.app":1,"_id.event":1}}]).forEach(d=>print(d._id.app, d._id.event, d.n))'
+# Son günler, gün gün:
+sudo docker compose exec mongo mongosh nexora --quiet --eval 'db.clicks.find({},{_id:0}).sort({day:-1,app:1,event:1}).limit(40).forEach(d=>print(d.day, d.app, d.event, d.n))'
+```
 
 ## Moderasyon: şikâyetleri okumak
 ```bash

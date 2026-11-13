@@ -1,0 +1,456 @@
+<!doctype html>
+<!--
+  ============================================================================================
+  LenstedReal indirme sayfası (apk.lenstedreal.info) — DÜZENLEME REHBERİ
+  - Uygulamalar, görev hesapları ve bekleme süresi: sayfanın en altındaki kodun başında, "AYARLAR" bölümünde.
+      APPS         her uygulama bir kayıt: ad, açıklama, sürüm, indirme bağlantısı (link)
+      TASKS        indirmeden önce açılması istenen hesaplar (sırayla)
+      MIN_SECONDS  bir hesapta en az kaç saniye kalınacağı
+    Yeni sürüm çıkınca yalnızca o uygulamanın "link" ve "version" değerini değiştir.
+    "link" boş bırakılırsa kartta "İndirme geçici olarak kapalı" yazar.
+  - Neon bağlantı düğmeleri: id="links" içindeki a etiketleri (kişisel sitedekiyle aynı bileşen).
+  Kurallar: bu sayfada Google Play'deki uygulama ve oyunlara bağlantı verilmez; karakter görseli kullanılmaz.
+  Yayına alma: main dalına push yeterli; GitHub Actions siteyi kendisi günceller.
+  ============================================================================================
+-->
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LenstedReal — İndirmeler</title>
+<meta name="description" content="LenstedReal'ın Play Store dışında dağıttığı Android uygulamaları.">
+<link rel="canonical" href="https://apk.lenstedreal.info/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="LenstedReal">
+<meta property="og:url" content="https://apk.lenstedreal.info/">
+<meta property="og:title" content="LenstedReal — İndirmeler">
+<meta property="og:description" content="Play Store dışında dağıttığım Android uygulamaları.">
+<meta property="og:locale" content="tr_TR">
+<meta name="theme-color" content="#09090d">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#09090d;--s1:#11111a;--s2:#171723;--bd:#262636;--tx:#f5f5fa;--mut:#9a9ab0;--blue:#38bdf8;--pink:#ec4899;--red:#ff4d6d;--ok:#34d399;--grad:linear-gradient(100deg,#38bdf8,#818cf8 50%,#ec4899)}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--tx);font:16px/1.6 'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+[hidden]{display:none!important}
+.bg{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.bg i{position:absolute;border-radius:50%;filter:blur(100px);opacity:.3;animation:float 20s ease-in-out infinite alternate}
+.bg i:nth-child(1){width:560px;height:560px;background:#3b82f6;top:-220px;left:-180px}
+.bg i:nth-child(2){width:480px;height:480px;background:#ec4899;bottom:-200px;right:-160px;animation-delay:-8s}
+.bg b{position:absolute;inset:0;background-image:linear-gradient(#ffffff07 1px,transparent 1px),linear-gradient(90deg,#ffffff07 1px,transparent 1px);background-size:52px 52px;mask-image:radial-gradient(ellipse at 50% 20%,#000 25%,transparent 70%)}
+@keyframes float{to{transform:translate(70px,50px) scale(1.15)}}
+main{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:max(28px,env(safe-area-inset-top)) 16px 40px}
+nav{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0 30px}
+.logo{font:800 20px Outfit,sans-serif;letter-spacing:-.3px;text-decoration:none}
+.logo span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.back{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:13px;border:1px solid #ffffff26;background:#ffffff0a;font:700 14px Outfit,sans-serif;text-decoration:none;white-space:nowrap}
+.back:hover{background:#ffffff16}
+.hero{padding:44px 0 34px}
+.tag{display:inline-flex;gap:8px;align-items:center;font-size:12px;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;color:var(--blue);border:1px solid #38bdf855;background:#38bdf812;padding:6px 12px;border-radius:99px}
+h1{font:800 clamp(42px,10vw,84px)/1 Outfit,sans-serif;letter-spacing:-2.5px;margin:22px 0 16px}
+h1 .g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 30px #ec489955)}
+.lead{font-size:clamp(17px,2.4vw,21px);color:var(--mut);max-width:640px}
+section{padding:34px 0}
+h2{font:800 clamp(24px,4.4vw,34px) Outfit,sans-serif;letter-spacing:-.6px;margin-bottom:18px}
+.k{color:var(--pink);font-size:12px;letter-spacing:3px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:8px}
+.note{color:var(--mut);font-size:14px;max-width:720px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:11px 18px;border-radius:14px;font:700 15px Outfit,sans-serif;text-decoration:none;transition:transform .15s,filter .2s,background-color .2s;-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(.97)}
+.btn.p{background:linear-gradient(120deg,#3b82f6,#8b5cf6 50%,#ec4899);color:#fff;box-shadow:0 12px 40px -12px #ec4899aa}
+.btn.p:hover{filter:brightness(1.1)}
+.btn.g{border:1px solid #ffffff26;background:#ffffff0a}
+.btn.g:hover{background:#ffffff16}
+.btn.off{opacity:.55;cursor:default;pointer-events:none}
+.btn:focus-visible,.back:focus-visible,.x:focus-visible,.pol:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+.app{position:relative;display:flex;flex-direction:column;background:linear-gradient(160deg,#1a1a28cc,#11111acc);border:1px solid var(--bd);border-radius:22px;padding:22px;transition:border-color .25s,box-shadow .25s}
+.app:hover{border-color:#ec489966;box-shadow:0 24px 60px -28px #ec4899aa}
+.app .top{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.app .ph{flex:0 0 52px;width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font:800 24px Outfit,sans-serif;background:linear-gradient(135deg,#3b82f633,#ec489933);border:1px solid #ffffff1c}
+.app h3{font:700 21px/1.2 Outfit,sans-serif;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.app p{color:var(--mut);font-size:15px}
+.app .ver{font-size:13px;margin-top:6px;color:#7d7d95}
+.app .act{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.app .pol{display:inline-block;margin-top:14px;padding:6px 0;font-size:13px;color:var(--mut);text-underline-offset:3px}
+.app .pol:hover{color:var(--tx)}
+.b18{display:inline-flex;align-items:center;justify-content:center;font:800 12px/1 Outfit,sans-serif;letter-spacing:.5px;padding:5px 8px;border-radius:8px;background:#ff4d6d22;color:var(--red);border:1px solid #ff4d6d88}
+.how{list-style:none;counter-reset:s;display:grid;gap:10px;max-width:720px;color:#c9c9d8;font-size:15px}
+.how li{counter-increment:s;position:relative;padding-left:38px}
+.how li::before{content:counter(s);position:absolute;left:0;top:0;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font:700 13px Outfit,sans-serif;background:var(--s2);border:1px solid var(--bd);color:var(--tx)}
+footer{border-top:1px solid var(--bd);margin-top:20px;padding:26px 0 calc(26px + env(safe-area-inset-bottom));color:#7b7b92;font-size:13px;display:grid;gap:10px}
+footer .row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px 18px}
+footer a{color:#b9b9cc;text-underline-offset:3px}
+footer .priv{max-width:760px;line-height:1.55}
+
+/* --- tam ekran pencereler: 18+ onayı ve görev ekranı --- */
+.ov{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));background:#05050ae0;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);overflow-y:auto}
+.ov.full{background:#07070c}
+.sheet{position:relative;width:100%;max-width:440px;margin:auto;background:linear-gradient(160deg,#1a1a28,#11111a);border:1px solid var(--bd);border-radius:22px;padding:24px;box-shadow:0 30px 80px -30px #ec4899aa}
+.sheet h2{font-size:24px;margin:4px 44px 8px 0}
+.sheet p{color:var(--mut);font-size:15px}
+.x{position:absolute;top:12px;right:12px;width:44px;height:44px;border-radius:12px;border:1px solid var(--bd);background:#ffffff0a;color:var(--mut);font-size:18px;line-height:1}
+.x:hover{color:var(--tx);background:#ffffff16}
+.age{text-align:center}
+.age .b18{font-size:22px;padding:12px 16px;border-radius:14px;margin-bottom:14px;box-shadow:0 0 30px -8px var(--red)}
+.age h2{margin:0 0 8px}
+.age .col{display:grid;gap:10px;margin-top:22px}
+.bar{height:8px;border-radius:99px;background:var(--s2);border:1px solid var(--bd);overflow:hidden;margin:18px 0 6px}
+.bar i{display:block;height:100%;width:0;background:var(--grad);border-radius:99px;transition:width .35s ease}
+.cnt{font:700 13px Outfit,sans-serif;color:var(--mut);text-align:right}
+.cnt b{color:var(--tx)}
+.tl{list-style:none;display:grid;gap:10px;margin:12px 0 4px}
+.t{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px;border-radius:16px;background:#ffffff08;border:1px solid var(--bd)}
+.t.done{border-color:#34d39966;background:#34d39910}
+.t.lock{opacity:.6}
+.t .n{flex:0 0 30px;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font:700 14px Outfit,sans-serif;background:var(--s2);border:1px solid var(--bd)}
+.t.done .n{background:#34d39922;border-color:#34d39977;color:var(--ok)}
+.t .m{flex:1 1 120px;min-width:0;display:grid;line-height:1.3}
+.t .m b{font:700 15px Outfit,sans-serif}
+.t .m span{color:var(--mut);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t .a{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+.t .btn{min-height:44px;padding:9px 16px;font-size:14px;border-radius:12px}
+.t .st{font:700 14px Outfit,sans-serif;color:var(--ok);padding:0 4px;white-space:nowrap}
+.t .wait{flex-basis:100%;font-size:13px;color:var(--mut)}
+.msg{min-height:22px;margin-top:8px;font-size:14px;color:#fbbf24}
+.msg.good{color:var(--ok)}
+.go{margin-top:10px}
+.go .btn{width:100%;min-height:52px;font-size:16px}
+.go .closed{display:block;text-align:center;padding:14px;border-radius:14px;border:1px dashed var(--bd);color:var(--mut);font-size:14px}
+.sheet small{display:block;color:#7b7b92;font-size:12.5px;margin-top:14px;line-height:1.5}
+
+/* --- bağlantı düğmeleri: neon görseller links/ klasöründe (iki sayfada aynı) --- */
+.nl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 18px;max-width:760px;margin-top:20px}
+.nl-b{display:block;border-radius:999px;transition:filter .2s,transform .15s;-webkit-tap-highlight-color:transparent}
+.nl-b img{display:block;width:100%;height:auto;aspect-ratio:796/204}
+.nl-b:hover{filter:brightness(1.15)}
+.nl-b:active{transform:scale(.985)}
+.nl-b:focus-visible{outline:2px solid #fff;outline-offset:2px}
+@media (max-width:640px){.nl{grid-template-columns:1fr;max-width:440px}}
+
+@media (max-width:420px){.sheet{padding:20px 16px}.t{padding:10px}}
+@media (prefers-reduced-motion:reduce){.bg i{animation:none}html{scroll-behavior:auto}.btn,.nl-b,.bar i,.app{transition:none}}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i></i><i></i><b></b></div>
+<main>
+  <nav>
+    <a class="logo" href="./" aria-label="LenstedReal">Lensted<span>Real</span></a>
+    <a class="back" href="https://me.lenstedreal.info">LenstedReal kimdir? →</a>
+  </nav>
+
+  <header class="hero">
+    <span class="tag">Android · APK</span>
+    <h1><span class="g">İndirmeler</span></h1>
+    <p class="lead">Play Store dışında dağıttığım uygulamalar.</p>
+  </header>
+
+  <section id="apps" aria-label="Uygulamalar">
+    <div class="grid" id="app-list"></div>
+    <noscript><p class="note">Uygulama listesi ve indirme düğmeleri için tarayıcında JavaScript açık olmalı.</p></noscript>
+  </section>
+
+  <section id="how">
+    <span class="k">Nasıl indirilir?</span>
+    <h2>Üç adım.</h2>
+    <ol class="how">
+      <li>Uygulamanın kartındaki <b>İndir</b> düğmesine dokun.</li>
+      <li>Açılan ekrandaki hesapları sırayla takip et ve bu sayfaya dön.</li>
+      <li>Beliren <b>İndir</b> düğmesi önce kısa bir reklam sayfasını, ardından dosyanın indirme sayfasını yeni sekmede açar.</li>
+    </ol>
+  </section>
+
+  <section id="links">
+    <span class="k">Bağlantılar</span>
+    <h2>Beni buralarda bulursun.</h2>
+    <div class="nl">
+      <a class="nl-b" href="https://github.com/LenstedReal" target="_blank" rel="noopener" title="GitHub"><img src="links/github.webp" alt="GitHub @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://www.youtube.com/@lenstedreal" target="_blank" rel="noopener" title="YouTube"><img src="links/youtube.webp" alt="YouTube @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://www.instagram.com/lenstedreal/" target="_blank" rel="noopener" title="Instagram"><img src="links/instagram.webp" alt="Instagram @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://www.tiktok.com/@lenstedreal" target="_blank" rel="noopener" title="TikTok"><img src="links/tiktok.webp" alt="TikTok @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://open.spotify.com/user/lenstedreal" target="_blank" rel="noopener" title="Spotify"><img src="links/spotify.webp" alt="Spotify @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+      <a class="nl-b" href="https://x.com/lenstedreal" target="_blank" rel="noopener" title="X"><img src="links/x.webp" alt="X @lenstedreal" width="796" height="204" loading="lazy" decoding="async"></a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="row"><span>© <span id="y">2026</span> LenstedReal</span><span><a href="https://me.lenstedreal.info">me.lenstedreal.info</a> · <a href="mailto:lenstedreal@gmail.com">lenstedreal@gmail.com</a></span></div>
+    <p class="priv">Bu sayfa çerez kullanmaz. İndirme düğmelerine kaç kez basıldığı sayılır; kim olduğun kaydedilmez. Yarım kalan indirme adımı yalnızca bu sekmede, sekme kapanana kadar tutulur. Yazı tipleri Google Fonts'tan yüklenir; sayfa açılırken tarayıcın Google'ın sunucularına da bağlanır.</p>
+  </footer>
+</main>
+
+<!-- 18+ onayı: yalnızca adult: true olan uygulamalarda, görev ekranından önce -->
+<div class="ov full" id="age" role="dialog" aria-modal="true" aria-labelledby="age-t" aria-describedby="age-d" hidden>
+  <div class="sheet age">
+    <span class="b18" aria-hidden="true">18+</span>
+    <h2 id="age-t">Hassas içerik</h2>
+    <p id="age-d">Bu uygulama yalnızca 18 yaş ve üzeri içindir.</p>
+    <div class="col">
+      <button class="btn p" id="age-yes" type="button">18 yaşından büyüğüm, devam et</button>
+      <button class="btn g" id="age-no" type="button">Geri dön</button>
+    </div>
+  </div>
+</div>
+
+<!-- görev ekranı -->
+<div class="ov" id="tasks" role="dialog" aria-modal="true" aria-labelledby="tk-t" aria-describedby="tk-d" hidden>
+  <div class="sheet">
+    <button class="x" id="tk-x" type="button" aria-label="Kapat">✕</button>
+    <span class="k">İndirme</span>
+    <h2 id="tk-t"></h2>
+    <p id="tk-d"></p>
+    <div class="bar" id="tk-bar" role="progressbar" aria-valuemin="0" aria-valuenow="0"><i></i></div>
+    <div class="cnt" id="tk-c"></div>
+    <ol class="tl" id="tk-l"></ol>
+    <p class="msg" id="tk-m" role="status" aria-live="polite"></p>
+    <div class="go" id="tk-go"></div>
+    <small>Bu adımlar her indirmede yeniden istenir.</small>
+  </div>
+</div>
+
+<script>
+/* ============================== AYARLAR — elle düzenlenebilir ============================== */
+var MIN_SECONDS = 4;   // bir hesapta en az kaç saniye kalınmalı (3, 4, 5 …)
+
+var APPS = [
+  { id: "velvet", name: "Velvet Cake AI", letter: "V", adult: true,
+    text: "Yetişkinler için yapay zekâ sohbet uygulaması",
+    version: "",                                   // biliniyorsa yaz: "1.2.0"
+    link: "https://shrinkme.click/qjB9",           // ShrinkMe kısa bağlantısı (boşsa: "İndirme geçici olarak kapalı")
+    tryUrl: "https://velvetcakeai.vercel.app/app", // "Tarayıcıda dene" düğmesi
+    policyUrl: "https://velvetcakeai.vercel.app/"  // "Gizlilik ve 18+ politikası" bağlantısı
+  },
+  { id: "zeppelin", name: "Zeppelin VPN", letter: "Z", adult: false,
+    text: "Android için VPN uygulaması",
+    version: "2.4.1",
+    link: "https://shrinkme.click/ZLjsFLa"
+  }
+];
+
+var TASKS = [
+  { name: "Instagram", handle: "@lenstedreal", url: "https://www.instagram.com/lenstedreal/" },
+  { name: "TikTok",    handle: "@lenstedreal", url: "https://www.tiktok.com/@lenstedreal" }
+];
+/* =========================================================================================== */
+
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  var okUrl = function (u) { return typeof u === "string" && /^https:\/\/[^\s"<>]+$/.test(u); };
+  var KEY = "lr-apk-run";
+  var run = null;        // the download in progress: { app, done: [bool], pend: { i, t, left } | null }
+  var opener = null;     // the button that opened a window (focus goes back to it)
+  var ageFor = null;     // the app waiting behind the 18+ question
+
+  /* Tap counter: a number per day, app and step; nothing about the visitor. Failures are ignored. */
+  function track(app, event) {
+    try {
+      if (navigator.sendBeacon) navigator.sendBeacon("/api/track", new Blob([JSON.stringify({ app: app, event: event })], { type: "text/plain" }));
+    } catch (e) { /* counting must never get in the way */ }
+  }
+
+  /* The step in progress is kept for this tab only, so that coming back with the Back button (browsers that
+     open the profile in the same tab) or to a tab the phone had put to sleep continues instead of starting over.
+     A reload or a new visit always starts from zero. */
+  function save() {
+    try {
+      if (!run) sessionStorage.removeItem(KEY);
+      else sessionStorage.setItem(KEY, JSON.stringify({ app: run.app.id, done: run.done, pend: run.pend ? { i: run.pend.i, t: run.pend.t } : null, at: Date.now() }));
+    } catch (e) { /* private mode etc.: the page works without it */ }
+  }
+
+  /* ---------- app cards ---------- */
+  function card(app) {
+    var a = el("article", "app");
+    a.setAttribute("data-app", app.id);
+    var top = el("div", "top");
+    var ph = el("div", "ph", app.letter || app.name.charAt(0)); ph.setAttribute("aria-hidden", "true");
+    var h = el("h3", "", app.name);
+    if (app.adult) { var b = el("span", "b18", "18+"); b.setAttribute("aria-label", "Yalnızca 18 yaş ve üzeri"); h.appendChild(b); }
+    top.appendChild(ph); top.appendChild(h); a.appendChild(top);
+    a.appendChild(el("p", "", app.text));
+    a.appendChild(el("p", "ver", (app.version ? "Sürüm " + app.version + " · " : "") + "Android APK"));
+    var act = el("div", "act");
+    if (okUrl(app.link)) {
+      var dl = el("button", "btn p", "İndir"); dl.type = "button"; dl.setAttribute("data-dl", app.id);
+      dl.setAttribute("aria-label", app.name + " — indir");
+      dl.addEventListener("click", function () { start(app, dl); });
+      act.appendChild(dl);
+    } else {
+      var off = el("span", "btn g off", "İndirme geçici olarak kapalı"); off.setAttribute("data-closed", app.id);
+      act.appendChild(off);
+    }
+    if (okUrl(app.tryUrl)) {
+      var t = el("a", "btn g", "Tarayıcıda dene"); t.href = app.tryUrl; t.target = "_blank"; t.rel = "noopener";
+      act.appendChild(t);
+    }
+    a.appendChild(act);
+    if (okUrl(app.policyUrl)) {
+      var p = el("a", "pol", "Gizlilik ve 18+ politikası"); p.href = app.policyUrl; p.target = "_blank"; p.rel = "noopener";
+      a.appendChild(p);
+    }
+    return a;
+  }
+
+  /* ---------- windows (18+ question, task screen) ---------- */
+  function show(box, focusEl) {
+    box.hidden = false;
+    document.documentElement.style.overflow = "hidden";
+    (focusEl || box).focus({ preventScroll: true });
+  }
+  function hide(box) {
+    box.hidden = true;
+    if ($("age").hidden && $("tasks").hidden) document.documentElement.style.overflow = "";
+  }
+  function backToOpener() { if (opener && document.contains(opener)) opener.focus({ preventScroll: true }); opener = null; }
+  function trap(box, e) {   // Tab stays inside the open window
+    var f = box.querySelectorAll("a[href],button:not([disabled])");
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  function start(app, from) {
+    opener = from || null;
+    track(app.id, "open");
+    if (app.adult) { ageFor = app; show($("age"), $("age-yes")); }
+    else openTasks(app);
+  }
+  function closeAge(back) { ageFor = null; hide($("age")); if (back) backToOpener(); }
+
+  function openTasks(app, restored) {
+    run = { app: app, done: TASKS.map(function () { return false; }), pend: null };
+    if (restored) {
+      run.done = TASKS.map(function (_, i) { return !!(restored.done && restored.done[i]); });
+      if (restored.pend && TASKS[restored.pend.i] && !run.done[restored.pend.i]) run.pend = { i: restored.pend.i, t: restored.pend.t, left: true };
+    }
+    $("tk-t").textContent = app.name;
+    $("tk-d").textContent = TASKS.length
+      ? "İndirme düğmesi, aşağıdaki " + (TASKS.length === 1 ? "hesabı" : TASKS.length + " hesabı") + " takip ettikten sonra açılır. Takip et'e dokun, hesabı takip et ve bu sayfaya dön."
+      : "İndirme hazır.";
+    say("");
+    paint();
+    show($("tasks"), $("tk-x"));
+    save();
+  }
+  function closeTasks() {   // closing always forgets the progress
+    run = null; save();
+    $("tk-go").textContent = ""; $("tk-l").textContent = "";
+    hide($("tasks")); backToOpener();
+  }
+  function say(text, good) { var m = $("tk-m"); m.textContent = text; m.className = "msg" + (good ? " good" : ""); }
+
+  function paint() {
+    if (!run) return;
+    var n = run.done.filter(Boolean).length, total = TASKS.length;
+    var bar = $("tk-bar");
+    bar.setAttribute("aria-valuemax", String(total)); bar.setAttribute("aria-valuenow", String(n));
+    bar.firstChild.style.width = (total ? Math.round((n / total) * 100) : 100) + "%";
+    var c = $("tk-c"); c.textContent = ""; c.appendChild(el("b", "", String(n))); c.appendChild(document.createTextNode(" / " + total));
+    var list = $("tk-l"); list.textContent = "";
+    TASKS.forEach(function (task, i) {
+      var locked = run.done.slice(0, i).indexOf(false) !== -1;
+      var waiting = !!run.pend && run.pend.i === i;
+      var li = el("li", "t" + (run.done[i] ? " done" : locked ? " lock" : ""));
+      li.setAttribute("data-task", String(i));
+      li.appendChild(el("span", "n", run.done[i] ? "✓" : String(i + 1)));
+      var m = el("div", "m"); m.appendChild(el("b", "", task.name)); m.appendChild(el("span", "", task.handle)); li.appendChild(m);
+      var a = el("div", "a");
+      if (run.done[i]) a.appendChild(el("span", "st", "✓ Tamamlandı"));
+      else if (locked) { var lk = el("span", "btn g off", "Sırada"); lk.setAttribute("aria-disabled", "true"); a.appendChild(lk); }
+      else {
+        if (waiting) {
+          var back = el("button", "btn p", "Döndüm"); back.type = "button"; back.setAttribute("data-check", String(i));
+          back.addEventListener("click", function () { settle(true); });
+          a.appendChild(back);
+        }
+        var open = el("a", "btn " + (waiting ? "g" : "p"), waiting ? "Yeniden aç" : "Takip et");
+        open.href = task.url; open.target = "_blank"; open.rel = "noopener"; open.setAttribute("data-open", String(i));
+        open.setAttribute("aria-label", task.name + " " + task.handle + " — takip et");
+        open.addEventListener("click", function () { run.pend = { i: i, t: Date.now(), left: false }; say(""); save(); setTimeout(paint, 0); });
+        a.appendChild(open);
+      }
+      li.appendChild(a);
+      if (waiting && !run.done[i]) li.appendChild(el("span", "wait", "Hesabı takip et, sonra bu sayfaya dön."));
+      list.appendChild(li);
+    });
+    var go = $("tk-go"); go.textContent = "";
+    if (n === total) {
+      if (okUrl(run.app.link)) {   // the link is put on the page only now
+        var d = el("a", "btn p", "İndir"); d.id = "tk-dl"; d.href = run.app.link; d.target = "_blank"; d.rel = "noopener";
+        var appId = run.app.id;
+        d.addEventListener("click", function () { track(appId, "download"); say("İndirme yeni sekmede açıldı.", true); });
+        go.appendChild(d);
+      } else go.appendChild(el("span", "closed", "İndirme geçici olarak kapalı"));
+    }
+  }
+
+  /* A visit counts when at least MIN_SECONDS passed between tapping "Aç" and coming back.
+     The page cannot see what happens on the other site; it only measures the time away. */
+  function settle(manual) {
+    if (!run || !run.pend) return;
+    var p = run.pend;
+    if (!manual && !p.left) return;   // a focus event while the page was never left
+    var secs = (Date.now() - p.t) / 1000;
+    run.pend = null;
+    if (secs >= MIN_SECONDS) {
+      run.done[p.i] = true; track(run.app.id, "task_done");
+      say(run.done.indexOf(false) === -1 ? "Hazır. İndir düğmesi açıldı." : "Tamamlandı. Sıradaki hesaba geç.", true);
+    } else say("Görev tamamlanmadı. Hesabı takip et, sonra dön.");
+    paint(); save();
+    var next = $("tk-dl") || $("tk-l").querySelector("[data-open]");
+    if (next && !$("tasks").hidden) next.focus({ preventScroll: true });
+  }
+  function left() { if (run && run.pend && !run.pend.left) { run.pend.left = true; } }
+
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") { left(); save(); } else settle(false); });
+  window.addEventListener("blur", left);
+  window.addEventListener("focus", function () { settle(false); });
+  window.addEventListener("pagehide", function () { left(); save(); });
+  window.addEventListener("pageshow", function (e) { if (e.persisted) left(); settle(false); });
+
+  document.addEventListener("keydown", function (e) {
+    var age = !$("age").hidden, tasks = !$("tasks").hidden;
+    if (!age && !tasks) return;
+    if (e.key === "Escape") { e.preventDefault(); if (age) closeAge(true); else closeTasks(); }
+    else if (e.key === "Tab") trap(age ? $("age") : $("tasks"), e);
+  });
+  $("age-no").addEventListener("click", function () { closeAge(true); });
+  $("age-yes").addEventListener("click", function () {
+    var app = ageFor; if (!app) return;
+    track(app.id, "age_ok"); closeAge(false); openTasks(app);
+  });
+  $("tk-x").addEventListener("click", closeTasks);
+  $("tasks").addEventListener("click", function (e) { if (e.target === $("tasks")) closeTasks(); });   // backdrop
+
+  /* ---------- start ---------- */
+  var list = $("app-list");
+  APPS.forEach(function (app) { list.appendChild(card(app)); });
+  $("y").textContent = new Date().getFullYear();
+
+  (function resume() {
+    var raw = null;
+    try { raw = sessionStorage.getItem(KEY); sessionStorage.removeItem(KEY); } catch (e) { return; }
+    if (!raw) return;
+    var nav = window.performance && performance.getEntriesByType ? performance.getEntriesByType("navigation")[0] : null;
+    var cameBack = (nav && nav.type === "back_forward") || document.wasDiscarded === true;
+    if (!cameBack) return;   // reload or new visit: start over
+    var s; try { s = JSON.parse(raw); } catch (e) { return; }
+    if (!s || typeof s.at !== "number" || Date.now() - s.at > 15 * 60 * 1000) return;
+    var app = null; APPS.forEach(function (a) { if (a.id === s.app) app = a; });
+    if (!app || !okUrl(app.link)) return;
+    openTasks(app, s);
+    settle(false);
+  })();
+})();
+</script>
+</body>
+</html>

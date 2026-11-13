@@ -1,7 +1,8 @@
 # DOMAIN          -> web app + /api (FastAPI backend, WebSocket included)
 # PERSONAL_DOMAIN -> static personal site
+# APK_DOMAIN      -> static download page (site/apk) + its tap counter (/api/track)
 #
-# Caching rule for both sites: a page is never taken from the browser's cache without asking the server first
+# Caching rule for all sites: a page is never taken from the browser's cache without asking the server first
 # ("no-cache" = keep a copy, but check that it is still current), so a new release is visible at once, in browsers
 # and in the mobile app. Only the app's build files are kept for good: their names change whenever their content does.
 # This file is checked while the image is built (deploy/web.Dockerfile): a mistake here stops the release instead
@@ -43,4 +44,24 @@
 	root * /srv/personal
 	try_files {path} {path}.html {path}/index.html /index.html
 	file_server
+}
+
+{$APK_DOMAIN:apk.lenstedreal.info} {
+	encode gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Cache-Control "no-cache"
+		-Server
+	}
+	root * /srv/apk
+	# The page reports taps on its download buttons (a number per day, nothing about the visitor). Only this one
+	# API path is reachable here; everything else on this address is the static page.
+	handle /api/track {
+		reverse_proxy backend:8001
+	}
+	handle {
+		try_files {path} {path}.html {path}/index.html /index.html
+		file_server
+	}
 }
