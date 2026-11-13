@@ -72,7 +72,10 @@ h2{font:800 clamp(24px,4.4vw,34px) Outfit,sans-serif;letter-spacing:-.6px;margin
 .app{position:relative;display:flex;flex-direction:column;background:linear-gradient(160deg,#1a1a28cc,#11111acc);border:1px solid var(--bd);border-radius:22px;padding:22px;transition:border-color .25s,box-shadow .25s}
 .app:hover{border-color:#ec489966;box-shadow:0 24px 60px -28px #ec4899aa}
 .app .top{display:flex;align-items:center;gap:14px;margin-bottom:12px}
-.app .ph{flex:0 0 52px;width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font:800 24px Outfit,sans-serif;background:linear-gradient(135deg,#3b82f633,#ec489933);border:1px solid #ffffff1c}
+.feat{list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px;padding:0}
+.feat li{font-size:12.5px;line-height:1.3;padding:5px 10px;border-radius:99px;border:1px solid #38bdf844;background:#38bdf810;color:#cfe9ff}
+.app .ph img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+.app .ph{overflow:hidden;flex:0 0 52px;width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font:800 24px Outfit,sans-serif;background:linear-gradient(135deg,#3b82f633,#ec489933);border:1px solid #ffffff1c}
 .app h3{font:700 21px/1.2 Outfit,sans-serif;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .app p{color:var(--mut);font-size:15px}
 .app .ver{font-size:13px;margin-top:6px;color:#7d7d95}
@@ -220,6 +223,7 @@ var MIN_SECONDS = 4;   // bir hesapta en az kaç saniye kalınmalı (3, 4, 5 …
 
 var APPS = [
   { id: "velvet", name: "Velvet Cake AI", letter: "V", adult: true,
+    icon: "icons/velvet.webp",                     // boşsa harfi görünür
     text: "Yetişkinler için yapay zekâ sohbet uygulaması",
     version: "",                                   // biliniyorsa yaz: "1.2.0"
     link: "https://shrinkme.click/qjB9",           // ShrinkMe kısa bağlantısı (boşsa: "İndirme geçici olarak kapalı")
@@ -227,7 +231,9 @@ var APPS = [
     policyUrl: "https://velvetcakeai.vercel.app/"  // "Gizlilik ve 18+ politikası" bağlantısı
   },
   { id: "zeppelin", name: "Zeppelin VPN", letter: "Z", adult: false,
-    text: "Android için VPN uygulaması",
+    icon: "icons/zeppelin.webp",                   // boşsa harfi görünür
+    text: "Android için WireGuard VPN. Hesap istemez, trafik kaydı tutmaz.",
+    features: ["Hazır sunucuya tek dokunuşla bağlan", "Kendi sunucunu kur (ücretsiz Oracle Cloud)", "Topluluk sunucuları"],
     version: "2.4.1",
     link: "https://shrinkme.click/ZLjsFLa"
   }
@@ -256,14 +262,20 @@ var TASKS = [
     } catch (e) { /* counting must never get in the way */ }
   }
 
-  /* The step in progress is kept for this tab only, so that coming back with the Back button (browsers that
-     open the profile in the same tab) or to a tab the phone had put to sleep continues instead of starting over.
-     A reload or a new visit always starts from zero. */
+  /* The step in progress is kept (tab storage + this browser's storage, 15 minutes) so that coming back in any way
+     continues instead of starting over: the Back button, a tab the phone reloaded, an in-app browser that opened
+     the profile in the same view. Closing the task screen with the X forgets it. */
   function save() {
-    try {
-      if (!run) sessionStorage.removeItem(KEY);
-      else sessionStorage.setItem(KEY, JSON.stringify({ app: run.app.id, done: run.done, pend: run.pend ? { i: run.pend.i, t: run.pend.t } : null, at: Date.now() }));
-    } catch (e) { /* private mode etc.: the page works without it */ }
+    // a finished run is not kept: every download asks again
+    var v = run && run.done.indexOf(false) !== -1 ? JSON.stringify({ app: run.app.id, done: run.done, pend: run.pend ? { i: run.pend.i, t: run.pend.t } : null, at: Date.now() }) : null;
+    ["sessionStorage", "localStorage"].forEach(function (n) {
+      try { var st = window[n]; if (v) st.setItem(KEY, v); else st.removeItem(KEY); } catch (e) { /* private mode etc. */ }
+    });
+  }
+  function loadSaved() {
+    var raw = null;
+    ["sessionStorage", "localStorage"].forEach(function (n) { try { if (!raw) raw = window[n].getItem(KEY); } catch (e) {} });
+    return raw;
   }
 
   /* ---------- app cards ---------- */
@@ -271,11 +283,16 @@ var TASKS = [
     var a = el("article", "app");
     a.setAttribute("data-app", app.id);
     var top = el("div", "top");
-    var ph = el("div", "ph", app.letter || app.name.charAt(0)); ph.setAttribute("aria-hidden", "true");
+    var ph = el("div", "ph", app.icon ? null : (app.letter || app.name.charAt(0))); ph.setAttribute("aria-hidden", "true");
+    if (app.icon) { var im = el("img"); im.src = app.icon; im.alt = ""; im.width = 52; im.height = 52; im.decoding = "async";
+      im.onerror = function () { ph.textContent = app.letter || app.name.charAt(0); }; ph.appendChild(im); }
     var h = el("h3", "", app.name);
     if (app.adult) { var b = el("span", "b18", "18+"); b.setAttribute("aria-label", "Yalnızca 18 yaş ve üzeri"); h.appendChild(b); }
     top.appendChild(ph); top.appendChild(h); a.appendChild(top);
     a.appendChild(el("p", "", app.text));
+    if (app.features && app.features.length) {
+      var fl = el("ul", "feat"); app.features.forEach(function (f) { fl.appendChild(el("li", "", f)); }); a.appendChild(fl);
+    }
     a.appendChild(el("p", "ver", (app.version ? "Sürüm " + app.version + " · " : "") + "Android APK"));
     var act = el("div", "act");
     if (okUrl(app.link)) {
@@ -416,6 +433,10 @@ var TASKS = [
   window.addEventListener("focus", function () { settle(false); });
   window.addEventListener("pagehide", function () { left(); save(); });
   window.addEventListener("pageshow", function (e) { if (e.persisted) left(); settle(false); });
+  // Some phones and in-app browsers send no event when you come back: check every second while visible.
+  setInterval(function () {
+    if (run && run.pend && run.pend.left && document.visibilityState !== "hidden" && (Date.now() - run.pend.t) / 1000 >= MIN_SECONDS) settle(false);
+  }, 1000);
 
   document.addEventListener("keydown", function (e) {
     var age = !$("age").hidden, tasks = !$("tasks").hidden;
@@ -438,13 +459,10 @@ var TASKS = [
 
   (function resume() {
     var raw = null;
-    try { raw = sessionStorage.getItem(KEY); sessionStorage.removeItem(KEY); } catch (e) { return; }
+    raw = loadSaved();
     if (!raw) return;
-    var nav = window.performance && performance.getEntriesByType ? performance.getEntriesByType("navigation")[0] : null;
-    var cameBack = (nav && nav.type === "back_forward") || document.wasDiscarded === true;
-    if (!cameBack) return;   // reload or new visit: start over
     var s; try { s = JSON.parse(raw); } catch (e) { return; }
-    if (!s || typeof s.at !== "number" || Date.now() - s.at > 15 * 60 * 1000) return;
+    if (!s || typeof s.at !== "number" || Date.now() - s.at > 15 * 60 * 1000) { save(); return; }
     var app = null; APPS.forEach(function (a) { if (a.id === s.app) app = a; });
     if (!app || !okUrl(app.link)) return;
     openTasks(app, s);
