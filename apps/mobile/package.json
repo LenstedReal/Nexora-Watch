@@ -1,6 +1,6 @@
 {
   "name": "nexora-mobile",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/core/sync.test.ts"
+    "test": "node --experimental-strip-types --test src/core/sync.test.ts src/core/ads.test.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",

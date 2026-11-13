@@ -55,9 +55,10 @@ MIN_AGE = int(os.environ.get("MIN_AGE", "16"))
 OWNER_NAME = os.environ.get("OWNER_NAME", "").strip()
 OWNER_ADDRESS = os.environ.get("OWNER_ADDRESS", "").strip()
 
-# Only sources that work by design: YouTube (official player), Internet Archive (direct files) and Drive (link import).
-# Other platforms return when they get an official-player adapter. Override with ALLOWED_SITES in .env ("domain|Name,...").
-_DEFAULT_SITES = "youtube.com|YouTube,archive.org|Internet Archive,drive.google.com|Google Drive"
+# Only sources that work by design: YouTube, Vimeo and Twitch (their official players), Internet Archive (direct files)
+# and Drive (link import). Other platforms return when they get an official-player adapter.
+# Override with ALLOWED_SITES in .env ("domain|Name,...").
+_DEFAULT_SITES = "youtube.com|YouTube,vimeo.com|Vimeo,twitch.tv|Twitch,kick.com|Kick,archive.org|Internet Archive,drive.google.com|Google Drive"
 ALLOWED_SITES: list[dict] = []
 for _item in (os.environ.get("ALLOWED_SITES") or _DEFAULT_SITES).split(","):
     _dom, _, _name = _item.strip().partition("|")

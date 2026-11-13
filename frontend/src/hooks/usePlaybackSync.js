@@ -31,6 +31,10 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
   const mutedRef = useRef(false);
   const caps = room?.video?.capabilities || {};
   const mediaId = room?.video?.media_id;
+  const [notice, setNotice] = useState(null); // {id, kind, name, time}: what someone else just did, for a few seconds
+  const [pausedBy, setPausedBy] = useState(null);
+  const lastPb = useRef(null);
+  const noticeTimer = useRef(0);
 
   const setMuted = useCallback((m) => {
     mutedRef.current = m;
@@ -183,6 +187,42 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     return () => clearInterval(id);
   }, [mediaId, caps.sync, isHost, conn.clockRef, playerRef, publish, push, tryPlay]);
 
+  // "Deniz paused", "Deniz jumped to 1:23": told to everyone except the person who did it. Nothing on the first look
+  // at a room or a new video, nothing for old news after a reconnect, never more than one at a time.
+  const pb = room?.playback;
+  useEffect(() => {
+    const prev = lastPb.current;
+    lastPb.current = pb;
+    if (!pb) return;
+    if (!prev || prev.media_id !== pb.media_id) {
+      setPausedBy(null);
+      setNotice(null);
+      return;
+    }
+    if ((pb.revision ?? 0) <= (prev.revision ?? 0)) return;
+    if (pb.playing) setPausedBy(null);
+    const by = pb.updated_by;
+    const me = ident?.participant_id;
+    if (!by || by === me) return;
+    const name = roomRef.current?.participants?.find((x) => x.id === by)?.nickname;
+    if (!name || Date.now() + conn.clockRef.current.offset - pb.updated_at > 5000) return;
+    let kind = null;
+    if (pb.playing !== prev.playing) {
+      const dur = playerRef.current?.getDuration?.();
+      const atEnd = !pb.playing && Number.isFinite(dur) && dur > 0 && pb.position >= dur - 1; // the video ended by itself
+      if (!atEnd) kind = pb.playing ? "resumed" : "paused";
+    } else {
+      const expected = prev.playing ? prev.position + (pb.updated_at - prev.updated_at) / 1000 : prev.position;
+      if (Math.abs(pb.position - expected) > 2.5) kind = "seeked";
+    }
+    if (!kind) return;
+    if (kind === "paused") setPausedBy(name);
+    setNotice({ id: pb.revision, kind, name, time: pb.position });
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 3500);
+  }, [pb, ident?.participant_id, conn.clockRef, playerRef]);
+  useEffect(() => () => clearTimeout(noticeTimer.current), []);
+
   useEffect(() => conn.onPlaybackEvent((msg) => {
     const recv = Date.now() + conn.clockRef.current.offset;
     if (typeof msg.cmd_sent_at === "number") push({ event: "command_received", cmd_sent_at: msg.cmd_sent_at, server_at: msg.server_time, received_at: recv });
@@ -217,5 +257,5 @@ export function usePlaybackSync({ room, isHost, conn, playerRef, ident }) {
     p.play().then(() => setNeedsGesture(false)).catch(() => setNeedsGesture(true));
   }, [playerRef, conn.clockRef, setMuted]);
 
-  return { events, needsGesture, resolveGesture, stats, muted, setMuted, autoMuted };
+  return { events, needsGesture, resolveGesture, stats, muted, setMuted, autoMuted, notice, pausedBy };
 }

@@ -1,0 +1,98 @@
+/* ---------- Nexora player: our own controls for links, HLS and uploads (YouTube keeps its own) ---------- */
+.stage.nxp.ctl-off{cursor:none}
+.stage.nxp .stage-title{transition:opacity .25s}
+.stage.nxp.ctl-off .stage-title{opacity:0}
+/* Notes sit above the control bar or under the title, never on top of a button. */
+.stage.nxp .sound{bottom:66px}
+.stage.nxp .stage-chip{top:34px;bottom:auto}
+.stage.nxp .stage-warn~.stage-chip{top:52px}
+.stage.nxp .loader~.nxp-ui .nxp-big{display:none}
+
+.nxp-ui{position:absolute;inset:0;z-index:4;pointer-events:none;color:#fff;font-family:var(--font);-webkit-tap-highlight-color:transparent}
+.nxp-ui button{pointer-events:auto}
+.nxp-top{position:absolute;top:8px;right:10px;display:flex;gap:6px}
+.stage-warn~.nxp-ui .nxp-top{top:50px}
+.nxp-sync{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.3px;padding:4px 9px;border-radius:99px;background:#000a;border:1px solid #ffffff26;transition:opacity .25s}
+.nxp-sync::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.nxp-sync.syncing::before{background:var(--warn);animation:pulse 1s infinite}
+.nxp-ui.off .nxp-sync.ok{opacity:0}
+
+.nxp-big{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;display:grid;place-items:center;background:#000000a6;border:1px solid #ffffff33;box-shadow:0 10px 40px #0008;transition:transform .15s,background-color .2s,opacity .25s}
+.nxp-big svg{margin-left:4px}
+.nxp-big:active{transform:scale(.94)}
+
+.nxp-flash{position:absolute;top:50%;width:66px;height:66px;margin-top:-33px;border-radius:50%;display:grid;place-items:center;font:700 15px var(--head);background:#000a;border:1px solid #ffffff2e;animation:nxp-flash .55s ease-out forwards;pointer-events:none}
+.nxp-flash.l{left:14%}.nxp-flash.r{right:14%}
+@keyframes nxp-flash{0%{opacity:0;transform:scale(.8)}25%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.08)}}
+
+.nxp-notice{position:absolute;top:36px;left:50%;transform:translateX(-50%);z-index:4;max-width:calc(100% - 24px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:99px;background:#000c;border:1px solid #ffffff2b;pointer-events:none;animation:nxp-note 3.4s ease forwards}
+.stage-chip~.nxp-notice{top:66px}
+.stage-warn~.nxp-notice{top:54px}
+.stage-warn~.stage-chip~.nxp-notice{top:84px}
+@keyframes nxp-note{0%{opacity:0;transform:translate(-50%,-4px)}8%,85%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,0)}}
+
+/* bottom bar */
+.nxp-bottom{position:absolute;left:0;right:0;bottom:0;padding:26px max(8px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:linear-gradient(to top,#000000d9 0%,#00000080 55%,#0000 100%);transition:opacity .25s;pointer-events:auto}
+.nxp-ui.off .nxp-bottom,.nxp-ui.off .nxp-big{opacity:0;pointer-events:none}
+.nxp-ui.off .nxp-bottom *{pointer-events:none}
+
+.nxp-seek{position:relative;height:20px;margin:0 6px;display:flex;align-items:center;cursor:pointer;touch-action:none}
+.nxp-seek.ro{cursor:default;height:12px}
+.nxp-seek.none{visibility:hidden}
+.nxp-track{position:relative;flex:1;height:4px;border-radius:9px;background:#ffffff38;overflow:hidden;transition:height .15s}
+.nxp-track i{position:absolute;inset:0;transform-origin:left center;transform:scaleX(0)}
+.nxp-track .buf{background:#ffffff59}
+.nxp-track .fill{background:linear-gradient(90deg,#38bdf8,#818cf8 55%,#ec4899)}
+.nxp-seek.ro .nxp-track{height:3px}
+.nxp-seek:not(.ro):hover .nxp-track,.nxp-seek.drag .nxp-track{height:6px}
+.nxp-seek .thumb{position:absolute;top:50%;left:0;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px #ec489955,0 2px 8px #0008;transform:scale(0);transition:transform .15s;pointer-events:none}
+.nxp-seek:hover .thumb,.nxp-seek.drag .thumb,.nxp-seek:focus-visible .thumb{transform:scale(1)}
+.nxp-seek .tip{position:absolute;bottom:22px;left:0;transform:translateX(-50%);font-size:11.5px;font-weight:700;padding:3px 7px;border-radius:7px;background:#000d;border:1px solid #ffffff2b;white-space:nowrap;opacity:0;transition:opacity .12s;pointer-events:none;font-variant-numeric:tabular-nums}
+.nxp-seek .tip.on{opacity:1}
+.nxp-seek:focus-visible{outline:2px solid var(--cy);outline-offset:2px;border-radius:6px}
+
+.nxp-row{display:flex;align-items:center;gap:2px;height:42px;min-width:0}
+.nxp-btn{position:relative;flex:0 0 auto;width:40px;height:40px;display:grid;place-items:center;border-radius:10px;color:#fff;transition:background-color .15s,color .15s}
+.nxp-btn:active{transform:scale(.94)}
+.nxp-btn.on{color:var(--cy)}
+.nxp-skip em{position:absolute;inset:0;display:grid;place-items:center;font:700 8.5px var(--font);font-style:normal;padding-top:1px;pointer-events:none}
+.nxp-vol{display:flex;align-items:center;flex:0 0 auto}
+.nxp-ui input.nxp-range{display:none;width:0;height:20px;padding:0;margin:0;border:0;border-radius:0;background:transparent;opacity:0;cursor:pointer;accent-color:#ec4899;transition:width .2s,opacity .2s,margin .2s}
+.nxp-ui input.nxp-range:focus,.nxp-ui input.nxp-range:focus-visible{border:0;box-shadow:none;outline:none}
+@media (hover:hover) and (pointer:fine){
+  .nxp-ui input.nxp-range{display:block}
+  .nxp-vol:hover input.nxp-range,.nxp-vol:focus-within input.nxp-range{width:72px;opacity:1;margin:0 8px 0 2px}
+}
+.nxp-time{flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap;padding:0 6px;font-size:12.5px;font-weight:600;color:#e9e9f2;font-variant-numeric:tabular-nums}
+.nxp-time .sep{margin:0 4px;color:#ffffff80}
+.nxp-live{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;margin:0 6px;font-size:11px;font-weight:800;letter-spacing:1px}
+.nxp-live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--err);box-shadow:0 0 8px var(--err)}
+.nxp-space{flex:1 1 0;min-width:0}
+
+/* settings menu */
+.nxp-menu{position:absolute;right:max(10px,env(safe-area-inset-right));bottom:calc(64px + env(safe-area-inset-bottom));z-index:2;min-width:208px;max-width:calc(100% - 20px);max-height:calc(100% - 78px);overflow-y:auto;overscroll-behavior:contain;padding:6px;border-radius:14px;background:#0f0f18f2;border:1px solid #ffffff21;box-shadow:0 18px 50px #000b;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);pointer-events:auto;animation:pop .15s ease both}
+.nxp-menu button{width:100%;display:flex;align-items:center;gap:10px;min-height:40px;padding:0 10px;border-radius:10px;font-size:13.5px;text-align:start;color:#fff}
+.nxp-menu button span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nxp-menu button small{color:var(--mut);font-size:12px;white-space:nowrap}
+.nxp-menu button i{width:15px;flex:0 0 15px}
+.nxp-menu button[aria-checked="true"]{color:var(--cy)}
+.nxp-menu .back{color:var(--mut);font-weight:700;border-bottom:1px solid #ffffff14;border-radius:10px 10px 4px 4px;margin-bottom:4px}
+
+/* hover looks only where there is a real pointer: on a touch screen a tapped button would stay lit */
+@media (hover:hover) and (pointer:fine){
+  .nxp-big:hover{background:linear-gradient(135deg,#38bdf8,#ec4899);border-color:transparent}
+  .nxp-btn:hover{background:#ffffff1f}
+  .nxp-menu button:hover{background:#ffffff14}
+}
+@media (max-width:599px){
+  .nxp-btn{width:38px;height:38px}
+  .nxp-time{font-size:12px;padding:0 4px}
+}
+@media (max-width:359px){
+  .nxp-skip{display:none}
+  .nxp-btn{width:36px}
+}
+@media (prefers-reduced-motion:reduce){
+  .nxp-notice{animation:none}
+  .nxp-flash{animation:none;opacity:0}
+}

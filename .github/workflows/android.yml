@@ -27,6 +27,10 @@ jobs:
       # Repository variables: Settings -> Secrets and variables -> Actions -> Variables
       EXPO_PUBLIC_API_URL: ${{ vars.NEXORA_API_URL }}
       EXPO_PUBLIC_WEB_URL: ${{ vars.NEXORA_WEB_URL }}
+      # InMobi ads (empty = no ads, build unchanged). Set as repository variables.
+      EXPO_PUBLIC_INMOBI_ACCOUNT_ID: ${{ vars.INMOBI_ACCOUNT_ID }}
+      EXPO_PUBLIC_INMOBI_BANNER_ID: ${{ vars.INMOBI_BANNER_ID }}
+      EXPO_PUBLIC_INMOBI_INTERSTITIAL_ID: ${{ vars.INMOBI_INTERSTITIAL_ID }}
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v4

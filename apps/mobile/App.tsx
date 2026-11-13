@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, BackHandler, Linking, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, AppState, BackHandler, Linking, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as ExpoLinking from "expo-linking";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -13,6 +13,8 @@ import { WEB_URL } from "./src/core/api";
 import { loadLang, t, useT } from "./src/i18n";
 import { IntroSplash } from "./src/components/Brand";
 import { BrowserModal, type DetectedMedia } from "./src/screens/BrowserModal";
+import { ROUTE_REPORTER, adsEnabled, initialAdState, onBackground, onResume, onRoute, routeOf, type AdEffects, type AdIds } from "./src/core/ads";
+import { NexoraAds } from "./modules/nexora-ads/src";
 
 /**
  * Nexora Watch app = the Nexora Watch web app (same screens, same code, always the same version as the website)
@@ -30,7 +32,13 @@ export function webUrlFrom(link: string | null): string | null {
 }
 
 // "caps" tells the web app what this version of the app can do, so the web side never has to compare version numbers.
-const BOOT = `window.__NEXORA_APP__ = { platform: ${JSON.stringify(Platform.OS)}, version: ${JSON.stringify(VERSION)}, caps: ["open_external"] }; true;`;
+const BOOT = `window.__NEXORA_APP__ = { platform: ${JSON.stringify(Platform.OS)}, version: ${JSON.stringify(VERSION)}, caps: ["open_external"] }; ${ROUTE_REPORTER} true;`;
+
+// InMobi IDs: filled at build time from EXPO_PUBLIC_INMOBI_* (app.config.js `extra.inmobi`). Empty = no ads at all.
+const AD_IDS: Partial<AdIds> = (Constants.expoConfig?.extra as any)?.inmobi ?? {};
+const ADS_ON = Platform.OS === "android" && NexoraAds != null && adsEnabled(AD_IDS);
+// No consent tool (CMP) yet: consent unavailable -> non-personalised, no device identifiers. See docs/ADS.md.
+const AD_CONSENT = JSON.stringify({ gdpr_consent_available: false, gdpr: "1" });
 
 /** Only our own site may be sent to the phone's browser: pages shown inside the room (video players) can post messages too. */
 export function isOwnWebUrl(url: unknown): url is string {
@@ -55,6 +63,56 @@ function Shell() {
   const [failed, setFailed] = useState(false);
   const [browser, setBrowser] = useState(false);
   const picked = useRef(false);
+  const ads = useRef(initialAdState(ADS_ON ? AD_IDS : null, Date.now()));
+  const [bannerWanted, setBannerWanted] = useState(false);
+  const [bannerH, setBannerH] = useState(0);
+
+  const applyAds = useCallback((e: AdEffects) => {
+    if (!ADS_ON) return;
+    setBannerWanted(e.banner);
+    try {
+      if (e.preloadInterstitial) NexoraAds!.loadInterstitial(AD_IDS.interstitialId!);
+      if (e.showInterstitial) NexoraAds!.showInterstitial(AD_IDS.interstitialId!);
+    } catch {}
+  }, []);
+  const routeChanged = useCallback(
+    (urlOrPath: string) => {
+      const [s, e] = onRoute(ads.current, routeOf(urlOrPath, WEB_HOST), Date.now());
+      if (s.route === ads.current.route && !e.showInterstitial) return;
+      ads.current = s;
+      applyAds(e);
+    },
+    [applyAds],
+  );
+
+  useEffect(() => {
+    if (!ADS_ON) return;
+    try {
+      NexoraAds!.init(AD_IDS.accountId!, AD_CONSENT, true);
+    } catch {}
+    const ev = NexoraAds!.addListener("onBanner", (b) => setBannerH(b.visible ? b.height : 0));
+    const st = AppState.addEventListener("change", (state) => {
+      const [s, e] = state === "active" ? onResume(ads.current, Date.now()) : onBackground(ads.current);
+      ads.current = s;
+      applyAds(e);
+    });
+    return () => {
+      ev.remove();
+      st.remove();
+    };
+  }, [applyAds]);
+
+  // The banner is native and sits above the navigation bar; the WebView is padded by its height so it never covers content.
+  const showBanner = ADS_ON && bannerWanted && !intro && !failed && !browser;
+  const navInset = landscape ? 0 : Math.round(insets.bottom);
+  useEffect(() => {
+    if (!ADS_ON) return;
+    try {
+      if (showBanner) NexoraAds!.showBanner(AD_IDS.bannerId!, navInset);
+      else NexoraAds!.hideBanner();
+    } catch {}
+  }, [showBanner, navInset]);
+  const adPad = showBanner ? bannerH : 0;
 
   useEffect(() => {
     (async () => {
@@ -111,11 +169,14 @@ function Shell() {
     } else if (m.type === "keep_awake") {
       if (m.on) activateKeepAwakeAsync("room").catch(() => {});
       else deactivateKeepAwake("room");
+    } else if (m.type === "route") {
+      // SPA navigation reported by ROUTE_REPORTER (pushState / replaceState / popstate).
+      if (typeof m.path === "string") routeChanged(m.path);
     } else if (m.type === "open_external") {
       // "Watch on the web": the website opens in the phone's browser.
       if (isOwnWebUrl(m.url)) Linking.openURL(m.url).catch(() => {});
     }
-  }, []);
+  }, [routeChanged]);
 
   const onPick = async (m: DetectedMedia) => {
     picked.current = true;
@@ -149,7 +210,7 @@ function Shell() {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: landscape ? 0 : insets.top, paddingBottom: landscape ? 0 : insets.bottom }]}>
+    <View style={[styles.root, { paddingTop: landscape ? 0 : insets.top, paddingBottom: (landscape ? 0 : insets.bottom) + adPad }]}>
       <StatusBar style="light" hidden={landscape} />
       {start && (
         <WebView
@@ -159,7 +220,10 @@ function Shell() {
           applicationNameForUserAgent={`NexoraWatchApp/${VERSION}`}
           onMessage={onMessage}
           onShouldStartLoadWithRequest={onShouldStart}
-          onNavigationStateChange={(s) => (canBack.current = s.canGoBack)}
+          onNavigationStateChange={(s) => {
+            canBack.current = s.canGoBack;
+            if (s.url) routeChanged(s.url);
+          }}
           onLoadEnd={() => setLoaded(true)}
           onError={() => setFailed(true)}
           onHttpError={(e) => {

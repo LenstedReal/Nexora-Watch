@@ -1,6 +1,6 @@
 # Nexora Watch
 
-Arkadaşlarınla aynı videoyu **aynı anda** izlediğin, Rave benzeri senkron izleme uygulaması. Oda kurarsın, kodu paylaşırsın; YouTube, doğrudan MP4/M3U8 bağlantısı, Google Drive, web sayfasından algılanan video ya da telefonundan yüklediğin bir video herkeste aynı saniyede oynar. Yanında sohbet, emoji tepkileri ve katılımcı listesi var.
+Arkadaşlarınla aynı videoyu **aynı anda** izlediğin, Rave benzeri senkron izleme uygulaması. Oda kurarsın, kodu paylaşırsın; YouTube, Vimeo, Twitch, Kick (canlı), Internet Archive, Dropbox, doğrudan MP4/M3U8 bağlantısı, Google Drive, web sayfasından algılanan video ya da telefonundan yüklediğin bir video herkeste aynı saniyede oynar. Yanında sohbet, emoji tepkileri ve katılımcı listesi var.
 
 ## Repo yapısı
 
@@ -62,6 +62,17 @@ cd apps/mobile
 npm install
 npx expo start        # uygulama web arayüzünü (EXPO_PUBLIC_WEB_URL) WebView içinde açar; bkz. docs/DEPLOY.md
 ```
+
+## Desteklenen kaynaklar
+
+Resmî oynatıcılarla çalışan kaynaklar (sitelerin kendi oynatıcısı ve belgelenmiş JS API'leri):
+
+- **YouTube** ve **Vimeo**: odada senkron (oynat, durdur, sar). Misafirlerin oynatıcıya dokunması kilitli.
+- **Twitch**: kayıtlı yayın (`twitch.tv/videos/...`) senkron; canlı kanal (`twitch.tv/<kanal>`) herkeste canlı oynar, senkron kontrolü yoktur. Klipler eşitlenemediği için kabul edilmez. Twitch kuralları gereği oynatıcının üstüne hiçbir şey çizilmez (düğmeler yanda durur) ve oynatıcı en az 400×300 piksel olmalıdır; dik telefonda "yan çevir" notu çıkar.
+- **Kick**: yalnızca canlı kanal (`kick.com/<kanal>`), Kick'in resmî gömme oynatıcısıyla herkeste canlı oynar; senkron kontrolü yoktur (Kick'in gömme oynatıcısının JavaScript arayüzü yok). Kayıtlı yayınlar ve klipler resmî olarak gömülemediği için kabul edilmez.
+- **Internet Archive** sayfası (`archive.org/details/...`): öğenin resmî metadata API'sinden tarayıcıda oynayan video dosyası seçilir, kalıcı `archive.org/download/...` adresiyle eklenir.
+- **Dropbox** paylaşım bağlantısı: `raw=1` ile dosyanın kendisi olarak açılır.
+- **Dailymotion**: resmî oynatıcı Dailymotion Studio'da oluşturulan bir Player ID istiyor; bu kimlik olmadan eklenmedi.
 
 ## Web'den video algılama
 

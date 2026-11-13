@@ -1,0 +1,11 @@
+/* Official embedded players with their own rules (Twitch). Loaded by TwitchPlayer.jsx. */
+
+/* Twitch must not be covered: the player takes the stage minus a side rail that holds the room's buttons. */
+.stage .tw-host{position:absolute;top:0;left:0;bottom:0;right:52px;background:#000}
+.stage .tw-host .tw-mount{position:absolute;inset:0}
+.stage .tw-host iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+.stage-tools.rail{top:0;right:0;bottom:0;width:52px;flex-direction:column;align-items:center;padding-top:10px;gap:8px;background:#000;opacity:1}
+.stage-tools.rail:empty{display:none}
+.tw-small{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;text-align:center;color:var(--mut);font-size:13px;line-height:1.4}
+.tw-small svg{color:#a78bfa}
+.tw-small b{color:#fff;font:600 13px/1.4 var(--font);max-width:300px}

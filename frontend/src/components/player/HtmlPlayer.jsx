@@ -4,10 +4,14 @@ import { absUrl, api } from "@/lib/api";
 
 const MEDIA_ERR = { 1: "network", 2: "network", 3: "decode", 4: "codec" };
 
-export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal }) => {
+// The picture only: the buttons live in PlayerControls (drawn by Stage above the guest lock), so the element never shows
+// the browser's own controls. `onMedia` hands the element and the hls.js instance to whoever draws the controls.
+export const HtmlPlayer = ({ video, ident, playerRef, events, onFatal, onMedia }) => {
   const ref = useRef(null);
   const evRef = useRef(events);
   evRef.current = events;
+  const mediaCb = useRef(onMedia);
+  mediaCb.current = onMedia;
   const buffering = useRef(false);
   const [src, setSrc] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -40,6 +44,7 @@ export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal })
     playerRef.current = {
       get ready() { return ready; }, supportsRate: true, kind: "html",
       getTime: () => el.currentTime,
+      getDuration: () => el.duration,
       isPaused: () => el.paused,
       isBuffering: () => stalled(),
       play: () => el.play(),
@@ -69,7 +74,8 @@ export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal })
     // fall back to native HLS only where MSE is missing (older iPhone Safari / iOS WebView).
     const nativeHls = el.canPlayType("application/vnd.apple.mpegurl");
     if (video.kind === "hls" && Hls.isSupported()) {
-      hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      // Phone-friendly limits: never fetch a rendition larger than the player, keep about half a minute ahead and behind.
+      hls = new Hls({ enableWorker: true, lowLatencyMode: false, capLevelToPlayerSize: true, maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: 30 });
       hls.on(Hls.Events.ERROR, (_e, d) => {
         if (!d.fatal) return;
         evRef.current.onError?.();
@@ -84,8 +90,10 @@ export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal })
       el.src = src;
       el.load();
     }
+    mediaCb.current?.({ el, hls: hls || null });
     return () => {
       disposed = true;
+      mediaCb.current?.(null);
       clearInterval(tick);
       Object.entries(on).forEach(([k, fn]) => el.removeEventListener(k, fn));
       hls?.destroy();
@@ -96,5 +104,5 @@ export const HtmlPlayer = ({ video, isHost, ident, playerRef, events, onFatal })
     };
   }, [src, video.kind, playerRef, onFatal, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <video ref={ref} playsInline controls={isHost} preload="auto" className="html-video" data-testid="html-video-player" />;
+  return <video ref={ref} playsInline preload="auto" className="html-video" data-testid="html-video-player" />;
 };

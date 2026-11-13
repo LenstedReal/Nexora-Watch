@@ -23,7 +23,7 @@ import { useT } from "../i18n";
 
 export type DetectedMedia = {
   url: string;
-  kind: "hls" | "mp4" | "webm" | "video" | "youtube" | "blocked";
+  kind: "hls" | "mp4" | "webm" | "video" | "youtube" | "vimeo" | "twitch" | "kick" | "archive" | "blocked";
   page: string;
   title: string;
   how: string;
@@ -75,6 +75,45 @@ setInterval(scan,1500);
 })();true;`;
 
 const YT_RE = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/;
+// Sites with an official player in the room: the page itself is offered (the server turns it into that player).
+const VIMEO_RE = /^https?:\/\/(?:www\.|player\.)?vimeo\.com\/(?:video\/|channels\/[\w-]+\/|groups\/[\w-]+\/videos\/|album\/\d+\/video\/|showcase\/\d+\/video\/)?(\d{6,12})(?:\/([0-9a-f]{6,16}))?\/?(?:[?#]|$)/i;
+const TWITCH_VOD_RE = /^https?:\/\/(?:www\.|m\.)?twitch\.tv\/(?:videos|[A-Za-z0-9_]{3,25}\/(?:v|video))\/(\d{6,12})\/?(?:[?#]|$)/i;
+const TWITCH_LIVE_RE = /^https?:\/\/(?:www\.|m\.)?twitch\.tv\/([A-Za-z0-9][A-Za-z0-9_]{2,24})\/?(?:[?#]|$)/i;
+const TWITCH_PAGES = new Set(["directory", "videos", "settings", "downloads", "search", "subscriptions", "wallet", "turbo", "store", "jobs",
+  "privacy", "legal", "about", "friends", "inventory", "drops", "prime", "team", "teams", "user", "collections", "popout", "moderator",
+  "embed", "login", "signup", "following", "broadcast", "partner", "creatorcamp", "bits", "payments", "messages", "activate",
+  "annual-recap", "events", "clips", "category", "security", "safety", "ads"]);
+// Kick: only a live channel has an official embed (player.kick.com/<channel>); videos/clips are not offered.
+const KICK_LIVE_RE = /^https?:\/\/(?:www\.|m\.)?kick\.com\/([A-Za-z0-9][A-Za-z0-9_-]{2,39})\/?(?:[?#]|$)/i;
+const KICK_PAGES = new Set(["browse", "categories", "category", "following", "dashboard", "video", "videos", "clips", "search", "settings",
+  "about", "terms-of-service", "privacy-policy", "community-guidelines", "dmca-policy", "careers", "help", "login", "signup", "auth",
+  "api", "popout", "transactions", "subscriptions", "messages", "creator-program", "leaderboards", "emotes", "store", "download", "apps",
+  "mobile", "contact", "partners", "security"]);
+const ARCHIVE_RE = /^https?:\/\/(?:www\.)?archive\.org\/details\/([A-Za-z0-9][A-Za-z0-9._-]{0,99})(?:[/?#]|$)/i;
+// Their players stream through MediaSource or their own CDNs: what the page loads is never offered for these sites.
+const NO_SNIFF = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|vimeocdn\.com|twitch\.tv|ttvnw\.net|kick\.com/i;
+const PAGE_KINDS = new Set<DetectedMedia["kind"]>(["youtube", "vimeo", "twitch", "kick", "archive"]);
+
+/** The page being viewed, when it is a video of a site with an official player (or an Internet Archive item). */
+export function pageOffer(url: string, title: string, fallbackTitle: string): DetectedMedia | null {
+  const yt = url.match(YT_RE);
+  if (yt) return { url: `https://www.youtube.com/watch?v=${yt[1]}`, kind: "youtube", page: url, title: title || fallbackTitle, how: "page" };
+  const vm = url.match(VIMEO_RE);
+  if (vm) return { url: `https://vimeo.com/${vm[1]}${vm[2] ? `/${vm[2]}` : ""}`, kind: "vimeo", page: url, title: title || "Vimeo", how: "page" };
+  const tv = url.match(TWITCH_VOD_RE);
+  if (tv) return { url: `https://www.twitch.tv/videos/${tv[1]}`, kind: "twitch", page: url, title: title || "Twitch", how: "page" };
+  const tl = url.match(TWITCH_LIVE_RE);
+  if (tl && !TWITCH_PAGES.has(tl[1].toLowerCase())) {
+    return { url: `https://www.twitch.tv/${tl[1].toLowerCase()}`, kind: "twitch", page: url, title: title || `Twitch · ${tl[1]}`, how: "page" };
+  }
+  const kl = url.match(KICK_LIVE_RE);
+  if (kl && !KICK_PAGES.has(kl[1].toLowerCase()) && !/[?&]clip=/.test(url)) {
+    return { url: `https://kick.com/${kl[1].toLowerCase()}`, kind: "kick", page: url, title: title || `Kick · ${kl[1]}`, how: "page" };
+  }
+  const ia = url.match(ARCHIVE_RE);
+  if (ia) return { url: `https://archive.org/details/${ia[1]}`, kind: "archive", page: url, title: title || "Internet Archive", how: "page" };
+  return null;
+}
 const MAX_ITEMS = 12;
 
 export function hostOf(url: string): string {
@@ -102,7 +141,7 @@ function classify(url: string, blocked: boolean): DetectedMedia["kind"] {
 }
 
 function rank(m: DetectedMedia): number {
-  if (m.kind === "youtube") return -1;
+  if (PAGE_KINDS.has(m.kind)) return -1;
   if (m.kind === "blocked") return 9;
   if (m.kind === "hls") return /master|playlist|index/i.test(m.url) ? 0 : 1;
   if (m.how === "video" || m.how === "source") return 2;
@@ -287,10 +326,8 @@ export function BrowserModal({
                   pageHost.current = host;
                   setFound([]);
                 }
-                const yt = s.url.match(YT_RE);
-                if (yt) {
-                  addItem({ url: `https://www.youtube.com/watch?v=${yt[1]}`, kind: "youtube", page: s.url, title: s.title || t("yt_video"), how: "page" });
-                }
+                const offer = pageOffer(s.url, s.title || "", t("yt_video"));
+                if (offer) addItem(offer);
               }}
               onMessage={(e) => {
                 let m: any;
@@ -301,8 +338,8 @@ export function BrowserModal({
                 }
                 if (m?.t !== "media" || typeof m.url !== "string") return;
                 if (!isAllowedHost(hostOf(String(m.page || "")), sites)) return;
-                // YouTube pages stream through MediaSource; the page itself is offered instead (see above).
-                if (/youtube\.com|youtu\.be|googlevideo\.com/i.test(String(m.page || ""))) return;
+                // These sites stream through MediaSource or their own CDNs; the page itself is offered instead (see above).
+                if (NO_SNIFF.test(String(m.page || ""))) return;
                 addItem({
                   url: m.url,
                   kind: classify(m.url, !!m.blocked),
@@ -348,7 +385,7 @@ export function BrowserModal({
                       <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                         <Badge
                           text={item.kind === "blocked" ? t("b_protected") : item.kind.toUpperCase()}
-                          color={item.kind === "blocked" ? C.error : item.kind === "hls" || item.kind === "youtube" ? C.cyan : C.purple}
+                          color={item.kind === "blocked" ? C.error : item.kind === "hls" || PAGE_KINDS.has(item.kind) ? C.cyan : C.purple}
                         />
                         {!!item.duration && item.duration > 0 && (
                           <Text style={styles.meta}>

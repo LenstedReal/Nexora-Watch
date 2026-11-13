@@ -353,3 +353,31 @@ def test_tap_counter_always_answers_204():
         assert r.status_code == 204 and r.content == b"", (payload[:40], r.status_code, r.text)
     assert requests.post(url, json={"app": "velvet", "event": "task_done"}).status_code == 204
     assert requests.get(url).status_code == 405
+
+
+# Official players: Vimeo and Twitch addresses are recognised without contacting the sites.
+def test_resolve_vimeo_public_and_unlisted():
+    r = requests.post(f"{API}/resolve", json={"url": "https://vimeo.com/channels/staffpicks/76979871"})
+    assert r.status_code == 200, r.text
+    v = r.json()
+    assert (v["kind"], v["video_id"], v["video_hash"], v["provider"]) == ("vimeo", "76979871", None, "vimeo")
+    assert v["capabilities"] == {"seek": True, "rate_correction": False, "sync": True}
+    u = requests.post(f"{API}/resolve", json={"url": "https://vimeo.com/76979871/8272103f6e"}).json()
+    assert (u["video_hash"], u["embed_url"]) == ("8272103f6e", "https://player.vimeo.com/video/76979871?h=8272103f6e")
+
+
+def test_resolve_twitch_vod_live_and_clip():
+    vod = requests.post(f"{API}/resolve", json={"url": "https://www.twitch.tv/videos/2301234567"}).json()
+    assert (vod["kind"], vod["video_id"], vod["live"], vod["capabilities"]["sync"]) == ("twitch", "2301234567", False, True)
+    live = requests.post(f"{API}/resolve", json={"url": "https://m.twitch.tv/SomeChannel"}).json()
+    assert (live["kind"], live["channel"], live["live"], live["capabilities"]["sync"]) == ("twitch", "somechannel", True, False)
+    clip = requests.post(f"{API}/resolve", json={"url": "https://clips.twitch.tv/FunnyClipSlug-abc123"})
+    assert clip.status_code == 422 and clip.json()["code"] == "twitch_clip"
+
+
+def test_resolve_kick_live_and_recorded():
+    live = requests.post(f"{API}/resolve", json={"url": "https://m.kick.com/SomeStreamer"}).json()
+    assert (live["kind"], live["channel"], live["live"], live["embed_url"]) == ("kick", "somestreamer", True, "https://player.kick.com/somestreamer")
+    assert live["capabilities"] == {"seek": False, "rate_correction": False, "sync": False}
+    rec = requests.post(f"{API}/resolve", json={"url": "https://kick.com/somestreamer/clips/clip_01HABCDEF"})
+    assert rec.status_code == 422 and rec.json()["code"] == "kick_recorded"

@@ -1,0 +1,29 @@
+// Local Expo module (autolinked from apps/mobile/modules). InMobi only, no AdMob.
+apply plugin: 'com.android.library'
+
+group = 'expo.modules.nexoraads'
+version = '0.1.0'
+
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useExpoPublishing()
+useDefaultAndroidSdkVersions()
+
+android {
+  namespace "expo.modules.nexoraads"
+}
+
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+  // 10.8.x: the 11.x line needs Kotlin 2.x + AGP 8.9.3, Expo SDK 52 ships Kotlin 1.9 / AGP 8.6.
+  implementation 'com.inmobi.monetization:inmobi-ads-kotlin:10.8.8'
+  // Required companions listed in InMobi's Android getting-started guide.
+  implementation 'com.google.android.gms:play-services-ads-identifier:18.0.1'
+  implementation 'androidx.browser:browser:1.8.0'   // without it ad requests fail
+  implementation 'com.squareup.picasso:picasso:2.8'  // without it interstitials fail
+}
