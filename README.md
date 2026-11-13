@@ -74,5 +74,5 @@ cd apps/mobile && npm test        # eşitleme ve reklam kuralları (Node 22+)
 - `docs/PLAYBACK-SYNC.md`: eşitleme protokolü
 - `docs/ADS.md`: InMobi kurulumu (odada reklam yok)
 - `docs/SERVICES.md`: Netflix, Disney+, Prime Video, HBO Max (beta)
-- `docs/BEKLEYENLER.md`: dış nedenle bekleyen işler (Dailymotion, InMobi)
+- `docs/BEKLEYENLER.md`: bekleyen işler (Dailymotion; InMobi'nin Play sonrası adımları)
 - `docs/SECURITY.md`, `docs/STORAGE.md`, `docs/TESTING.md`, `docs/ARCHITECTURE.md`

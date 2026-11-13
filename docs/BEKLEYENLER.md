@@ -29,11 +29,13 @@ yol dışında bir oynatıcı kullanılmayacak.
 4. Gizlilik politikası: video sağlayıcıları listesine Dailymotion eklenir (TR + EN) ve GitHub'daki
    `NexoraWatch/` kopyaları yeniden üretilir.
 
-## InMobi (sırada, birlikte yapılacak)
+## InMobi: Play yayınından sonra yapılacaklar
 
-Ayrıntılar `docs/ADS.md` içinde. Gerekenler:
+Panel kurulumu ve kimlikler tamam (`docs/ADS.md`). Uygulama Google Play'de yayınlanınca:
 
-- InMobi panelinde `com.lenstedreal.nexorawatch` uygulaması, `home_banner` ve `room_exit` yerleşimleri.
-- GitHub depo değişkenleri: `INMOBI_ACCOUNT_ID`, `INMOBI_BANNER_ID`, `INMOBI_INTERSTITIAL_ID`.
-- InMobi'nin verdiği app-ads.txt satırı → `site/personal/app-ads.txt` (me.lenstedreal.info kökü).
-- Odada ve video izlerken reklam yok; yalnızca oda dışındaki ekranlarda, kişiselleştirilmemiş.
+1. InMobi panel → Inventory Settings → Nexora Watch → App Details → **Link app URL**: Play adresini bağla.
+2. Her iki yerleşimde (home_banner, room_exit) **Test Mode: Off** olduğundan emin ol; şu an InMobi uygulama Play'de
+   olmadığı için test modunu kendisi "Global" tutuyor.
+3. Play Console mağaza kaydında web sitesi `https://nexora.lenstedreal.info` olsun; birkaç gün içinde panelde
+   app-ads.txt durumu doğrulandı olarak görünmeli.
+4. Kendi reklamına tıklama; ilk günlerde gelir görünmeyebilir, bu normal.

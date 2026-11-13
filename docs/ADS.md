@@ -26,15 +26,33 @@ Akış: `vars.*` → `.github/workflows/android.yml` (`EXPO_PUBLIC_INMOBI_*`) �
 
 ## app-ads.txt
 
-Adres: `https://me.lenstedreal.info/app-ads.txt` (dosya `site/personal/app-ads.txt`, düz metin). Play Console'daki
-geliştirici web sitesi bu alan adı olmalıdır. Satır biçimi (IAB):
+Aynı dosya iki adreste durur (InMobi panelinden alınan "Exhaustive sellers list", 332 satır):
 
-```
-inmobi.com, <INMOBI_ACCOUNT_ID>, DIRECT, 83e75a7ae333ca9d
-```
+- `https://nexora.lenstedreal.info/app-ads.txt` (dosya `frontend/public/app-ads.txt`): Play Console'daki web sitesi
+  bu adres olacağı için tarayıcılar (crawler) dosyayı burada arar.
+- `https://me.lenstedreal.info/app-ads.txt` (dosya `site/personal/app-ads.txt`).
 
-Son alan InMobi'nin sertifika kimliğidir; InMobi panelinde gösterilen satırla karşılaştırın ve paneldeki satırı esas alın
-(bu belge yazılırken InMobi sayfasından doğrulanamadı).
+İlk satır InMobi'nin doğrudan satırıdır: `inmobi.com, 090baed2145d4bd7b9eb391f0107c715, DIRECT, 83e75a7ae333ca9d`.
+Buradaki kimlik satıcı kimliğidir; SDK'ya verilen hesap kimliği (`INMOBI_ACCOUNT_ID`) bundan farklıdır.
+InMobi listeyi değiştirirse panelden yeniden kopyalanıp iki dosya birlikte güncellenir (ikisi aynı kalmalı).
+
+Panelde "app-ads.txt could not be crawled" uyarısı, uygulama Play'de yayınlanıp mağaza kaydına web sitesi yazılana
+kadar normaldir; InMobi dosyayı mağazadaki web sitesi adresinden bulur.
+
+## Kimlikler (13-14 Kasım 2026)
+
+| Ne | Değer |
+|---|---|
+| Uygulama | Nexora Watch, App Key 10000255239 |
+| `INMOBI_ACCOUNT_ID` | `99e775800ff24fd9b8eed4d405722eec` |
+| `INMOBI_BANNER_ID` | `10000879796` (`home_banner`) |
+| `INMOBI_INTERSTITIAL_ID` | `10000879797` (`room_exit`) |
+
+Bunlar gizli değildir (uygulamanın içinde de bulunurlar) ve `.github/workflows/android.yml` içinde varsayılan olarak
+yazılıdır; GitHub'da aynı adla bir variable girilirse o kullanılır. Hiçbir şey girmek gerekmez.
+Panelde: kategori Arts & Entertainment, derecelendirme T, çocuklara yönelik değil, konum verisi kapalı, siyasi /
+kumar / alkol reklamları engelli, eCPM tabanı $0.01, Audience Bidding kapalı.
+Uygulama Play'de yayınlanmadığı için test modu InMobi tarafından "Global" açık tutulur (yalnızca test reklamı gelir).
 
 ## Play Console
 

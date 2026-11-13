@@ -60,14 +60,15 @@ Beklenen sonuç: kullanıcı etkileşimi uyarısıyla düşük/orta derece (ör.
 ## 3. Veri güvenliği formu (Data safety)
 
 Genel: veriler aktarım sırasında şifrelenir (**HTTPS: evet**). Kullanıcı veri silme isteyebilir (**evet**:
-`https://nexora.lenstedreal.info/veri-silme`). Hesap yok. Veriler satılmaz.
+`https://lenstedreal.github.io/NexoraWatch/delete-data.html`). Hesap yok. Veriler satılmaz.
 
 | Veri türü (Play adı) | Toplanıyor mu | Paylaşılıyor mu | Neden | Zorunlu mu | Not |
 |---|---|---|---|---|---|
 | Kişisel bilgi → Ad (takma ad) | Evet | Hayır | Uygulama işlevi | Evet | Oda içinde görünen takma ad; oda bitince silinir |
 | Mesajlar → Uygulama içi mesajlar | Evet | Hayır | Uygulama işlevi | Hayır | Oda sohbeti; oda bittikten 24 saat sonra silinir |
 | Fotoğraf ve videolar → Videolar | Evet | Hayır | Uygulama işlevi | Hayır | Yüklenen videolar; en geç 7 gün sonra silinir |
-| Cihaz veya diğer kimlikler → Reklam kimliği | Evet (reklamlar açıkken) | **Evet** (InMobi) | Reklam | Hayır | InMobi SDK; onay ekranı ile |
+| Cihaz veya diğer kimlikler | Evet | **Evet** (InMobi; Firebase yalnızca bildirim için) | Uygulama işlevi, Reklam | Hayır | Rastgele cihaz kimliği ve bildirim anahtarı (bildirime izin verilirse; 90 gün kullanılmazsa silinir). Reklam: InMobi SDK yaş kısıtlı modda çalışır, reklam kimliği gönderilmez; yine de SDK'nın işlediği teknik bilgiler için ihtiyatlı olarak "paylaşılıyor" beyan edilir |
+| Uygulama etkinliği → Uygulama etkileşimleri | Evet | **Evet** (InMobi) | Reklam | Hayır | Reklam gösterimi ve tıklama bilgisi (InMobi); kişiselleştirilmemiş reklam |
 | Uygulama bilgileri ve performans → Kilitlenme günlükleri | Evet | Hayır | Analiz (hata ayıklama) | Hayır | Hata mesajı, yığın izi (≤ 4 KB), sayfa yolu, sürüm, tarayıcı bilgisi; 14 gün sonra silinir; kimlik bilgisi yok |
 | Uygulama etkinliği → Diğer | Evet | Hayır | Uygulama işlevi | Evet | Eşitleme ölçümleri (gecikme), oda başına; oda bittikten 24 saat sonra silinir |
 
@@ -77,10 +78,11 @@ Not: IP adresi yalnızca hız sınırı için bellekte tutulur, kaydedilmez.
 ## 4. Reklamlar
 
 - "Uygulamanızda reklam var mı?" → **Evet** (InMobi banner + geçiş reklamı, ayrıntı: docs/ADS.md).
-- **app-ads.txt:** `https://me.lenstedreal.info/app-ads.txt` (dosya: `site/personal/app-ads.txt`, içerik
-  docs/ADS.md'deki InMobi satırı). Play Console → Mağaza ayarları → **Web sitesi** alanı tam olarak
-  `https://me.lenstedreal.info` olmalı; aksi halde InMobi app-ads.txt'yi bulamaz ve reklam geliri düşer.
-  Kontrol: `curl -s https://me.lenstedreal.info/app-ads.txt`
+- **Reklam kimliği beyanı:** uygulamada `AD_ID` izni var (InMobi SDK) → **Evet**, amaç **Reklam**.
+- **app-ads.txt:** `https://nexora.lenstedreal.info/app-ads.txt` (dosya `frontend/public/app-ads.txt`; aynı dosya
+  `me.lenstedreal.info/app-ads.txt` adresinde de var). Play Console → Mağaza ayarları → **Web sitesi** alanı
+  `https://nexora.lenstedreal.info` olmalı; InMobi dosyayı bu adresten bulur.
+  Kontrol: `curl -s https://nexora.lenstedreal.info/app-ads.txt | head -1`
 
 ## 5. Hedef kitle ve içerik
 
