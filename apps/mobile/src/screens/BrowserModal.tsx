@@ -97,7 +97,7 @@ const X_RE = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/[\w]{1,20}\/sta
 const FB_RE = /^https?:\/\/(?:www\.|m\.|web\.)?facebook\.com\/(?:watch\/?\?(?:.*&)?v=(\d{6,20})|[\w.-]+\/videos\/(?:[\w.-]+\/)?(\d{6,20})|reel\/(\d{6,20}))/i;
 // Their players stream through MediaSource or their own CDNs: what the page loads is never offered for these sites.
 const NO_SNIFF = /youtube\.com|youtu\.be|googlevideo\.com|vimeo\.com|vimeocdn\.com|twitch\.tv|ttvnw\.net|kick\.com|tiktok\.com|tiktokcdn|instagram\.com|cdninstagram|fbcdn\.net|facebook\.com|x\.com|twitter\.com|twimg\.com/i;
-const PAGE_KINDS = new Set<DetectedMedia["kind"]>(["youtube", "vimeo", "twitch", "kick", "archive", "tiktok", "instagram", "x", "facebook"]);
+const PAGE_KINDS = new Set<DetectedMedia["kind"]>(["youtube", "vimeo", "twitch", "archive", "tiktok", "facebook"]);
 
 /** The page being viewed, when it is a video of a site with an official player (or an Internet Archive item). */
 export function pageOffer(url: string, title: string, fallbackTitle: string): DetectedMedia | null {
@@ -107,20 +107,9 @@ export function pageOffer(url: string, title: string, fallbackTitle: string): De
   if (vm) return { url: `https://vimeo.com/${vm[1]}${vm[2] ? `/${vm[2]}` : ""}`, kind: "vimeo", page: url, title: title || "Vimeo", how: "page" };
   const tv = url.match(TWITCH_VOD_RE);
   if (tv) return { url: `https://www.twitch.tv/videos/${tv[1]}`, kind: "twitch", page: url, title: title || "Twitch", how: "page" };
-  const tl = url.match(TWITCH_LIVE_RE);
-  if (tl && !TWITCH_PAGES.has(tl[1].toLowerCase())) {
-    return { url: `https://www.twitch.tv/${tl[1].toLowerCase()}`, kind: "twitch", page: url, title: title || `Twitch · ${tl[1]}`, how: "page" };
-  }
-  const kl = url.match(KICK_LIVE_RE);
-  if (kl && !KICK_PAGES.has(kl[1].toLowerCase()) && !/[?&]clip=/.test(url)) {
-    return { url: `https://kick.com/${kl[1].toLowerCase()}`, kind: "kick", page: url, title: title || `Kick · ${kl[1]}`, how: "page" };
-  }
+  // Twitch live channels, Kick, Instagram and X are not offered: they cannot play in sync for everyone.
   const tt = url.match(TIKTOK_RE);
   if (tt) return { url: url.split(/[?#]/)[0], kind: "tiktok", page: url, title: title || "TikTok", how: "page" };
-  const ig = url.match(IG_RE);
-  if (ig) return { url: `https://www.instagram.com/${ig[1].startsWith("reel") ? "reel" : "p"}/${ig[2]}/`, kind: "instagram", page: url, title: title || "Instagram", how: "page" };
-  const xm = url.match(X_RE);
-  if (xm) return { url: `https://x.com/i/status/${xm[1]}`, kind: "x", page: url, title: title || "X", how: "page" };
   const fb = url.match(FB_RE);
   if (fb) return { url: fb[1] ? `https://www.facebook.com/watch/?v=${fb[1]}` : url.split(/[?#]/)[0], kind: "facebook", page: url, title: title || "Facebook", how: "page" };
   const ia = url.match(ARCHIVE_RE);

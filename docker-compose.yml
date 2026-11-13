@@ -32,7 +32,7 @@ services:
       OCI_BUCKET: ${OCI_BUCKET:-}
       WEB_URL: ${WEB_URL:-https://nexora.lenstedreal.info}
       PLAY_URL: ${PLAY_URL:-}
-      APK_URL: ${APK_URL:-https://github.com/LenstedReal/Nexora-Watch/releases/latest}
+      APK_URL: ${APK_URL:-https://github.com/LenstedReal/NexoraWatch/releases/latest}
       CONTACT_EMAIL: ${CONTACT_EMAIL:-contact.nexorawatch@protonmail.com}
       MIN_AGE: ${MIN_AGE:-16}
       OWNER_NAME: ${OWNER_NAME:-}

@@ -47,7 +47,7 @@ MEDIA_DELETE_AFTER_CLOSE_HOURS = float(os.environ.get("MEDIA_DELETE_AFTER_CLOSE_
 # --- Public app config / content policy -------------------------------------------------------------------
 WEB_URL = os.environ.get("WEB_URL", "https://nexora.lenstedreal.info").rstrip("/")
 PLAY_URL = os.environ.get("PLAY_URL", "")
-APK_URL = os.environ.get("APK_URL", "https://github.com/LenstedReal/Nexora-Watch/releases/latest")
+APK_URL = os.environ.get("APK_URL", "https://github.com/LenstedReal/NexoraWatch/releases/latest")
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "contact.nexorawatch@protonmail.com")
 # Minimum age asked at first start (under 18: with a parent/guardian). Keep in sync with the Play Console target audience.
 MIN_AGE = int(os.environ.get("MIN_AGE", "16"))
@@ -58,8 +58,8 @@ OWNER_ADDRESS = os.environ.get("OWNER_ADDRESS", "").strip()
 # Sites offered in the app (official players only): YouTube, TikTok, Instagram, X, Facebook, Twitch, Kick and Drive.
 # Vimeo and Internet Archive links still play when pasted; they are just not offered (little used in Turkey).
 # Override with ALLOWED_SITES in .env ("domain|Name,...").
-_DEFAULT_SITES = ("youtube.com|YouTube,tiktok.com|TikTok,instagram.com|Instagram,x.com|X (Twitter),facebook.com|Facebook,"
-                  "twitch.tv|Twitch,kick.com|Kick,drive.google.com|Google Drive")
+_DEFAULT_SITES = ("youtube.com|YouTube,tiktok.com|TikTok,facebook.com|Facebook,"
+                  "twitch.tv|Twitch,drive.google.com|Google Drive")
 # Accepted as source pages too, but not listed: twitter.com (old X addresses) and the sites dropped from the list.
 QUIET_SITES = [h.strip().lower().lstrip(".") for h in (os.environ.get("QUIET_SITES") or "twitter.com,vimeo.com,archive.org").split(",") if h.strip()]
 ALLOWED_SITES: list[dict] = []

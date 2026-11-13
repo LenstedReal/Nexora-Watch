@@ -12,15 +12,13 @@ Arkadaşlarınla aynı videoyu **aynı anda** izlediğin, Rave benzeri birlikte 
 |---|---|---|
 | YouTube (video, Shorts) | resmî oynatıcı | var |
 | TikTok | resmî gömme oynatıcı | var |
-| Facebook videoları | resmî oynatıcı (JS SDK) | var (yüklenemezse eşitlemesiz gömme) |
-| Instagram, X (Twitter) | resmî gömme | yok |
-| Twitch | resmî oynatıcı | kayıtlı yayın var, canlı yok |
-| Kick (canlı) | resmî gömme | yok |
+| Facebook videoları | resmî oynatıcı (JS SDK) | var |
+| Twitch kayıtlı yayınları | resmî oynatıcı | var |
 | Google Drive | herkese açık dosya içe aktarılır | var |
 | MP4 / M3U8 bağlantısı, telefondan yüklenen video | kendi oynatıcımız (kalite, altyazı, sıra) | var |
 | Netflix, Disney+, Prime Video, HBO Max (beta) | yalnızca uygulamada, herkes kendi hesabıyla | var, bkz. `docs/SERVICES.md` |
 
-Vimeo, Internet Archive ve Dropbox bağlantıları yapıştırılınca da çalışır; listelerde gösterilmez. Resmî oynatıcıların üstüne hiçbir şey çizilmez; başlık ve düğmeler oynatıcının altındaki çubuktadır.
+Vimeo, Internet Archive ve Dropbox bağlantıları yapıştırılınca da çalışır; listelerde gösterilmez. Herkeste aynı anda oynatılamayan kaynaklar (Twitch ve Kick canlı yayınları, Instagram, X) bilerek desteklenmez: Nexora bir birlikte izleme uygulaması. Resmî oynatıcıların üstüne hiçbir şey çizilmez; başlık ve düğmeler oynatıcının altındaki çubuktadır.
 
 ## Repo yapısı
 

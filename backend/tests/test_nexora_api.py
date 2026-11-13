@@ -419,18 +419,18 @@ def test_resolve_vimeo_public_and_unlisted():
 def test_resolve_twitch_vod_live_and_clip():
     vod = requests.post(f"{API}/resolve", json={"url": "https://www.twitch.tv/videos/2301234567"}).json()
     assert (vod["kind"], vod["video_id"], vod["live"], vod["capabilities"]["sync"]) == ("twitch", "2301234567", False, True)
-    live = requests.post(f"{API}/resolve", json={"url": "https://m.twitch.tv/SomeChannel"}).json()
-    assert (live["kind"], live["channel"], live["live"], live["capabilities"]["sync"]) == ("twitch", "somechannel", True, False)
+    # live channels cannot play in sync for everyone: refused (1.6.2)
+    live = requests.post(f"{API}/resolve", json={"url": "https://m.twitch.tv/SomeChannel"})
+    assert live.status_code == 422 and live.json()["code"] == "twitch_live"
     clip = requests.post(f"{API}/resolve", json={"url": "https://clips.twitch.tv/FunnyClipSlug-abc123"})
     assert clip.status_code == 422 and clip.json()["code"] == "twitch_clip"
 
 
-def test_resolve_kick_live_and_recorded():
-    live = requests.post(f"{API}/resolve", json={"url": "https://m.kick.com/SomeStreamer"}).json()
-    assert (live["kind"], live["channel"], live["live"], live["embed_url"]) == ("kick", "somestreamer", True, "https://player.kick.com/somestreamer")
-    assert live["capabilities"] == {"seek": False, "rate_correction": False, "sync": False}
-    rec = requests.post(f"{API}/resolve", json={"url": "https://kick.com/somestreamer/clips/clip_01HABCDEF"})
-    assert rec.status_code == 422 and rec.json()["code"] == "kick_recorded"
+def test_resolve_unsynced_sources_are_refused():
+    """1.6.2: Nexora is a watch-together app; Kick live, Instagram and X cannot play in sync, so they are refused."""
+    for url in ("https://m.kick.com/SomeStreamer", "https://www.instagram.com/reel/C1a2B3c4D5e/", "https://x.com/someone/status/1790000000000000001"):
+        r = requests.post(f"{API}/resolve", json={"url": url})
+        assert r.status_code == 422 and r.json()["code"] == "no_sync_source", (url, r.text)
 
 
 # Queue ("Sıra"): everyone adds and votes, only the host plays/removes, sorted by votes then time
@@ -497,10 +497,6 @@ def test_queue_bad_link_and_ws_broadcast():
 # channels, never a lone "YouTube"/"KICK" page title. Offline over HTTP (the test server may not reach the internet),
 # and in-process with an injected fake fetcher.
 def test_resolve_titles_over_http_never_a_lone_site_word():
-    k = requests.post(f"{API}/resolve", json={"url": "https://kick.com/SomeStreamer", "title": "KICK"}).json()
-    assert k["title"] == "Kick · SomeStreamer"
-    t = requests.post(f"{API}/resolve", json={"url": "https://www.twitch.tv/SomeChannel", "title": "Twitch"}).json()
-    assert t["title"] == "Twitch · SomeChannel"
     vod = requests.post(f"{API}/resolve", json={"url": "https://www.twitch.tv/SomeChannel/v/2301234567"}).json()
     assert vod["title"] == "Twitch · SomeChannel"
     y = requests.post(f"{API}/resolve", json={"url": "https://www.youtube.com/shorts/aqz-KE-bpKQ", "title": "(2) YouTube"}).json()
@@ -554,10 +550,8 @@ def test_resolver_titles_from_oembed_with_cache_and_fallbacks():
         answers["https://vimeo.com/api/oembed.json"] = None  # 404 / private
         assert run("https://vimeo.com/11111111", "Videos & Movies on Vimeo")["title"] == "Vimeo"
         assert run("https://vimeo.com/22222222", "Gece Yolu on Vimeo")["title"] == "Gece Yolu"
-        # Twitch / Kick: the channel, whatever the page title said; no network for them
+        # Twitch past broadcasts: the channel from the page title; no network for them
         n = len(calls)
-        assert run("https://kick.com/xQc", "KICK")["title"] == "Kick · xQc"
-        assert run("https://www.twitch.tv/Gaules", "Twitch")["title"] == "Twitch · Gaules"
         assert run("https://www.twitch.tv/videos/2301234567", "Gaules - Twitch")["title"] == "Twitch · Gaules"
         assert run("https://www.twitch.tv/videos/2301234568", "Twitch")["title"] == "Twitch"
         assert len(calls) == n

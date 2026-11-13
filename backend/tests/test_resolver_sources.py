@@ -76,8 +76,8 @@ def test_tiktok_non_video_pages():
     ("https://www.instagram.com/p/C9xYz12AbCd/embed/captioned/", "https://www.instagram.com/p/C9xYz12AbCd/embed/"),
 ])
 def test_instagram(url, embed):
-    v = resolve(url)
-    assert (v["kind"], v["video_id"], v["embed_url"], v["capabilities"]) == ("instagram", "C9xYz12AbCd", embed, NOSYNC)
+    # 1.6.2: Instagram embeds cannot play in sync for everyone, so the link is refused with a clear reason
+    assert code_of(url) == "no_sync_source"
 
 
 def test_instagram_profile_is_a_clear_error():
@@ -93,9 +93,8 @@ def test_instagram_profile_is_a_clear_error():
     "https://platform.twitter.com/embed/Tweet.html?id=1790000000000000000",
 ])
 def test_x(url):
-    v = resolve(url)
-    assert (v["kind"], v["video_id"], v["capabilities"]) == ("x", "1790000000000000000", NOSYNC)
-    assert v["embed_url"] == "https://platform.twitter.com/embed/Tweet.html?id=1790000000000000000"
+    # 1.6.2: X embeds cannot play in sync, refused
+    assert code_of(url) == "no_sync_source"
 
 
 def test_x_profile_is_a_clear_error():
@@ -132,8 +131,9 @@ def test_lists_offer_the_new_sites():
     doms = [s["domain"] for s in config.ALLOWED_SITES]
     if os.environ.get("ALLOWED_SITES"):
         pytest.skip("ALLOWED_SITES is set in the environment")
-    for d in ("tiktok.com", "instagram.com", "x.com", "facebook.com"):
+    for d in ("tiktok.com", "facebook.com"):
         assert d in doms
-    assert "vimeo.com" not in doms and "archive.org" not in doms
+    for d in ("vimeo.com", "archive.org", "instagram.com", "x.com", "kick.com"):
+        assert d not in doms
     # still accepted as a page picked in the app's browser
     assert policy.is_allowed_site("vimeo.com") and policy.is_allowed_site("www.twitter.com") and policy.is_allowed_site("vm.tiktok.com")

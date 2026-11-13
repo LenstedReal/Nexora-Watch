@@ -533,6 +533,14 @@ async def resolve(url_in, referer=None, title=None) -> dict:
     ref = _clean_referer(referer)
     custom_title = _clean_title(title)
     res = await _resolve(url_in, ref)
+    # Nexora is a watch-together app: a source that cannot play at the same moment for everyone is not offered.
+    if (res.get("capabilities") or {}).get("sync") is False:
+        kind = res.get("kind")
+        if kind == "twitch":
+            raise ApiError(422, "twitch_live", "Twitch canlı yayınları eşitlenemiyor; kayıtlı yayın bağlantısı paylaş")
+        if kind == "drive_embed":
+            raise ApiError(422, "drive_no_stream", "Drive bu dosyayı akış olarak sunmuyor; dosyayı indirip Videoyu yükle ile ekle")
+        raise ApiError(422, "no_sync_source", "Bu kaynak herkeste aynı anda oynatılamıyor, bu yüzden desteklenmiyor")
     if res.get("kind") in PROVIDER_LABELS:
         res["title"] = await _provider_title(res, custom_title)
     elif custom_title:

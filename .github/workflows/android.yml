@@ -78,17 +78,29 @@ jobs:
             echo "::warning::ANDROID_KEYSTORE_BASE64 secret missing - building with the DEBUG key (not for Google Play)"
           fi
 
-      # Push notifications (docs/PUSH.md): secret GOOGLE_SERVICES_JSON = base64 of google-services.json.
-      # Without it the app builds the same, only push is off.
+      # Push notifications (docs/PUSH.md): secret GOOGLE_SERVICES_JSON = the google-services.json file itself
+      # (pasted as is) or its base64. A missing or broken secret never stops the build: push is simply off.
       - name: Restore google-services.json
         env:
-          GSJ_B64: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GSJ: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$GSJ_B64" ]; then
-            echo "$GSJ_B64" | base64 -d > google-services.json
+          rm -f google-services.json
+          if [ -z "$GSJ" ]; then
+            echo "::notice::GOOGLE_SERVICES_JSON secret missing - push notifications off"
+            exit 0
+          fi
+          printf '%s' "$GSJ" > gsj.in
+          if python3 -c 'import json,sys; json.load(open("gsj.in"))' 2>/dev/null; then
+            mv gsj.in google-services.json
+          elif tr -d ' \r\n\t' < gsj.in | base64 -d > gsj.out 2>/dev/null && python3 -c 'import json; json.load(open("gsj.out"))' 2>/dev/null; then
+            mv gsj.out google-services.json
+          fi
+          rm -f gsj.in gsj.out
+          if [ -f google-services.json ] && python3 -c 'import json; d=json.load(open("google-services.json")); assert any(c["client_info"]["android_client_info"]["package_name"]=="com.lenstedreal.nexorawatch" for c in d["client"])' 2>/dev/null; then
             echo "Push: google-services.json restored"
           else
-            echo "::notice::GOOGLE_SERVICES_JSON secret missing - push notifications off"
+            rm -f google-services.json
+            echo "::warning title=Push::GOOGLE_SERVICES_JSON secret is not a valid google-services.json for com.lenstedreal.nexorawatch (paste the file content as is). Building without push."
           fi
 
       - name: Generate native Android project
@@ -128,7 +140,7 @@ jobs:
         with:
           files: dist/*
 
-      # Keeps https://github.com/LenstedReal/Nexora-Watch/releases/latest (linked from the website) pointing at
+      # Keeps https://github.com/LenstedReal/NexoraWatch/releases/latest (linked from the website) pointing at
       # the newest signed APK. Only the APK is public; the AAB is for Play Console and stays in the artifact.
       - name: Publish latest APK release
         if: github.ref == 'refs/heads/main'

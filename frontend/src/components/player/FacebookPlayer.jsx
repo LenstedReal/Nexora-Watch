@@ -169,16 +169,7 @@ export const FacebookPlayer = ({ video, playerRef, events, onFatal, onFallback, 
   }, [href, lang, fallback, playerRef, onFatal]);
   useEffect(() => { if (fallback) onFallback?.(); }, [fallback, onFallback]);
 
-  if (fallback) {
-    return (
-      <iframe
-        title="Facebook"
-        src={`https://www.facebook.com/plugins/video.php?${new URLSearchParams({ href, show_text: "false" })}`}
-        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen"
-        allowFullScreen
-        data-testid="facebook-embed"
-      />
-    );
-  }
+  // Without Facebook's SDK the video could only play unsynced, which a watch-together room cannot use.
+  if (fallback) { onFatal?.("facebook_sdk"); return null; }
   return <div ref={hostRef} className="yt-host fb-host" data-testid="facebook-player" />;
 };

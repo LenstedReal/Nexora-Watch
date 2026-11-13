@@ -357,7 +357,11 @@
     "err_device_taken": "Bu cihaz kimliği kullanılıyor",
     "err_invalid_token": "Geçersiz bildirim anahtarı",
     "err_not_watched_together": "Bu kişiyi yalnızca birlikte izlediysen çağırabilirsin",
-    "push_test_title": "Telefon bildirimleri"
+    "push_test_title": "Telefon bildirimleri",
+    "err_twitch_live": "Twitch canlı yayınları herkeste aynı anda oynatılamıyor. Kayıtlı yayın (twitch.tv/videos/…) bağlantısı paylaş.",
+    "err_drive_no_stream": "Drive bu dosyayı akış olarak sunmuyor. Dosyayı indirip “Videoyu yükle” ile ekle.",
+    "err_no_sync_source": "Bu kaynak herkeste aynı anda oynatılamıyor, bu yüzden Nexora'da desteklenmiyor.",
+    "err_facebook_sdk": "Facebook oynatıcısı yüklenemedi, bu yüzden video eşitlenemiyor. Biraz sonra yeniden dene."
   },
   "en": {
     "chip": "BETTER THAN RAVE",
@@ -717,7 +721,11 @@
     "err_device_taken": "This device id is in use",
     "err_invalid_token": "Invalid notification token",
     "err_not_watched_together": "You can only invite people you watched with",
-    "push_test_title": "Phone notifications"
+    "push_test_title": "Phone notifications",
+    "err_twitch_live": "Twitch live streams can't be synced for everyone. Share a past broadcast link (twitch.tv/videos/…).",
+    "err_drive_no_stream": "Drive doesn't stream this file. Download it and add it with “Upload video”.",
+    "err_no_sync_source": "This source can't play at the same moment for everyone, so Nexora doesn't support it.",
+    "err_facebook_sdk": "Facebook's player didn't load, so the video can't be synced. Try again in a moment."
   },
   "de": {
     "chip": "BETTER THAN RAVE",
@@ -1077,6 +1085,10 @@
     "err_device_taken": "Diese Geräte-ID wird verwendet",
     "err_invalid_token": "Ungültiger Benachrichtigungsschlüssel",
     "err_not_watched_together": "Du kannst nur Leute einladen, mit denen du geschaut hast",
-    "push_test_title": "Handy-Benachrichtigungen"
+    "push_test_title": "Handy-Benachrichtigungen",
+    "err_twitch_live": "Twitch-Livestreams lassen sich nicht für alle synchronisieren. Teile einen Link zu einer vergangenen Übertragung (twitch.tv/videos/…).",
+    "err_drive_no_stream": "Drive streamt diese Datei nicht. Lade sie herunter und füge sie mit „Video hochladen“ hinzu.",
+    "err_no_sync_source": "Diese Quelle kann nicht bei allen gleichzeitig laufen, daher unterstützt Nexora sie nicht.",
+    "err_facebook_sdk": "Der Facebook-Player wurde nicht geladen, daher kann das Video nicht synchronisiert werden. Versuche es gleich noch einmal."
   }
 }
