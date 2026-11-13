@@ -6,13 +6,14 @@ Paket adı: `com.lenstedreal.nexorawatch` · Hedef kitle: 16+ · Reklam: var (In
 
 ### Türkçe
 **Kısa açıklama (≤ 80 karakter):**
-> Arkadaşlarınla aynı anda video izle, sohbet et. Oda kur, kodu paylaş, başla.
+> Sevgilinle film gecesi, arkadaşlarınla dizi maratonu: aynı saniyede izle.
 
 **Tam açıklama:**
-> Nexora Watch ile arkadaşlarınla aynı videoyu aynı saniyede izlersin. Bir oda kur, kodu ya da bağlantıyı paylaş;
+> Sevgilinle film gecesi, arkadaşlarınla dizi maratonu ya da kısa videolar: Nexora Watch ile aynı videoyu aynı saniyede
+> izlersin. Bir oda kur, kodu ya da bağlantıyı paylaş;
 > herkes tek dokunuşla katılır. Odayı kuran kişi oynatır, durdurur ve ileri sarar, herkesin ekranı otomatik eşitlenir.
 >
-> • YouTube, Vimeo, Twitch ve diğer desteklenen kaynaklardan bağlantı yapıştır
+> • YouTube, TikTok, Facebook, Twitch kayıtları, Google Drive ve video bağlantılarını yapıştır
 > • Kendi videonu yükle (7 gün sonra otomatik silinir)
 > • Oda sohbeti, izleme sırası ve oylama, altyazı (.srt / .vtt)
 > • Hesap gerekmez: sadece bir takma ad seç
@@ -22,13 +23,14 @@ Paket adı: `com.lenstedreal.nexorawatch` · Hedef kitle: 16+ · Reklam: var (In
 
 ### English
 **Short description (≤ 80 chars):**
-> Watch videos in sync with friends and chat. Create a room, share the code, go.
+> Movie night with your partner, series marathons with friends, all in sync.
 
 **Full description:**
-> Nexora Watch lets you and your friends watch the same video at the same second. Create a room, share the code or
+> Movie night with your partner, a series marathon with friends or short clips: Nexora Watch lets you watch the same
+> video at the same second. Create a room, share the code or
 > link, and everyone joins with one tap. The host plays, pauses and seeks; every screen stays in sync automatically.
 >
-> • Paste links from YouTube, Vimeo, Twitch and other supported sources
+> • Paste links from YouTube, TikTok, Facebook, Twitch past broadcasts, Google Drive and video links
 > • Upload your own video (deleted automatically after 7 days)
 > • Room chat, watch queue with voting, subtitles (.srt / .vtt)
 > • No account needed: just pick a nickname
@@ -36,7 +38,7 @@ Paket adı: `com.lenstedreal.nexorawatch` · Hedef kitle: 16+ · Reklam: var (In
 >
 > Videos play in each source's own official player. You can report inappropriate content from inside the room.
 
-Kontrol: kısa açıklamalar 80 karakterin altında (TR 76, EN 78). Ekran görüntüleri: en az 2 telefon görüntüsü
+Kontrol: kısa açıklamalar 80 karakterin altında (TR 73, EN 74). Ekran görüntüleri: en az 2 telefon görüntüsü
 (oda ekranı, sohbet), 512×512 simge, 1024×500 öne çıkan görsel.
 
 ## 2. İçerik derecelendirmesi (IARC anketi)

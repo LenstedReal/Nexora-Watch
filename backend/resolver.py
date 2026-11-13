@@ -188,7 +188,7 @@ def _twitch(url: str, parsed) -> dict | None:
     path = parsed.path or ""
     if host == "clips.twitch.tv" or (host in TWITCH_HOSTS and TWITCH_CLIP.match(path)):
         # Clips have no interactive embed (no position API), so they cannot be kept in sync.
-        raise ApiError(422, "twitch_clip", "Twitch klipleri eşitlenemiyor; yayının ya da kayıtlı videonun bağlantısını kullan")
+        raise ApiError(422, "twitch_clip", "Twitch klipleri eşitlenemiyor; kayıtlı yayının (twitch.tv/videos/…) bağlantısını kullan")
     vid = channel = owner = None  # owner = the channel name as written in the address, for the title
     if host == "player.twitch.tv":
         q = dict(parse_qsl(parsed.query))
@@ -227,7 +227,7 @@ def _kick(url: str, parsed) -> dict | None:
     if host not in KICK_HOSTS and host != "player.kick.com":
         return None
     if host in KICK_HOSTS and (KICK_RECORDED.match(path) or "clip" in dict(parse_qsl(parsed.query))):
-        raise ApiError(422, "kick_recorded", "Kick kayıtlı yayınları ve klipleri resmî oynatıcıyla gömülemiyor; kanalın canlı yayın bağlantısını kullan")
+        raise ApiError(422, "kick_recorded", "Kick videoları herkeste aynı anda oynatılamıyor, bu yüzden desteklenmiyor")
     m = KICK_CHANNEL.match(path)
     if not m or (host in KICK_HOSTS and m.group(1).lower() in KICK_RESERVED):
         return None

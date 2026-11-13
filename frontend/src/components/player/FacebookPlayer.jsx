@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 // out a player instance on "xfbml.ready" with play / pause / seek / mute / unmute / getCurrentPosition / getDuration and
 // the events startedPlaying, paused, finishedPlaying, startedBuffering, finishedBuffering, error.
 // No app id is passed (the embed page's own SDK snippet has none). If the SDK or the player instance does not come up,
-// the plain plugin iframe (plugins/video.php) is shown instead: the video still plays, only without sync.
+// a translated error is shown instead (a video that cannot be synced has no place in a watch-together room).
 const SDK_VERSION = "v25.0";
 const SDK_LOCALES = { tr: "tr_TR", en: "en_US", de: "de_DE" };
 const INSTANCE_TIMEOUT_MS = 10000;
@@ -167,9 +167,8 @@ export const FacebookPlayer = ({ video, playerRef, events, onFatal, onFallback, 
       mount.remove();
     };
   }, [href, lang, fallback, playerRef, onFatal]);
-  useEffect(() => { if (fallback) onFallback?.(); }, [fallback, onFallback]);
-
-  // Without Facebook's SDK the video could only play unsynced, which a watch-together room cannot use.
-  if (fallback) { onFatal?.("facebook_sdk"); return null; }
+  // Without Facebook's SDK the video could only play unsynced, which a watch-together room cannot use: show an error.
+  useEffect(() => { if (fallback) { onFallback?.(); onFatal?.("facebook_sdk"); } }, [fallback, onFallback, onFatal]);
+  if (fallback) return null;
   return <div ref={hostRef} className="yt-host fb-host" data-testid="facebook-player" />;
 };

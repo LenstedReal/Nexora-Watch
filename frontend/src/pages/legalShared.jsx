@@ -10,6 +10,8 @@ import "@/landing.css";
 // ---- Owner details (edit here) ------------------------------------------------------------------------------
 // KVKK md.10 requires the data controller's identity. Fill in your full legal name (and, if you have one, a
 // company title / KEP or postal address) before publishing on Google Play.
+export const PACKAGE_ID = "com.lenstedreal.nexorawatch";
+
 export const OWNER = {
   brand: "LenstedReal",
   controller: "LenstedReal (Nexora Watch geliştiricisi)",
@@ -196,6 +198,20 @@ export function LegalLayout({ title, children }) {
         <h1>{title}</h1>
         <p className="updated">
           {ui.updated}: {UPDATED[lang]}
+        </p>
+        {/* Google Play reviewers look for the package name at the top of every policy page. */}
+        <p className="legal-app" data-testid="legal-app">
+          {lang === "en" ? (
+            <>
+              This text applies to the <b>Nexora Watch</b> Android app (package name <b>{PACKAGE_ID}</b>) and the website{" "}
+              <b>nexora.lenstedreal.info</b>.
+            </>
+          ) : (
+            <>
+              Bu metin, <b>Nexora Watch</b> Android uygulaması (paket adı <b>{PACKAGE_ID}</b>) ve <b>nexora.lenstedreal.info</b> web
+              sitesi için geçerlidir.
+            </>
+          )}
         </p>
         {children}
       </article>
