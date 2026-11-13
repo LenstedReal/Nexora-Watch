@@ -84,8 +84,11 @@ Not: IP adresi yalnızca hız sınırı için bellekte tutulur, kaydedilmez.
 
 - Hedef yaş grupları: **16-17 ve 18+** (13 altı ve 13-15 seçilmez; uygulama içinde yaş onayı var, `MIN_AGE=16`).
 - Çocuklara yönelik değil → "Aileler için tasarlandı" programına girilmez.
-- Gizlilik politikası: `https://nexora.lenstedreal.info/gizlilik`
-- Çocuk güvenliği standartları (sosyal uygulamalar için zorunlu): `https://nexora.lenstedreal.info/cocuk-guvenligi`
+- Web sitesi: `https://nexora.lenstedreal.info`
+- Gizlilik politikası: `https://lenstedreal.github.io/NexoraWatch/privacy-policy.html` (aynı metin `https://nexora.lenstedreal.info/gizlilik` adresinde de durur)
+- Veri silme: `https://lenstedreal.github.io/NexoraWatch/delete-data.html`
+- Çocuk güvenliği standartları (sosyal uygulamalar için zorunlu): `https://lenstedreal.github.io/NexoraWatch/child-safety.html`
+- Bu sayfalar LenstedReal.github.io deposunun `NexoraWatch/` klasöründedir; Nexora'daki metin değişirse oradaki kopya da yenilenmeli.
 - İletişim e-postası: `contact.nexorawatch@protonmail.com`
 
 ## 6. Kapalı test (yeni kişisel hesaplar için zorunlu)

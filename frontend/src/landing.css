@@ -107,6 +107,10 @@
 .legal-toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
 .legal-toc a{font-size:12px;padding:6px 10px;border-radius:99px;background:var(--s2);border:1px solid var(--bd);color:var(--mut);text-decoration:none}
 .legal-toc a.on{color:#fff;border-color:var(--pu);background:#3a0a2c}
+.legal-lang{display:flex;justify-content:flex-end;gap:6px;margin-bottom:12px}
+.legal-lang button{font:700 12px var(--head);letter-spacing:.4px;padding:5px 11px;border-radius:99px;background:var(--s2);border:1px solid var(--bd);color:var(--mut);cursor:pointer}
+.legal-lang button.on{color:#fff;border-color:var(--pu);background:#3a0a2c}
+.legal-lang button:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
 
 @media (prefers-reduced-motion: reduce){.lp-bg .orb{animation:none}.lp-feature,.lp-btn{transition:none}}
 /* Settings (/ayarlar) */

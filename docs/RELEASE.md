@@ -59,9 +59,9 @@ web sitesindeki "Android APK indir" butonu bunu gösterir.
 ## 4. Google Play Console kontrol listesi
 - [ ] Uygulama oluştur: ad "Nexora Watch", varsayılan dil Türkçe, Uygulama, Ücretsiz.
 - [ ] **Play App Signing**: etkin (varsayılan). AAB'yi yükle, Google uygulama imzalama anahtarını yönetir; senin anahtarın "upload key".
-- [ ] **Gizlilik politikası**: `https://nexora.lenstedreal.info/gizlilik`
-- [ ] **Veri silme**: `https://nexora.lenstedreal.info/veri-silme` (hesap yok; bu sayfa yeterli)
-- [ ] **Çocuk güvenliği standartları (CSAE)**: `https://nexora.lenstedreal.info/cocuk-guvenligi`, irtibat: contact.nexorawatch@protonmail.com
+- [ ] **Web sitesi**: `https://nexora.lenstedreal.info` · **Gizlilik politikası**: `https://lenstedreal.github.io/NexoraWatch/privacy-policy.html`
+- [ ] **Veri silme**: `https://lenstedreal.github.io/NexoraWatch/delete-data.html` (hesap yok; bu sayfa yeterli)
+- [ ] **Çocuk güvenliği standartları (CSAE)**: `https://lenstedreal.github.io/NexoraWatch/child-safety.html`, irtibat: contact.nexorawatch@protonmail.com
 - [ ] **Hedef kitle**: 16+ (çocuklara yönelik değil; Play Console'da yalnızca "16-17" ve "18+" yaş gruplarını seç). 18 yaş altı için ebeveyn gözetimi şartı koşullarda yazıyor; uygulamada ilk açılışta yaş beyanı var.
 - [ ] **İçerik derecelendirme anketi**: kullanıcılar arası etkileşim (sohbet) VAR, kullanıcı içeriği paylaşımı VAR, konum paylaşımı YOK.
 - [ ] **Veri güvenliği formu** (özet):

@@ -52,6 +52,8 @@ async def device_from_headers(request: Request, required: bool = True) -> dict |
     doc = await db.devices.find_one({"device_id": dev_id, "secret_hash": hash_token(key)})
     if not doc and required:
         raise ApiError(403, "device_unknown", "Cihaz tanınmadı")
+    if doc:  # "last used", so an unused device record can be deleted after PEOPLE_TTL_DAYS (privacy policy)
+        await db.devices.update_one({"device_id": dev_id}, {"$set": {"last_seen": _now()}})
     return doc
 
 
@@ -287,3 +289,4 @@ async def cleanup(now: datetime | None = None):
     now = now or _now()
     await db.watched_pairs.delete_many({"last": {"$lt": now - timedelta(days=PEOPLE_TTL_DAYS)}})
     await db.invites.delete_many({"at": {"$lt": now - timedelta(days=PEOPLE_TTL_DAYS)}})
+    await db.devices.delete_many({"last_seen": {"$lt": now - timedelta(days=PEOPLE_TTL_DAYS)}})

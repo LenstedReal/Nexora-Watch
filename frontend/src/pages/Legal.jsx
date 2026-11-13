@@ -1,158 +1,25 @@
-import { useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Download } from "lucide-react";
-import { useAppConfig } from "@/lib/config";
-import "@/landing.css";
+import { Link } from "react-router-dom";
+import { Addr, Ctl, LegalLayout, Mail, RETENTION, withLang } from "@/pages/legalShared";
+import { ChildSafetyEn, CopyrightEn, DeleteDataEn, KvkkEn, PrivacyEn, TermsEn } from "@/pages/LegalEn";
 
-// ---- Owner details (edit here) ------------------------------------------------------------------------------
-// KVKK md.10 requires the data controller's identity. Fill in your full legal name (and, if you have one, a
-// company title / KEP or postal address) before publishing on Google Play.
-export const OWNER = {
-  brand: "LenstedReal",
-  controller: "LenstedReal (Nexora Watch geliştiricisi)",
-  address: "", // e.g. "İl/İlçe, Türkiye" — optional, shown only when filled
-};
-const UPDATED = "13 Kasım 2026";
+export { LEGAL_PAGES, OWNER, SiteFooter, legalPages } from "@/pages/legalShared";
 
-export const LEGAL_PAGES = [
-  { path: "/gizlilik", label: "Gizlilik Politikası" },
-  { path: "/kosullar", label: "Kullanım Koşulları" },
-  { path: "/kvkk", label: "KVKK Aydınlatma Metni" },
-  { path: "/telif", label: "Telif Hakkı ve İçerik Kaldırma" },
-  { path: "/veri-silme", label: "Veri Silme Talebi" },
-  { path: "/cocuk-guvenligi", label: "Çocuk Güvenliği Standartları" },
-];
+// Turkish texts. Each exported page shows the English version (LegalEn.jsx) when the legal language is "en".
+export const Privacy = withLang(PrivacyTr, PrivacyEn);
+export const Terms = withLang(TermsTr, TermsEn);
+export const Kvkk = withLang(KvkkTr, KvkkEn);
+export const Copyright = withLang(CopyrightTr, CopyrightEn);
+export const DeleteData = withLang(DeleteDataTr, DeleteDataEn);
+export const ChildSafety = withLang(ChildSafetyTr, ChildSafetyEn);
 
-export function SiteFooter() {
-  const cfg = useAppConfig();
-  return (
-    <footer className="site-footer">
-      <div className="site-footer-in">
-        <nav>
-          {LEGAL_PAGES.map((p) => (
-            <Link key={p.path} to={p.path}>
-              {p.label}
-            </Link>
-          ))}
-        </nav>
-        <a href={`mailto:${cfg.contact_email}`}>{cfg.contact_email}</a>
-        <small>© {new Date().getFullYear()} {OWNER.brand} · Nexora Watch</small>
-      </div>
-    </footer>
-  );
-}
-
-function LegalLayout({ title, children }) {
-  const cfg = useAppConfig();
-  const { pathname } = useLocation();
-  useEffect(() => {
-    document.title = `${title} · Nexora Watch`;
-    window.scrollTo(0, 0);
-  }, [title]);
-  return (
-    <div className="legal">
-      <div className="legal-top">
-        <header className="lp-nav">
-          <Link className="lp-brand" to="/">
-            <img src="/branding/logo-256.jpg" alt="" />
-            <span>
-              Nexora<b>Watch</b>
-            </span>
-          </Link>
-          {/* No download button before the app is on Google Play. */}
-          {cfg.play_url && (
-            <a className="lp-nav-cta" href={cfg.play_url} target="_blank" rel="noreferrer">
-              <Download size={15} /> <span>İndir</span>
-            </a>
-          )}
-        </header>
-      </div>
-      <article className="legal-doc">
-        <div className="legal-toc">
-          {LEGAL_PAGES.map((p) => (
-            <Link key={p.path} to={p.path} className={pathname === p.path ? "on" : ""}>
-              {p.label}
-            </Link>
-          ))}
-        </div>
-        <h1>{title}</h1>
-        <p className="updated">Son güncelleme: {UPDATED}</p>
-        {children}
-      </article>
-      <SiteFooter />
-    </div>
-  );
-}
-
-/** Data controller from server config (OWNER_NAME / OWNER_ADDRESS in .env), falling back to OWNER. */
-const useOwner = () => {
-  const cfg = useAppConfig();
-  const name = cfg.owner?.name?.trim();
-  return {
-    controller: name ? `${name} (${OWNER.brand} — Nexora Watch geliştiricisi)` : OWNER.controller,
-    address: cfg.owner?.address?.trim() || OWNER.address,
-  };
-};
-const Ctl = () => useOwner().controller;
-const Addr = ({ pre = ", ", wrap }) => {
-  const a = useOwner().address;
-  if (!a) return null;
-  return wrap ? ` (${a})` : `${pre}${a}`;
-};
-
-const Mail = () => {
-  const cfg = useAppConfig();
-  return <a href={`mailto:${cfg.contact_email}`}>{cfg.contact_email}</a>;
-};
-
-const RETENTION = (
-  <table>
-    <thead>
-      <tr>
-        <th>Veri</th>
-        <th>Saklama süresi</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Oda bilgileri (oda adı, kod, katılımcı rumuzları), oynatma durumu</td>
-        <td>Oda 24 saat sonra sona erer; kayıtlar sona ermeden itibaren en geç 24 saat içinde silinir.</td>
-      </tr>
-      <tr>
-        <td>Sohbet mesajları ve sistem mesajları</td>
-        <td>Odanın sona ermesinden itibaren en geç 24 saat içinde silinir.</td>
-      </tr>
-      <tr>
-        <td>Yüklenen videolar ve Google Drive'dan içe aktarılan videolar</td>
-        <td>Oda kapatıldıktan veya süresi dolduktan yaklaşık 1 saat sonra; her durumda yüklemeden itibaren en geç 7 gün içinde silinir.</td>
-      </tr>
-      <tr>
-        <td>Senkron ölçüm verileri (gecikme, sapma)</td>
-        <td>Oda kayıtlarıyla birlikte silinir.</td>
-      </tr>
-      <tr>
-        <td>Şikâyet kayıtları ve ilgili mesaj kopyası</td>
-        <td>İnceleme tamamlanana kadar, en fazla 180 gün; hukuki talep varsa yasal süre boyunca.</td>
-      </tr>
-      <tr>
-        <td>Güvenlik kayıtları (IP adresi, işlem kaydı)</td>
-        <td>En fazla 90 gün; 5651 sayılı Kanun kapsamında gerekli olması hâlinde yasal süre boyunca.</td>
-      </tr>
-      <tr>
-        <td>Cihazdaki oda anahtarı ve rumuz</td>
-        <td>Yalnızca cihazında tutulur; uygulamayı silerek veya tarayıcı verilerini temizleyerek kaldırabilirsin.</td>
-      </tr>
-    </tbody>
-  </table>
-);
-
-export function Privacy() {
+function PrivacyTr() {
   return (
     <LegalLayout title="Gizlilik Politikası">
       <div className="legal-box">
         <p>
-          <b>Kısaca:</b> Hesap yok; bugün reklam ve takip/analiz SDK'sı da yok. Odayı kullanman için gereken en az veriyi işliyoruz ve kısa
-          sürede otomatik olarak siliyoruz. Verilerini satmıyoruz.
+          <b>Kısaca:</b> Hesap yok. Odayı kullanman için gereken en az veriyi işliyoruz ve kısa sürede otomatik olarak siliyoruz. Mobil
+          uygulamada oda dışındaki ekranlarda kişiselleştirilmemiş reklam (InMobi) olabilir; izlerken reklam yok. Davet bildirimleri için
+          telefonuna rastgele bir cihaz kimliği verilir. Verilerini satmıyoruz.
         </p>
       </div>
       <h2>1. Kim olduğumuz</h2>
@@ -178,6 +45,25 @@ export function Privacy() {
           (ağ gecikmesi, oynatma sapması, yeniden bağlanma sayısı, oynatıcı hata sayısı).
         </li>
         <li>
+          <b>Anonim cihaz kimliği ve bildirim anahtarı:</b> Uygulama ve site, adını bilmediğimiz rastgele bir cihaz kimliği oluşturur.
+          Bildirimlere izin verirsen telefonunun bildirim anahtarı (Firebase) bu kimlikle saklanır. Bununla, aynı odada en az 2 dakika
+          birlikte izlediğin kişilerin son rumuzları ("Birlikte izlediklerin") ve gönderilen davetler tutulur; bunları yalnızca iki taraf
+          görür ve istediğin an silebilirsin.
+        </li>
+        <li>
+          <b>Odaya eklenenler:</b> Sıraya eklenen bağlantılar ve oylar; yüklenen altyazı dosyaları; ev sahibi odayı herkese açarsa oda adı,
+          oynayan videonun başlığı ve kişi sayısı ana sayfadaki "Açık odalar" listesinde herkese görünür.
+        </li>
+        <li>
+          <b>Hata raporları:</b> Uygulama veya site bir hatayla karşılaşırsa hata mesajı, teknik iz, sayfa, uygulama sürümü ve tarayıcı
+          bilgisi gönderilir. Kişisel bilgi içermez.
+        </li>
+        <li>
+          <b>Abonelik servisleri (beta):</b> Netflix, Disney+, Prime Video veya HBO Max uygulama içinde kendi hesabınla izlenir. Giriş
+          doğrudan servisin sayfasında yapılır; şifren ve servisin çerezleri yalnızca telefonunda kalır, bize gelmez. Biz yalnızca oynat,
+          duraklat ve konum bilgisini odayla eşitleriz.
+        </li>
+        <li>
           <b>Şikâyetler:</b> Bir mesajı veya kişiyi bildirdiğinde; şikâyet nedeni, notun, ilgili mesajın kopyası ve rumuzlar.
         </li>
         <li>
@@ -186,7 +72,7 @@ export function Privacy() {
         </li>
       </ul>
       <p>
-        Ad-soyad, e-posta, telefon, konum, rehber, kamera veya mikrofon verisi <b>toplamıyoruz</b>. Galeriden video seçtiğinde yalnızca
+        Ad-soyad, e-posta, telefon numarası, konum, rehber, kamera veya mikrofon verisi <b>toplamıyoruz</b>. Galeriden video seçtiğinde yalnızca
         seçtiğin dosyaya erişilir.
       </p>
       <h2>3. Amaçlar ve hukuki sebepler</h2>
@@ -194,6 +80,8 @@ export function Privacy() {
         <li>Oda oluşturma, katılma, sohbet ve senkron oynatma hizmetini sunmak (sözleşmenin ifası).</li>
         <li>Video yükleme ve oynatmayı sağlamak, kötüye kullanımı ve aşırı yüklenmeyi önlemek (sözleşmenin ifası, meşru menfaat).</li>
         <li>Güvenlik, hata ayıklama ve senkron kalitesini ölçüp iyileştirmek (meşru menfaat).</li>
+        <li>Odaya davet bildirimi göndermek; yalnızca bildirimlere izin verdiğinde (açık rıza, ayarlardan kapatılabilir).</li>
+        <li>Mobil uygulamayı ücretsiz sunabilmek için oda dışında reklam göstermek (meşru menfaat).</li>
         <li>Şikâyetleri incelemek, telif ve hukuka aykırı içerik bildirimlerini işlemek, yasal yükümlülükleri yerine getirmek (hukuki yükümlülük, meşru menfaat).</li>
       </ul>
       <h2>4. Saklama süreleri</h2>
@@ -208,6 +96,19 @@ export function Privacy() {
           <b>Cloudflare</b>: alan adı (DNS) çözümlemesi.
         </li>
         <li>
+          <b>Google Firebase Cloud Messaging</b>: yalnızca bildirimlere izin verdiysen, davet bildirimini telefonuna ulaştırmak için bildirim
+          anahtarı ve bildirim metni Google'a gönderilir.
+        </li>
+        <li>
+          <b>InMobi</b> (reklam ağı, yalnızca mobil uygulama, oda dışındaki ekranlar): reklamlar kişiselleştirilmez; uygulama InMobi'ye
+          reklam kimliği veya başka cihaz tanımlayıcısı göndermez. InMobi reklam sunmak için IP adresi ve cihaz/uygulama bilgisi gibi
+          teknik verileri kendi gizlilik politikası kapsamında işleyebilir.
+        </li>
+        <li>
+          <b>Video sağlayıcıları</b> (YouTube, TikTok, Facebook, Twitch, Vimeo): odada bu kaynaklardan bir video oynatıldığında sağlayıcının
+          resmî oynatıcısı yüklenir ve sağlayıcı kendi gizlilik politikası kapsamında veri işleyebilir.
+        </li>
+        <li>
           <b>YouTube (Google)</b>: odada bir YouTube videosu oynatıldığında resmi YouTube oynatıcısı yüklenir ve YouTube kendi gizlilik
           politikası kapsamında veri işleyebilir. Google Drive bağlantısı içe aktarıldığında sunucumuz dosyayı Google'dan indirir.
         </li>
@@ -216,9 +117,9 @@ export function Privacy() {
       </ul>
       <p>Verilerini reklam veya pazarlama amacıyla üçüncü kişilere satmıyor, kiralamıyor veya aktarmıyoruz.</p>
       <p>
-        <b>Reklamlar:</b> Bugün uygulamada ve sitede reklam göstermiyoruz. İleride mobil uygulamada, oda dışındaki ekranlarda reklam
-        göstermeyi planlıyoruz; izleme sırasında reklam gösterilmeyecek. Reklam eklendiği sürümle birlikte reklam ortağının kim olduğunu ve
-        hangi verileri işlediğini bu sayfada ve Google Play'deki veri güvenliği bölümünde açıklayacağız.
+        <b>Reklamlar:</b> Web sitesinde reklam yok. Mobil uygulamada yalnızca oda dışındaki ekranlarda (ana sayfada bir banner, odadan
+        çıkınca en fazla 3 dakikada bir tam ekran reklam) InMobi reklamları gösterilebilir; izleme sırasında hiçbir zaman reklam yoktur.
+        Reklamlar kişiselleştirilmez.
       </p>
       <h2>6. Güvenlik</h2>
       <p>
@@ -242,7 +143,7 @@ export function Privacy() {
   );
 }
 
-export function Terms() {
+function TermsTr() {
   return (
     <LegalLayout title="Kullanım Koşulları">
       <p>
@@ -303,7 +204,7 @@ export function Terms() {
   );
 }
 
-export function Kvkk() {
+function KvkkTr() {
   return (
     <LegalLayout title="KVKK Aydınlatma Metni">
       <p>
@@ -316,6 +217,7 @@ export function Kvkk() {
         <li>İşlem güvenliği: IP adresi, katılımcı kimliği, oda anahtarının özeti, işlem kayıtları.</li>
         <li>Müşteri işlem: oda kayıtları, sohbet mesajları, eklenen video bağlantıları, şikâyet kayıtları.</li>
         <li>Görsel/işitsel kayıt: kullanıcının yüklediği veya içe aktardığı video dosyaları (içeriğe bağlı olarak).</li>
+        <li>Cihaz bilgisi: rastgele cihaz kimliği, bildirimlere izin verildiyse bildirim anahtarı, birlikte izlenen kişilerin rumuzları ve davetler, hata raporları.</li>
       </ul>
       <h2>2. İşleme amaçları</h2>
       <p>
@@ -334,9 +236,11 @@ export function Kvkk() {
       <h2>5. Aktarım</h2>
       <p>
         Kişisel verilerin; barındırma hizmeti alınan Oracle Cloud Infrastructure (Frankfurt, Almanya) sunucularında saklanır ve bu
-        kapsamda KVKK md. 9 hükümlerine uygun olarak yurt dışına aktarılır. DNS hizmeti için Cloudflare kullanılır. Odaya bir YouTube
-        videosu eklendiğinde YouTube oynatıcısı yüklenir. Veriler, talep hâlinde yetkili kamu kurum ve kuruluşlarıyla yasal sınırlar
-        içinde paylaşılabilir. Reklam/pazarlama amaçlı aktarım yapılmaz.
+        kapsamda KVKK md. 9 hükümlerine uygun olarak yurt dışına aktarılır. DNS hizmeti için Cloudflare kullanılır. Davet bildirimleri, yalnızca
+        bildirimlere izin verildiyse Google Firebase Cloud Messaging üzerinden iletilir. Mobil uygulamada oda dışında gösterilen reklamlar
+        için InMobi kullanılır; InMobi'ye cihaz tanımlayıcısı gönderilmez. Odaya bir video sağlayıcısının (YouTube, TikTok, Facebook,
+        Twitch) videosu eklendiğinde o sağlayıcının resmî oynatıcısı yüklenir. Veriler, talep hâlinde yetkili kamu kurum ve kuruluşlarıyla
+        yasal sınırlar içinde paylaşılabilir. Verilerin reklam/pazarlama amacıyla satılması veya aktarılması söz konusu değildir.
       </p>
       <h2>6. Saklama</h2>
       {RETENTION}
@@ -361,7 +265,7 @@ export function Kvkk() {
   );
 }
 
-export function Copyright() {
+function CopyrightTr() {
   return (
     <LegalLayout title="Telif Hakkı ve İçerik Kaldırma">
       <p>
@@ -394,7 +298,7 @@ export function Copyright() {
   );
 }
 
-export function DeleteData() {
+function DeleteDataTr() {
   return (
     <LegalLayout title="Veri Silme Talebi">
       <div className="legal-box">
@@ -414,6 +318,10 @@ export function DeleteData() {
         <li>
           <b>Web:</b> Tarayıcıda nexora.lenstedreal.info için site verilerini temizle.
         </li>
+        <li>
+          <b>Ayarlar → Verilerimi sil</b> bu cihazdaki tüm Nexora verilerini tek dokunuşla siler. "Birlikte izlediklerin" listesindeki
+          kişileri ana sayfadan tek tek ya da "Hepsini unut" ile silebilirsin; bildirimleri Ayarlar'dan kapatınca bildirim anahtarın sunucudan silinir.
+        </li>
       </ul>
       <h2>Sunucudaki verilerin hemen silinmesini isteme</h2>
       <p>
@@ -425,7 +333,7 @@ export function DeleteData() {
   );
 }
 
-export function ChildSafety() {
+function ChildSafetyTr() {
   return (
     <LegalLayout title="Çocuk Güvenliği Standartları">
       <p>
