@@ -267,7 +267,7 @@ var TASKS = [
      the profile in the same view. Closing the task screen with the X forgets it. */
   function save() {
     // a finished run is not kept: every download asks again
-    var v = run && run.done.indexOf(false) !== -1 ? JSON.stringify({ app: run.app.id, done: run.done, pend: run.pend ? { i: run.pend.i, t: run.pend.t } : null, at: Date.now() }) : null;
+    var v = run && run.done.indexOf(false) !== -1 ? JSON.stringify({ app: run.app.id, done: run.done, pend: run.pend ? { i: run.pend.i, t: run.pend.t, left: !!run.pend.left } : null, at: Date.now() }) : null;
     ["sessionStorage", "localStorage"].forEach(function (n) {
       try { var st = window[n]; if (v) st.setItem(KEY, v); else st.removeItem(KEY); } catch (e) { /* private mode etc. */ }
     });
@@ -417,11 +417,18 @@ var TASKS = [
     var p = run.pend;
     if (!manual && !p.left) return;   // a focus event while the page was never left
     var secs = (Date.now() - p.t) / 1000;
+    if (secs < MIN_SECONDS) {
+      /* Too early. On Android the browser often shows this tab again for a moment while it hands the link to the
+         Instagram/TikTok app, so an early return must not cancel the step: it keeps waiting, and the time spent
+         in the app still counts when the user really comes back. */
+      p.left = false;
+      if (manual) say("Biraz daha kal: hesabı takip et, sonra dön.");
+      save();
+      return;
+    }
     run.pend = null;
-    if (secs >= MIN_SECONDS) {
-      run.done[p.i] = true; track(run.app.id, "task_done");
-      say(run.done.indexOf(false) === -1 ? "Hazır. İndir düğmesi açıldı." : "Tamamlandı. Sıradaki hesaba geç.", true);
-    } else say("Görev tamamlanmadı. Hesabı takip et, sonra dön.");
+    run.done[p.i] = true; track(run.app.id, "task_done");
+    say(run.done.indexOf(false) === -1 ? "Hazır. İndir düğmesi açıldı." : "Tamamlandı. Sıradaki hesaba geç.", true);
     paint(); save();
     var next = $("tk-dl") || $("tk-l").querySelector("[data-open]");
     if (next && !$("tasks").hidden) next.focus({ preventScroll: true });
