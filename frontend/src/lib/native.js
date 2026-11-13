@@ -53,7 +53,10 @@ export function enableAppPush(device) {
   return new Promise((resolve) => {
     if (!appInfo()?.caps?.includes("push")) return resolve({ ok: false, reason: "no_app" });
     const prev = window.__nexoraPush;
+    // An app that never answers (permission dialog dismissed, old build) must not leave the switch hanging.
+    const timer = setTimeout(() => { window.__nexoraPush = prev; resolve({ ok: false, reason: "timeout" }); }, 20000);
     window.__nexoraPush = (res) => {
+      clearTimeout(timer);
       window.__nexoraPush = prev;
       resolve(res || { ok: false });
     };

@@ -27,11 +27,30 @@ export default function Settings() {
   const [nick, setNick] = useState(lastNickname());
   const [notif, setNotif] = useState(notifyOn());
   const supported = notifySupported();
-  // Phone notifications (Firebase) inside the app: allow, then send a test to this phone.
-  const allowPush = async () => {
-    try { await api.people(); } catch { /* registers the device; the list itself is not needed here */ }
-    const r = await enableAppPush(getDevice());
-    toast[r.ok ? "success" : "error"](t(r.ok ? "push_on" : "push_off"));
+  // Inside the app notifications come from the phone (Firebase): one switch, no browser notification row.
+  const app = canAppPush();
+  const [push, setPush] = useState(() => { try { return localStorage.getItem("nx:push") === "1"; } catch { return false; } });
+  const [pushBusy, setPushBusy] = useState(false);
+  const togglePush = async () => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (push) {
+        try { await api.pushOff(); } catch { /* the phone's switch is what matters */ }
+        try { localStorage.setItem("nx:push", "0"); } catch { /* private mode */ }
+        setPush(false);
+        return;
+      }
+      try { await api.people(); } catch { /* registers this device on the server; the list itself is not needed */ }
+      const r = await enableAppPush(getDevice());
+      if (r.ok) {
+        try { localStorage.setItem("nx:push", "1"); } catch { /* private mode */ }
+        setPush(true);
+        toast.success(t("push_on"));
+      } else {
+        toast.error(t(r.reason === "denied" ? "notify_denied" : r.reason === "unavailable" ? "push_unavailable" : "push_off"));
+      }
+    } finally { setPushBusy(false); }
   };
   useEffect(() => { document.title = `${t("settings")} · Nexora Watch`; }, [t]);
 
@@ -73,18 +92,22 @@ export default function Settings() {
           <button className="settings-btn" onClick={saveNick} data-testid="settings-nickname-save">{t("save")}</button>
         </div>
       </section>
-      <section className="settings-row">
-        <label htmlFor="set-notif"><Bell size={16} /> {t("notifications")}</label>
-        <input id="set-notif" type="checkbox" className="switch" checked={notif} disabled={!supported} onChange={toggleNotif} data-testid="settings-notify" />
-      </section>
-      <p className="settings-note">{supported ? t("notify_hint") : t("notify_unsupported")}</p>
-      {canAppPush() && (
-        <section className="settings-row">
-          <span><Bell size={16} /> {t("push_test_title")}</span>
-          <div className="settings-inline">
-            <button className="settings-btn" onClick={allowPush} data-testid="settings-push-allow">{t("push_allow")}</button>
-          </div>
-        </section>
+      {app ? (
+        <>
+          <section className="settings-row">
+            <label htmlFor="set-push"><Bell size={16} /> {t("notifications")}</label>
+            <input id="set-push" type="checkbox" className="switch" checked={push} disabled={pushBusy} onChange={togglePush} data-testid="settings-push" />
+          </section>
+          <p className="settings-note">{t("push_hint")}</p>
+        </>
+      ) : (
+        <>
+          <section className="settings-row">
+            <label htmlFor="set-notif"><Bell size={16} /> {t("notifications")}</label>
+            <input id="set-notif" type="checkbox" className="switch" checked={notif} disabled={!supported} onChange={toggleNotif} data-testid="settings-notify" />
+          </section>
+          <p className="settings-note">{supported ? t("notify_hint") : t("notify_unsupported")}</p>
+        </>
       )}
       <section className="settings-row">
         <span><Trash2 size={16} /> {t("wipe_data")}</span>

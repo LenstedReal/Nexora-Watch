@@ -3,7 +3,7 @@
     "name": "Nexora Watch",
     "slug": "nexora-watch",
     "scheme": "nexora",
-    "version": "1.6.2",
+    "version": "1.6.3",
     "orientation": "default",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#09090D",
