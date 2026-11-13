@@ -301,9 +301,16 @@ html.in-app .lp-nav-cta,html.in-app [data-testid="cta-store"],html.in-app .lp-so
 
 /* phone landscape = video fills the screen (the app's rotate button lives in the stage's tool row) */
 @media (orientation:landscape) and (max-height:520px){
-  .room .top,.room .side,.room .banner,.room .hint,.room .desk-only{display:none!important}
-  .room .body{display:block;padding:0}
+  .room .top,.room .banner,.room .hint,.room .desk-only{display:none!important}
+  .room .body{display:flex;flex-direction:row-reverse;padding:0;gap:0;height:100dvh}
+  .room .main{flex:1 1 auto!important;min-width:0;width:auto!important}
   .room .stage{height:100dvh;max-height:100dvh;aspect-ratio:auto;border-radius:0;border:0}
+  /* the chat never disappears: a small see-through chat on the left, next to the picture (never over a provider's player) */
+  .room .side{display:flex!important;flex-direction:column;flex:0 0 min(34vw,300px)!important;width:min(34vw,300px)!important;max-width:min(34vw,300px)!important;min-width:0!important;height:100dvh;max-height:none;border:0;border-right:1px solid rgba(255,255,255,.08);border-radius:0;background:rgba(9,9,13,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding-left:var(--sa-left,env(safe-area-inset-left))}
+  .room .side .tabs-bar,.room .side .pane-sec:not(.chat-sec){display:none!important}
+  .room .side .pane{flex:1;min-height:0;display:flex}
+  .room .side .chat-sec,.room .side .chat-sec.hidden{display:flex!important;flex:1;min-height:0}
+  .room .side .chat{font-size:12.5px}
 }
 
 /* fullscreen: the picture fills the screen */

@@ -70,7 +70,6 @@ export const api = {
   createRoom: (nickname, name) => withDev("POST", "/rooms", { nickname, name }),
   joinRoom: (code, nickname, ident) => withDev("POST", `/rooms/${code}/join`, { nickname, ...(ident ? cred(ident) : {}) }),
   people: () => withDev("GET", "/devices/me/people"),
-  testPush: () => withDev("POST", "/devices/me/test-push", {}),
   forgetPerson: (id) => withDev("DELETE", `/devices/me/people/${encodeURIComponent(id)}`),
   forgetAll: () => withDev("DELETE", "/devices/me/people"),
   invitePerson: (code, ident, to) => withDev("POST", `/rooms/${code}/invite`, { ...cred(ident), to }),

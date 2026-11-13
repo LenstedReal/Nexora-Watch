@@ -272,7 +272,7 @@
     "err_vimeo_notfound": "Bu Vimeo videosu bulunamadı ya da kaldırılmış.",
     "err_vimeo_embed": "Bu Vimeo videosu başka sitelerde oynatılamıyor (gizlilik ayarı ya da parola).",
     "err_twitch_clip": "Twitch klipleri eşitlenemiyor. Yayının ya da kayıtlı videonun bağlantısını kullan.",
-    "twitch_small": "Twitch oynatıcısı için alan çok dar. Pencereyi genişlet ya da telefonu yan çevir.",
+    "twitch_small": "Twitch oynatıcısı en az 400×300 piksel olmalı. İzlemek için telefonu yan çevir.",
     "err_kick_recorded": "Kick kayıtlı yayınları ve klipleri resmî oynatıcıyla gömülemiyor. Kanalın canlı yayın bağlantısını kullan.",
     "err_tiktok_short": "TikTok kısa bağlantısı açılamadı. Videoyu TikTok'ta açıp tam bağlantısını kopyala.",
     "err_tiktok_notfound": "Bu TikTok videosu bulunamadı ya da gizli.",
@@ -357,10 +357,7 @@
     "err_device_taken": "Bu cihaz kimliği kullanılıyor",
     "err_invalid_token": "Geçersiz bildirim anahtarı",
     "err_not_watched_together": "Bu kişiyi yalnızca birlikte izlediysen çağırabilirsin",
-    "push_test_title": "Telefon bildirimleri",
-    "push_test": "Test bildirimi gönder",
-    "push_test_sent": "Test bildirimi gönderildi, birkaç saniye içinde gelir",
-    "push_test_no_token": "Önce “Bildirimlere izin ver”e dokun"
+    "push_test_title": "Telefon bildirimleri"
   },
   "en": {
     "chip": "BETTER THAN RAVE",
@@ -635,7 +632,7 @@
     "err_vimeo_notfound": "This Vimeo video was not found or has been removed.",
     "err_vimeo_embed": "This Vimeo video cannot be played on other sites (privacy setting or password).",
     "err_twitch_clip": "Twitch clips can't be synced. Use the link of the stream or of the past broadcast.",
-    "twitch_small": "Too little room for the Twitch player. Widen the window or turn your phone sideways.",
+    "twitch_small": "The Twitch player needs at least 400×300 pixels. Turn your phone sideways to watch.",
     "err_kick_recorded": "Kick past broadcasts and clips cannot be embedded with the official player. Use the link of the live channel.",
     "err_tiktok_short": "The TikTok short link could not be opened. Open the video in TikTok and copy its full link.",
     "err_tiktok_notfound": "This TikTok video was not found or is private.",
@@ -720,10 +717,7 @@
     "err_device_taken": "This device id is in use",
     "err_invalid_token": "Invalid notification token",
     "err_not_watched_together": "You can only invite people you watched with",
-    "push_test_title": "Phone notifications",
-    "push_test": "Send a test notification",
-    "push_test_sent": "Test notification sent, it arrives in a few seconds",
-    "push_test_no_token": "Tap “Allow notifications” first"
+    "push_test_title": "Phone notifications"
   },
   "de": {
     "chip": "BETTER THAN RAVE",
@@ -998,7 +992,7 @@
     "err_vimeo_notfound": "Dieses Vimeo-Video wurde nicht gefunden oder entfernt.",
     "err_vimeo_embed": "Dieses Vimeo-Video kann auf anderen Seiten nicht abgespielt werden (Privatsphäre-Einstellung oder Passwort).",
     "err_twitch_clip": "Twitch-Clips lassen sich nicht synchronisieren. Nutze den Link des Streams oder der gespeicherten Übertragung.",
-    "twitch_small": "Zu wenig Platz für den Twitch-Player. Mach das Fenster breiter oder dreh dein Handy quer.",
+    "twitch_small": "Der Twitch-Player braucht mindestens 400×300 Pixel. Dreh dein Handy quer, um zuzuschauen.",
     "err_kick_recorded": "Aufzeichnungen und Clips von Kick lassen sich nicht mit dem offiziellen Player einbetten. Nimm den Link des Live-Kanals.",
     "err_tiktok_short": "Der TikTok-Kurzlink ließ sich nicht öffnen. Öffne das Video in TikTok und kopiere den vollständigen Link.",
     "err_tiktok_notfound": "Dieses TikTok-Video wurde nicht gefunden oder ist privat.",
@@ -1083,9 +1077,6 @@
     "err_device_taken": "Diese Geräte-ID wird verwendet",
     "err_invalid_token": "Ungültiger Benachrichtigungsschlüssel",
     "err_not_watched_together": "Du kannst nur Leute einladen, mit denen du geschaut hast",
-    "push_test_title": "Handy-Benachrichtigungen",
-    "push_test": "Testbenachrichtigung senden",
-    "push_test_sent": "Testbenachrichtigung gesendet, sie kommt in wenigen Sekunden",
-    "push_test_no_token": "Tippe zuerst auf „Benachrichtigungen erlauben“"
+    "push_test_title": "Handy-Benachrichtigungen"
   }
 }

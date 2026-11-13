@@ -33,13 +33,6 @@ export default function Settings() {
     const r = await enableAppPush(getDevice());
     toast[r.ok ? "success" : "error"](t(r.ok ? "push_on" : "push_off"));
   };
-  const testPush = async () => {
-    try {
-      const r = await api.testPush();
-      if (r.sent) toast.success(t("push_test_sent"));
-      else toast.error(t(r.reason === "no_push_token" ? "push_test_no_token" : r.reason === "push_not_configured" ? "inv_no_push" : "inv_failed"));
-    } catch (e) { toast.error(t("inv_failed")); }
-  };
   useEffect(() => { document.title = `${t("settings")} · Nexora Watch`; }, [t]);
 
   const saveNick = () => {
@@ -90,7 +83,6 @@ export default function Settings() {
           <span><Bell size={16} /> {t("push_test_title")}</span>
           <div className="settings-inline">
             <button className="settings-btn" onClick={allowPush} data-testid="settings-push-allow">{t("push_allow")}</button>
-            <button className="settings-btn" onClick={testPush} data-testid="settings-push-test">{t("push_test")}</button>
           </div>
         </section>
       )}

@@ -7,8 +7,8 @@ import "@/embeds.css";
 // Twitch plays in Twitch's own interactive embed (https://dev.twitch.tv/docs/embed/video-and-clips/).
 // Twitch's embed rules (https://dev.twitch.tv/docs/embed/): the player must be at least 400x300 and must not be
 // covered by other page elements. So the room draws nothing on top of it (Stage.jsx: no lock, chips or buttons over
-// it; the buttons sit in the bar under the picture). A smaller picture area (a portrait phone) still gets a player of
-// at least 400x300 CSS pixels, shown smaller with a CSS scale; only a very narrow area (<200 px) shows a note instead.
+// it; the buttons sit in the bar under the picture). A smaller picture area (a portrait phone) shows a "turn the
+// phone" note instead of a player; turned sideways the player starts at the room's position.
 export const TWITCH_MIN = { w: 400, h: 300 };
 export const TWITCH_TINY = 200;
 
@@ -56,10 +56,10 @@ export const TwitchPlayer = ({ video, playerRef, events, onFatal }) => {
   const fit = () => {
     const el = hostRef.current, m = mountRef.current;
     if (!el || !m) return;
-    const f = twitchFit(el.clientWidth, el.clientHeight);
-    m.style.width = `${f.w}px`;
-    m.style.height = `${f.h}px`;
-    m.style.transform = f.s < 1 ? `scale(${f.s})` : "";
+    // Twitch's rule is a visible player of at least 400x300, so it is never scaled down: below that a note is shown.
+    m.style.width = "100%";
+    m.style.height = "100%";
+    m.style.transform = "";
   };
   const fitRef = useRef(fit);
   fitRef.current = fit;
@@ -67,7 +67,7 @@ export const TwitchPlayer = ({ video, playerRef, events, onFatal }) => {
   useEffect(() => {
     const el = hostRef.current;
     const measure = () => {
-      setBig(el.clientWidth >= TWITCH_TINY && el.clientHeight > 0);
+      setBig(el.clientWidth >= TWITCH_MIN.w && el.clientHeight >= TWITCH_MIN.h);
       fitRef.current();
     };
     measure();

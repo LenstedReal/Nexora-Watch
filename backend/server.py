@@ -175,6 +175,11 @@ async def leave(code: str, request: Request):
     await R.set_online(room.code, p.participant_id, False)
     msg = await R.system_message(room.code, f"{p.nickname} ayrıldı", "left", p.nickname)
     await hub.broadcast(room.code, {"type": "message", "message": msg, "server_time": R.now_ms()})
+    if room.host_id == p.participant_id:
+        # The host left on purpose: hand over right away to whoever joined next. If nobody else is online, the clock
+        # is already past the grace period, so the first person to connect becomes the host.
+        _host_left[room.code] = time.monotonic() - HOST_HANDOVER_S - 1
+        await handover_if_needed(room.code, force=True, exclude=p.participant_id)
     return {"ok": True}
 
 
@@ -439,16 +444,18 @@ async def _announce_host(code: str, old_id: str, new_id: str, msg: dict | None):
     return view
 
 
-async def handover_if_needed(code: str):
+async def handover_if_needed(code: str, force: bool = False, exclude: str | None = None):
+    """force: the host left on purpose ("Çık") — no grace period, the next person in line takes over at once.
+    Without force (connection lost) the host keeps the room for HOST_HANDOVER_S, so a short drop does not cost it."""
     left = _host_left.get(code)
-    if left is None or time.monotonic() - left < HOST_HANDOVER_S:
+    if not force and (left is None or time.monotonic() - left < HOST_HANDOVER_S):
         return
     try:
         room = await R.get_room(code)
     except ApiError:
         _host_left.pop(code, None)
         return
-    online = set(hub.online_ids(code))
+    online = set(hub.online_ids(code)) - ({exclude} if exclude else set())
     if room.host_id in online:
         _host_left.pop(code, None)
         return

@@ -303,6 +303,26 @@ def test_metrics_do_not_count_against_write_limit(room):
     assert r.json().get("limited") is True  # per-participant cap, never a 429
 
 
+def test_host_leave_hands_over_at_once_to_the_next_joined():
+    """The host taps "Çık": the room goes at once (no grace period) to the person who joined after the host."""
+    h = requests.post(f"{API}/rooms", json={"nickname": "TEST_lh"}).json()
+    code = h["room"]["code"]
+    g1 = requests.post(f"{API}/rooms/{code}/join", json={"nickname": "TEST_l1"}).json()
+    g2 = requests.post(f"{API}/rooms/{code}/join", json={"nickname": "TEST_l2"}).json()
+
+    async def run():
+        import contextlib
+        async with contextlib.AsyncExitStack() as stack:
+            for who in (h, g1, g2):
+                c = cred(who)
+                ws = await stack.enter_async_context(websockets.connect(f"{WS}?code={code}&participant_id={c['participant_id']}&token={c['token']}"))
+                await asyncio.wait_for(ws.recv(), 10)
+            r = await asyncio.get_running_loop().run_in_executor(None, lambda: requests.post(f"{API}/rooms/{code}/leave", json=cred(h)))
+            assert r.status_code == 200
+            return requests.get(f"{API}/rooms/{code}").json()["host_id"]
+    assert asyncio.run(run()) == g1["participant"]["id"]
+
+
 def test_host_handover_manual_and_automatic():
     """The host can hand the room over; if the host disappears, the longest-present online guest takes over.
     Needs HOST_HANDOVER_SECONDS<=2 on the server (set in CI)."""
